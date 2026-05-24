@@ -1,0 +1,119 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { listSeries, getSeries } from "../../../data/content";
+
+export function getStaticPaths() {
+  return listSeries().map((s) => ({ params: { workId: s.id } }));
+}
+
+const { workId } = Astro.params;
+const work = getSeries(workId!);
+
+if (!work) {
+  return Astro.redirect("/works");
+}
+---
+
+<BaseLayout title={`${work.title} — Manga Viewer`} description={work.description}>
+  <section class="container page-section">
+    <a href="/works" class="breadcrumb text-muted">← Works</a>
+    <div class="work-header">
+      <img src={work.coverUrl} alt={work.title} class="cover" />
+      <div class="work-meta">
+        <h1>{work.title}</h1>
+        <p class="text-muted">{work.description}</p>
+        <span class="badge">{work.status}</span>
+      </div>
+    </div>
+
+    <h2>Episodes</h2>
+    <div class="episode-list">
+      {work.episodes.map((ep) => (
+        <a href={`/works/${work.id}/episodes/${ep.id}`} class="card episode-card">
+          <div class="ep-number">#{ep.episodeNumber}</div>
+          <div class="ep-info">
+            <h3>{ep.title}</h3>
+            <span class="text-muted">{ep.publishedAt}</span>
+          </div>
+          <div class="ep-pages text-muted">{ep.pages.length} pages</div>
+        </a>
+      ))}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-section {
+    padding: var(--space-xl) 0;
+  }
+
+  .breadcrumb {
+    display: inline-block;
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-lg);
+  }
+
+  .work-header {
+    display: flex;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+  }
+
+  .cover {
+    width: 120px;
+    height: 168px;
+    border-radius: var(--radius-lg);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .work-meta h1 {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-xs);
+  }
+
+  .work-meta p {
+    margin-bottom: var(--space-sm);
+    font-size: 0.9rem;
+  }
+
+  h2 {
+    font-size: 1.125rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .episode-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .episode-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    color: inherit;
+  }
+
+  .ep-number {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-accent);
+    min-width: 2.5rem;
+  }
+
+  .ep-info h3 {
+    font-size: 0.9375rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .ep-info span {
+    font-size: 0.75rem;
+  }
+
+  .ep-pages {
+    margin-left: auto;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+</style>

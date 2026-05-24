@@ -1,0 +1,128 @@
+---
+import type { SupportedLocale } from "@manga/domain";
+
+interface Props {
+  title?: string;
+  description?: string;
+  locale?: SupportedLocale;
+  ogImage?: string;
+  canonicalUrl?: string;
+}
+
+const {
+  title = "Manga Viewer",
+  description = "Open manga reading experience with structured narrative data",
+  locale = "ja",
+  ogImage,
+  canonicalUrl,
+} = Astro.props;
+
+const resolvedCanonical = canonicalUrl ?? Astro.url.href;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+
+    <!-- OGP -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={resolvedCanonical} />
+    <meta property="og:locale" content={locale === "ja" ? "ja_JP" : "en_US"} />
+    <meta property="og:type" content="website" />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta name="twitter:card" content={ogImage ? "summary_large_image" : "summary"} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <link rel="canonical" href={resolvedCanonical} />
+
+    <!-- i18n hreflang — extend when more locales are supported -->
+    <link rel="alternate" hreflang="ja" href={Astro.url.pathname} />
+    <link rel="alternate" hreflang="x-default" href={Astro.url.pathname} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="container nav-bar">
+        <a href="/" class="logo">📖 Manga</a>
+        <ul class="nav-links">
+          <li><a href="/works">Works</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <p class="text-muted">Manga Infrastructure — Open Publishing Layer for Comics</p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  @import "../styles/global.css";
+
+  .site-header {
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    background: rgba(14, 14, 18, 0.85);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 3.5rem;
+  }
+
+  .logo {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .logo:hover {
+    color: var(--color-accent);
+  }
+
+  .nav-links {
+    display: flex;
+    gap: var(--space-lg);
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .nav-links a:hover {
+    color: var(--color-text);
+  }
+
+  .site-footer {
+    border-top: 1px solid var(--color-border);
+    padding: var(--space-xl) 0;
+    margin-top: var(--space-2xl);
+    text-align: center;
+    font-size: 0.8125rem;
+  }
+</style>

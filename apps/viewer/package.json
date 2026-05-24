@@ -1,0 +1,20 @@
+{
+    "name": "@manga/viewer",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "astro dev",
+        "build": "astro build",
+        "preview": "astro preview",
+        "start": "node dist/server/entry.mjs"
+    },
+    "dependencies": {
+        "@manga/domain": "workspace:*",
+        "@astrojs/node": "^9.0.0",
+        "astro": "^5.5.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    }
+}

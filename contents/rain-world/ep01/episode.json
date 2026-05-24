@@ -1,0 +1,128 @@
+{
+    "id": "ep01",
+    "episodeNumber": 1,
+    "title": "雨の廃墟",
+    "publishedAt": "2026-01-15",
+    "pages": [
+        {
+            "id": "rain-world-ep01-p01",
+            "pageNumber": 1,
+            "images": {
+                "ja": "pages/p01.jpg"
+            },
+            "width": 500,
+            "height": 760,
+            "panels": [
+                {
+                    "id": "rain-world-ep01-p01-k01",
+                    "panelNumber": 1,
+                    "bbox": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 500,
+                        "height": 400
+                    },
+                    "reactionTags": [
+                        "surprised"
+                    ],
+                    "bubbles": [
+                        {
+                            "id": "rain-world-ep01-p01-k01-f01",
+                            "bubbleNumber": 1,
+                            "shortId": "1-1-1",
+                            "bubbleType": "speech",
+                            "textOriginal": "ここは…どこだ？",
+                            "speaker": "主人公",
+                            "bbox": {
+                                "x": 120,
+                                "y": 40,
+                                "width": 200,
+                                "height": 80
+                            }
+                        },
+                        {
+                            "id": "rain-world-ep01-p01-k01-f02",
+                            "bubbleNumber": 2,
+                            "shortId": "1-1-2",
+                            "bubbleType": "narration",
+                            "textOriginal": "雨が降りしきる廃墟に、一人の少年が立っていた。",
+                            "bbox": {
+                                "x": 100,
+                                "y": 300,
+                                "width": 280,
+                                "height": 60
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "rain-world-ep01-p01-k02",
+                    "panelNumber": 2,
+                    "bbox": {
+                        "x": 0,
+                        "y": 410,
+                        "width": 500,
+                        "height": 350
+                    },
+                    "reactionTags": [],
+                    "bubbles": [
+                        {
+                            "id": "rain-world-ep01-p01-k02-f01",
+                            "bubbleNumber": 1,
+                            "shortId": "1-2-1",
+                            "bubbleType": "thought",
+                            "textOriginal": "思い出せない…何も。",
+                            "speaker": "主人公",
+                            "bbox": {
+                                "x": 150,
+                                "y": 450,
+                                "width": 180,
+                                "height": 60
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "rain-world-ep01-p02",
+            "pageNumber": 2,
+            "images": {
+                "ja": "pages/p02.jpg"
+            },
+            "width": 500,
+            "height": 760,
+            "panels": [
+                {
+                    "id": "rain-world-ep01-p02-k01",
+                    "panelNumber": 1,
+                    "bbox": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 500,
+                        "height": 760
+                    },
+                    "reactionTags": [
+                        "crying"
+                    ],
+                    "bubbles": [
+                        {
+                            "id": "rain-world-ep01-p02-k01-f01",
+                            "bubbleNumber": 1,
+                            "shortId": "2-1-1",
+                            "bubbleType": "speech",
+                            "textOriginal": "雨がやまない…",
+                            "speaker": "主人公",
+                            "bbox": {
+                                "x": 100,
+                                "y": 80,
+                                "width": 200,
+                                "height": 60
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

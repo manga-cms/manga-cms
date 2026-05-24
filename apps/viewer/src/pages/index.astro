@@ -1,0 +1,108 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { listSeries } from "../data/content";
+
+const series = listSeries();
+---
+
+<BaseLayout title="Manga Viewer — Home" description="Open manga reading experience">
+  <section class="hero container">
+    <h1 class="hero-title">漫画を、<span class="accent">知的メディア</span>に。</h1>
+    <p class="hero-sub text-muted">
+      構造化された物語データで、共有・翻訳・注釈・権利制御が可能な漫画インフラ。
+    </p>
+    <a href="/works" class="hero-cta">Works を見る →</a>
+  </section>
+
+  <section class="featured container">
+    <h2>Featured Works</h2>
+    <div class="grid grid-2">
+      {series.map((s) => (
+        <a href={`/works/${s.id}`} class="card work-card">
+          <img src={s.coverUrl} alt={s.title} class="work-cover" />
+          <div class="work-info">
+            <h3>{s.title}</h3>
+            <p class="text-muted">{s.description}</p>
+            <span class="badge">{s.status}</span>
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    text-align: center;
+    padding: var(--space-2xl) 0;
+  }
+
+  .hero-title {
+    font-size: clamp(1.75rem, 5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: var(--space-md);
+  }
+
+  .accent {
+    background: linear-gradient(135deg, var(--color-accent), #e06aef);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    font-size: 1.05rem;
+    max-width: 36rem;
+    margin: 0 auto var(--space-lg);
+  }
+
+  .hero-cta {
+    display: inline-block;
+    background: var(--color-accent);
+    color: #fff;
+    padding: 0.6rem 1.5rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: background 0.15s ease;
+  }
+
+  .hero-cta:hover {
+    background: var(--color-accent-hover);
+    color: #fff;
+  }
+
+  .featured {
+    padding-bottom: var(--space-2xl);
+  }
+
+  .featured h2 {
+    margin-bottom: var(--space-lg);
+    font-size: 1.25rem;
+  }
+
+  .work-card {
+    display: flex;
+    gap: var(--space-md);
+    color: inherit;
+  }
+
+  .work-cover {
+    width: 80px;
+    height: 112px;
+    border-radius: var(--radius);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .work-info h3 {
+    font-size: 1rem;
+    margin-bottom: var(--space-xs);
+  }
+
+  .work-info p {
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-sm);
+  }
+</style>

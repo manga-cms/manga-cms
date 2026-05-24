@@ -1,0 +1,25 @@
+node_modules/
+dist/
+.env
+.pnpm-store/
+tmp/
+coverage/
+*.log
+
+# Turborepo
+.turbo/
+
+# Next.js / Astro
+.next/
+.astro/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# DB
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

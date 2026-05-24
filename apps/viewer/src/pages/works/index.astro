@@ -1,0 +1,77 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { listSeries } from "../../data/content";
+
+const series = listSeries();
+---
+
+<BaseLayout title="Works — Manga Viewer">
+  <section class="container page-section">
+    <h1>Works</h1>
+    <p class="text-muted page-desc">公開中の作品一覧</p>
+    <div class="grid grid-2">
+      {series.map((s) => (
+        <a href={`/works/${s.id}`} class="card work-card">
+          <img src={s.coverUrl} alt={s.title} class="work-cover" />
+          <div class="work-info">
+            <h3>{s.title}</h3>
+            <p class="text-muted">{s.description}</p>
+            <div class="work-meta">
+              <span class="badge">{s.status}</span>
+              <span class="text-muted episode-count">{s.episodes.length} episodes</span>
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-section {
+    padding: var(--space-xl) 0;
+  }
+
+  .page-section h1 {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-xs);
+  }
+
+  .page-desc {
+    margin-bottom: var(--space-lg);
+  }
+
+  .work-card {
+    display: flex;
+    gap: var(--space-md);
+    color: inherit;
+  }
+
+  .work-cover {
+    width: 90px;
+    height: 126px;
+    border-radius: var(--radius);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .work-info h3 {
+    font-size: 1rem;
+    margin-bottom: var(--space-xs);
+  }
+
+  .work-info p {
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-sm);
+  }
+
+  .work-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .episode-count {
+    font-size: 0.75rem;
+  }
+</style>

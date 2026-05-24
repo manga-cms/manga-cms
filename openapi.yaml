@@ -1,0 +1,1084 @@
+openapi: 3.1.0
+info:
+  title: Manga Infrastructure API
+  version: 0.1.0
+  description: >
+    API specification for Manga Infrastructure.
+    This API supports structured manga reading, quote/clip sharing,
+    community proposals, pack retrieval, entitlements, and purchase code redemption.
+
+servers:
+  - url: https://api.example.com/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: Reader
+  - name: Delivery
+    description: >
+      Image delivery with entitlement gating and per-user watermark injection.
+      Viewer pages embed delivery URLs (not origin URLs) in <img> tags.
+  - name: Quotes
+  - name: Clips
+  - name: Reactions
+  - name: Packs
+  - name: Proposals
+  - name: Review
+  - name: Entitlements
+  - name: Redeem
+
+security:
+  - bearerAuth: []
+
+paths:
+  /series/{seriesId}/episodes/{episodeId}/pages/{pageNumber}:
+    get:
+      tags: [Reader]
+      summary: Get reader page payload
+      description: >
+        Returns page metadata, page images for available languages,
+        panel/bubble references, and published packs relevant to the page.
+      security:
+        - {}
+        - bearerAuth: []
+      description: >
+        Returns page metadata, delivery image URLs, panel/bubble references,
+        and published packs. Accepts optional auth — if the episode requires
+        entitlement and no valid token is provided, returns a gated response
+        with `locked: true` and preview-only data.
+        Image URLs in the response are tokenized delivery URLs pointing to
+        /deliver/{pageId}, not origin file URLs.
+      parameters:
+        - $ref: '#/components/parameters/seriesId'
+        - $ref: '#/components/parameters/episodeId'
+        - name: pageNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            description: ISO 639-1 language code, e.g. en, ja
+        - name: packs
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+          description: Optional pack IDs to load
+      responses:
+        '200':
+          description: Reader page payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReaderPageResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /quotes/{seriesId}/{episodeId}/{pageNumber}/{panelNumber}/{bubbleNumber}:
+    get:
+      tags: [Quotes]
+      summary: Get quote payload
+      description: >
+        Returns a quote (bubble) with related panel preview, original text,
+        available translations, footnotes, and commentary.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/seriesId'
+        - $ref: '#/components/parameters/episodeId'
+        - $ref: '#/components/parameters/pageNumber'
+        - name: panelNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: bubbleNumber
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quote payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /clips/{seriesId}/{episodeId}/{pageNumber}/{panelStart}/{panelEnd}:
+    get:
+      tags: [Clips]
+      summary: Get clip payload
+      description: >
+        Returns a clip (panel range) including panel previews, dialogues,
+        and related translations/footnotes.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/seriesId'
+        - $ref: '#/components/parameters/episodeId'
+        - $ref: '#/components/parameters/pageNumber'
+        - name: panelStart
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: panelEnd
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Clip payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClipResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reactions:
+    get:
+      tags: [Reactions]
+      summary: Search reaction panels
+      description: Returns published reaction panels filtered by tag and/or series.
+      security: []
+      parameters:
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Reaction tag such as surprised, crying, angry
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reaction search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReactionSearchResponse'
+
+  /packs/{packId}:
+    get:
+      tags: [Packs]
+      summary: Get pack metadata and items
+      description: Returns published pack metadata and optionally items.
+      security: []
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: includeItems
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Pack payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /proposals:
+    get:
+      tags: [Proposals]
+      summary: List proposals
+      description: Returns proposals visible to the current user.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProposalStatus'
+        - name: type
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ProposalType'
+        - name: bubbleId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: panelId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: pageId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: language
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proposal list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Proposals]
+      summary: Create proposal
+      description: >
+        Creates a new proposal for translation, footnote, commentary, or correction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProposalRequest'
+      responses:
+        '201':
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /proposals/{proposalId}:
+    get:
+      tags: [Proposals]
+      summary: Get proposal detail
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proposal detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /proposals/{proposalId}/comments:
+    post:
+      tags: [Review]
+      summary: Add review comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Review comment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewCommentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /proposals/{proposalId}/review:
+    post:
+      tags: [Review]
+      summary: Review proposal
+      description: Reviewer/admin changes proposal status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [review, approve, reject, merge]
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Proposal review updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /entitlements:
+    get:
+      tags: [Entitlements]
+      summary: List current user entitlements
+      responses:
+        '200':
+          description: Entitlement list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntitlementListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /entitlements/check:
+    get:
+      tags: [Entitlements]
+      summary: Check access for a target
+      parameters:
+        - name: targetType
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/EntitlementTargetType'
+        - name: targetId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Access check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntitlementCheckResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /redeem:
+    post:
+      tags: [Redeem]
+      summary: Redeem purchase/unlock code
+      description: Redeems a purchase code and issues entitlements to the current user/session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        '200':
+          description: Code redeemed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedeemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Code already redeemed or invalid state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ---------------------------------------------------------------------------
+  # Image Delivery
+  # ---------------------------------------------------------------------------
+  /deliver/{pageId}:
+    get:
+      tags: [Delivery]
+      summary: Deliver a watermarked page image
+      description: >
+        Returns a page image with per-user watermark injected.
+        Requires a short-lived signed token (issued by the reader endpoint)
+        or a valid bearer token with an active entitlement.
+
+        The watermark seed is derived from:
+          HMAC(secret, entitlement_id + page_id + lang + session_bucket)
+
+        For free content, a generic watermark (no entitlement ID) is applied.
+        The response is cacheable per (token, lang) pair but NOT globally.
+      parameters:
+        - name: pageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+            description: ISO 639-1 code. Selects the language variant of the page image.
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+            description: >
+              Short-lived signed token issued by the reader endpoint.
+              If absent, falls back to bearer auth.
+      security:
+        - {}
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Watermarked page image
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: private, max-age=300
+            X-Watermark-Applied:
+              schema:
+                type: boolean
+          content:
+            image/avif:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Entitlement required but not present
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    seriesId:
+      name: seriesId
+      in: path
+      required: true
+      schema:
+        type: string
+    episodeId:
+      name: episodeId
+      in: path
+      required: true
+      schema:
+        type: string
+    pageNumber:
+      name: pageNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Permission denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ProposalType:
+      type: string
+      enum: [TRANSLATION, FOOTNOTE, COMMENTARY, CORRECTION]
+
+    ProposalStatus:
+      type: string
+      enum: [DRAFT, REVIEW, APPROVED, REJECTED, MERGED]
+
+    PackType:
+      type: string
+      enum: [TRANSLATION, FOOTNOTE, COMMENTARY, LEARNING, ACCESSIBILITY]
+
+    EntitlementTargetType:
+      type: string
+      enum: [SERIES, EPISODE, VOLUME, PACK, BUNDLE]
+
+    EntitlementSource:
+      type: string
+      enum: [PURCHASE, CONTRIBUTOR_REWARD, PROMO, ADMIN_GRANT, SUBSCRIPTION]
+
+    BoundingBox:
+      type: object
+      required: [x, y, width, height]
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+        width:
+          type: integer
+        height:
+          type: integer
+
+    BubbleRef:
+      type: object
+      required: [id, bubbleNumber, bbox, textOriginal]
+      properties:
+        id:
+          type: string
+        shortId:
+          type: string
+          nullable: true
+        bubbleNumber:
+          type: integer
+        bubbleType:
+          type: string
+          nullable: true
+        bbox:
+          $ref: '#/components/schemas/BoundingBox'
+        textOriginal:
+          type: string
+        speaker:
+          type: string
+          nullable: true
+
+    PanelRef:
+      type: object
+      required: [id, panelNumber, bbox]
+      properties:
+        id:
+          type: string
+        panelNumber:
+          type: integer
+        bbox:
+          $ref: '#/components/schemas/BoundingBox'
+        reactionTags:
+          type: array
+          items:
+            type: string
+        bubbles:
+          type: array
+          items:
+            $ref: '#/components/schemas/BubbleRef'
+
+    PageImageSet:
+      type: object
+      description: >
+        Locale-keyed delivery URLs. These are NOT raw origin file URLs.
+        Each URL points to /deliver/{pageId}?lang={locale}&token={signed_token}.
+        The delivery endpoint validates entitlement and injects watermark.
+      properties:
+        ja:
+          type: string
+          nullable: true
+          description: Delivery URL for the Japanese variant
+        en:
+          type: string
+          nullable: true
+          description: Delivery URL for the English variant
+        other:
+          type: object
+          additionalProperties:
+            type: string
+          description: Additional locale delivery URLs
+
+    ReaderPageResponse:
+      type: object
+      required: [seriesId, episodeId, pageId, pageNumber, panels]
+      properties:
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        pageNumber:
+          type: integer
+        images:
+          $ref: '#/components/schemas/PageImageSet'
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+        panels:
+          type: array
+          items:
+            $ref: '#/components/schemas/PanelRef'
+        availablePacks:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackSummary'
+
+    QuoteResponse:
+      type: object
+      required: [seriesId, episodeId, pageId, panelId, bubble]
+      properties:
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        panelId:
+          type: string
+        pageNumber:
+          type: integer
+        panelNumber:
+          type: integer
+        bubble:
+          $ref: '#/components/schemas/BubbleRef'
+        panelImageUrl:
+          type: string
+          nullable: true
+        translations:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackItemResponse'
+        footnotes:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackItemResponse'
+        commentary:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackItemResponse'
+
+    ClipResponse:
+      type: object
+      required: [seriesId, episodeId, pageId, panels]
+      properties:
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        pageNumber:
+          type: integer
+        panelStart:
+          type: integer
+        panelEnd:
+          type: integer
+        panels:
+          type: array
+          items:
+            $ref: '#/components/schemas/PanelRef'
+        translations:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackItemResponse'
+        footnotes:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackItemResponse'
+
+    ReactionPanelResponse:
+      type: object
+      required: [panelId, seriesId, episodeId, pageId, pageNumber, panelNumber, panelImageUrl]
+      properties:
+        panelId:
+          type: string
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        pageNumber:
+          type: integer
+        panelNumber:
+          type: integer
+        panelImageUrl:
+          type: string
+        reactionTags:
+          type: array
+          items:
+            type: string
+
+    ReactionSearchResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReactionPanelResponse'
+        nextCursor:
+          type: string
+          nullable: true
+
+    PackSummary:
+      type: object
+      required: [id, type, version, isPublished]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/PackType'
+        language:
+          type: string
+          nullable: true
+        version:
+          type: integer
+        title:
+          type: string
+          nullable: true
+        authorLabel:
+          type: string
+          nullable: true
+        isPublished:
+          type: boolean
+
+    PackItemResponse:
+      type: object
+      required: [id, text]
+      properties:
+        id:
+          type: string
+        packId:
+          type: string
+        bubbleId:
+          type: string
+          nullable: true
+        panelId:
+          type: string
+          nullable: true
+        pageId:
+          type: string
+          nullable: true
+        text:
+          type: string
+        notes:
+          type: string
+          nullable: true
+
+    PackResponse:
+      type: object
+      required: [pack]
+      properties:
+        pack:
+          $ref: '#/components/schemas/PackSummary'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackItemResponse'
+
+    ProposalResponse:
+      type: object
+      required: [id, type, status, authorId, content, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/ProposalType'
+        status:
+          $ref: '#/components/schemas/ProposalStatus'
+        authorId:
+          type: string
+        reviewerId:
+          type: string
+          nullable: true
+        seriesId:
+          type: string
+          nullable: true
+        episodeId:
+          type: string
+          nullable: true
+        pageId:
+          type: string
+          nullable: true
+        panelId:
+          type: string
+          nullable: true
+        bubbleId:
+          type: string
+          nullable: true
+        language:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        content:
+          type: string
+        rationale:
+          type: string
+          nullable: true
+        sourcePackId:
+          type: string
+          nullable: true
+        mergedPackId:
+          type: string
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        mergedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewCommentResponse'
+
+    ProposalListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProposalResponse'
+        nextCursor:
+          type: string
+          nullable: true
+
+    CreateProposalRequest:
+      type: object
+      required: [type, content]
+      properties:
+        type:
+          $ref: '#/components/schemas/ProposalType'
+        seriesId:
+          type: string
+          nullable: true
+        episodeId:
+          type: string
+          nullable: true
+        pageId:
+          type: string
+          nullable: true
+        panelId:
+          type: string
+          nullable: true
+        bubbleId:
+          type: string
+          nullable: true
+        language:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        content:
+          type: string
+        rationale:
+          type: string
+          nullable: true
+        sourcePackId:
+          type: string
+          nullable: true
+
+    ReviewCommentResponse:
+      type: object
+      required: [id, proposalId, authorId, content, createdAt]
+      properties:
+        id:
+          type: string
+        proposalId:
+          type: string
+        authorId:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    EntitlementResponse:
+      type: object
+      required: [id, targetType, targetId, source, status, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+          nullable: true
+        seriesId:
+          type: string
+          nullable: true
+        targetType:
+          $ref: '#/components/schemas/EntitlementTargetType'
+        targetId:
+          type: string
+        source:
+          $ref: '#/components/schemas/EntitlementSource'
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED, REVOKED]
+        purchaseRecordId:
+          type: string
+          nullable: true
+        packId:
+          type: string
+          nullable: true
+        grantedByUserId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    EntitlementListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntitlementResponse'
+
+    EntitlementCheckResponse:
+      type: object
+      required: [allowed]
+      properties:
+        allowed:
+          type: boolean
+        entitlement:
+          $ref: '#/components/schemas/EntitlementResponse'
+          nullable: true
+
+    RedeemResponse:
+      type: object
+      required: [success, entitlements]
+      properties:
+        success:
+          type: boolean
+        entitlements:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntitlementResponse'
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string

@@ -1,0 +1,467 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// Enums
+//
+
+enum UserRole {
+  READER
+  CONTRIBUTOR
+  REVIEWER
+  ADMIN
+}
+
+enum ProposalType {
+  TRANSLATION
+  FOOTNOTE
+  COMMENTARY
+  CORRECTION
+}
+
+enum ProposalStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  REJECTED
+  MERGED
+}
+
+enum PackType {
+  TRANSLATION
+  FOOTNOTE
+  COMMENTARY
+  LEARNING
+  ACCESSIBILITY
+}
+
+enum EntitlementSource {
+  PURCHASE
+  CONTRIBUTOR_REWARD
+  PROMO
+  ADMIN_GRANT
+  SUBSCRIPTION
+}
+
+enum EntitlementTargetType {
+  SERIES
+  EPISODE
+  VOLUME
+  PACK
+  BUNDLE
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum PurchaseProvider {
+  GUMROAD
+  STRIPE
+}
+
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum CodeStatus {
+  ISSUED
+  REDEEMED
+  REVOKED
+}
+
+enum ContributionAction {
+  TRANSLATION_CREATED
+  TRANSLATION_APPROVED
+  FOOTNOTE_CREATED
+  FOOTNOTE_APPROVED
+  COMMENTARY_CREATED
+  COMMENTARY_APPROVED
+  CORRECTION_APPROVED
+}
+
+enum WatermarkSubjectType {
+  PAGE
+  PANEL
+  CLIP
+}
+
+//
+// Users
+//
+
+model User {
+  id             String         @id @default(cuid())
+  displayName    String
+  email          String?        @unique
+  githubId       String?        @unique
+  role           UserRole       @default(READER)
+  locale         String?        // ex. "ja", "en"
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  proposals      Proposal[]
+  reviewComments ReviewComment[]
+  contributions  Contribution[]
+  entitlements   Entitlement[]
+  redeemedCodes  CodeRecord[]   @relation("RedeemedByUser")
+
+  @@index([role])
+}
+
+//
+// Content references
+// NOTE:
+// Source of truth for manga content is Git-based structured files.
+// DB only stores references needed for operations, proposals, and indexing.
+//
+
+model SeriesRef {
+  id            String        @id // canonical series_id from Git
+  title         String
+  status        String?       // ongoing / completed / etc.
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  episodes      EpisodeRef[]
+  packs         PackRef[]
+  entitlements  Entitlement[]
+
+  @@index([title])
+}
+
+model EpisodeRef {
+  id            String        @id // canonical episode_id from Git
+  seriesId      String
+  episodeNumber Int
+  title         String?
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  series        SeriesRef     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  pages         PageRef[]
+  packs         PackRef[]
+
+  @@unique([seriesId, episodeNumber])
+  @@index([seriesId])
+}
+
+model PageRef {
+  id            String        @id // canonical page_id from Git
+  episodeId     String
+  pageNumber    Int
+  imageJaUrl    String?
+  imageEnUrl    String?
+  width         Int?
+  height        Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  episode       EpisodeRef    @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  panels        PanelRef[]
+  watermarkEvents WatermarkEvent[]
+
+  @@unique([episodeId, pageNumber])
+  @@index([episodeId])
+}
+
+model PanelRef {
+  id            String        @id // canonical panel_id from Git
+  pageId        String
+  panelNumber   Int
+  bboxX         Int
+  bboxY         Int
+  bboxWidth     Int
+  bboxHeight    Int
+  reactionTags  String[]      @default([])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  page          PageRef       @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  bubbles       BubbleRef[]
+
+  @@unique([pageId, panelNumber])
+  @@index([pageId])
+}
+
+model BubbleRef {
+  id            String        @id // canonical bubble_id from Git
+  panelId       String
+  bubbleNumber  Int
+  shortId       String?       // human-facing short id like "5-2-1"
+  bubbleType    String?       // speech / thought / narration / sfx
+  bboxX         Int
+  bboxY         Int
+  bboxWidth     Int
+  bboxHeight    Int
+  textOriginal  String
+  speaker       String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  panel         PanelRef      @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  proposals     Proposal[]
+  packItems     PackItem[]
+
+  @@unique([panelId, bubbleNumber])
+  @@index([panelId])
+  @@index([shortId])
+}
+
+//
+// Packs
+// Git is source of truth, but DB can mirror published pack metadata / index
+//
+
+model PackRef {
+  id            String        @id // ex. translation-en-v1
+  seriesId      String
+  episodeId     String?
+  type          PackType
+  language      String?
+  version       Int           @default(1)
+  title         String?
+  authorLabel   String?
+  isPublished   Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  series        SeriesRef     @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  episode       EpisodeRef?   @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  items         PackItem[]
+  entitlements  Entitlement[]
+
+  @@index([seriesId])
+  @@index([episodeId])
+  @@index([type, language])
+}
+
+model PackItem {
+  id            String        @id @default(cuid())
+  packId        String
+  bubbleId      String?
+  panelId       String?
+  pageId        String?
+  text          String
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  pack          PackRef       @relation(fields: [packId], references: [id], onDelete: Cascade)
+  bubble        BubbleRef?    @relation(fields: [bubbleId], references: [id], onDelete: Cascade)
+  panel         PanelRef?     @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  page          PageRef?      @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([packId])
+  @@index([bubbleId])
+  @@index([panelId])
+  @@index([pageId])
+}
+
+//
+// Proposals / Review
+//
+
+model Proposal {
+  id              String          @id @default(cuid())
+  type            ProposalType
+  status          ProposalStatus  @default(DRAFT)
+
+  authorId        String
+  reviewerId      String?
+
+  seriesId        String?
+  episodeId       String?
+  pageId          String?
+  panelId         String?
+  bubbleId        String?
+
+  language        String?         // required for translation
+  title           String?
+  content         String
+  rationale       String?
+  sourcePackId    String?         // if proposal modifies/extends a pack
+  mergedPackId    String?         // populated after merge/publish
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  reviewedAt      DateTime?
+  mergedAt        DateTime?
+
+  author          User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reviewer        User?           @relation("ProposalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  series          SeriesRef?      @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  episode         EpisodeRef?     @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  page            PageRef?        @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  panel           PanelRef?       @relation(fields: [panelId], references: [id], onDelete: SetNull)
+  bubble          BubbleRef?      @relation(fields: [bubbleId], references: [id], onDelete: SetNull)
+
+  reviewComments  ReviewComment[]
+
+  @@index([status])
+  @@index([type])
+  @@index([authorId])
+  @@index([reviewerId])
+  @@index([bubbleId])
+  @@index([panelId])
+  @@index([pageId])
+}
+
+model ReviewComment {
+  id             String        @id @default(cuid())
+  proposalId     String
+  authorId       String
+  content        String
+  createdAt      DateTime      @default(now())
+
+  proposal       Proposal      @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  author         User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId])
+  @@index([authorId])
+}
+
+//
+// Contribution Ledger
+//
+
+model Contribution {
+  id             String              @id @default(cuid())
+  userId         String
+  proposalId     String?
+  action         ContributionAction
+  seriesId       String?
+  episodeId      String?
+  pageId         String?
+  panelId        String?
+  bubbleId       String?
+  packId         String?
+  points         Int                 @default(0)
+  approvedAt     DateTime            @default(now())
+  createdAt      DateTime            @default(now())
+
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proposal       Proposal?           @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  series         SeriesRef?          @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  episode        EpisodeRef?         @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+  page           PageRef?            @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  panel          PanelRef?           @relation(fields: [panelId], references: [id], onDelete: SetNull)
+  bubble         BubbleRef?          @relation(fields: [bubbleId], references: [id], onDelete: SetNull)
+  pack           PackRef?            @relation(fields: [packId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([bubbleId])
+  @@index([packId])
+}
+
+//
+// Entitlements
+//
+
+model Entitlement {
+  id             String                 @id @default(cuid())
+  userId         String?
+  seriesId       String?
+  targetType     EntitlementTargetType
+  targetId       String
+  source         EntitlementSource
+  status         EntitlementStatus      @default(ACTIVE)
+
+  purchaseRecordId String?
+  packId         String?                // optional convenience link if target is a pack
+  grantedByUserId String?               // admin/manual grant actor
+
+  createdAt      DateTime               @default(now())
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+
+  user           User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  series         SeriesRef?             @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  purchaseRecord PurchaseRecord?        @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
+  pack           PackRef?               @relation(fields: [packId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([targetType, targetId])
+  @@index([source])
+  @@index([status])
+}
+
+//
+// Purchase / Codes
+//
+
+model PurchaseRecord {
+  id                String           @id @default(cuid())
+  provider          PurchaseProvider
+  providerPurchaseId String          @unique
+  productId         String
+  purchaserEmail    String?          // optional, may be omitted if not retained
+  currency          String?
+  amount            Int?             // smallest unit, e.g. cents
+  status            PurchaseStatus   @default(PENDING)
+  createdAt         DateTime         @default(now())
+  completedAt       DateTime?
+
+  entitlements      Entitlement[]
+  codes             CodeRecord[]
+
+  @@index([provider, productId])
+  @@index([status])
+}
+
+model CodeRecord {
+  id                String         @id @default(cuid())
+  purchaseRecordId  String?
+  code              String         @unique
+  status            CodeStatus     @default(ISSUED)
+  redeemedByUserId  String?
+  createdAt         DateTime       @default(now())
+  redeemedAt        DateTime?
+  revokedAt         DateTime?
+
+  purchaseRecord    PurchaseRecord? @relation(fields: [purchaseRecordId], references: [id], onDelete: SetNull)
+  redeemedByUser    User?           @relation("RedeemedByUser", fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseRecordId])
+  @@index([status])
+  @@index([redeemedByUserId])
+}
+
+//
+// Watermark / Delivery audit
+//
+
+model WatermarkEvent {
+  id               String                @id @default(cuid())
+  entitlementId    String?
+  pageId           String?
+  subjectType      WatermarkSubjectType
+  subjectRef       String                // page_id / panel_id / clip token etc.
+  language         String?
+  sessionId        String?
+  seedVersion      String?
+  createdAt        DateTime              @default(now())
+
+  entitlement      Entitlement?          @relation(fields: [entitlementId], references: [id], onDelete: SetNull)
+  page             PageRef?              @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([entitlementId])
+  @@index([pageId])
+  @@index([subjectType, subjectRef])
+  @@index([sessionId])
+}

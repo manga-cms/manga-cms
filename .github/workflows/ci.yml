@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @manga/db db:generate
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Validate content schemas
+        run: |
+          node -e "
+            const { FileContentRepository } = require('@manga/domain');
+            const repo = new FileContentRepository('./contents');
+            const series = repo.listSeries();
+            console.log('Content validation passed:', series.length, 'series');
+            if (series.length === 0) process.exit(1);
+          "

@@ -1,0 +1,105 @@
+---
+/**
+ * Clip share page (SSR).
+ *
+ * Data path: API-first → content loader fallback.
+ * URL: /clip/{seriesId}/{episodeId}/{page}/{panelStart}/{panelEnd}
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { fetchClip, isApiConfigured } from "../../lib/api-client";
+import { findPanelsBySlug } from "../../data/content";
+
+export const prerender = false;
+
+const rawSlug = Astro.params.slug;
+if (!rawSlug) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+const slug = rawSlug.split("/");
+
+// --- API-first with loader fallback ---
+let seriesId = "";
+let episodeId = "";
+let pageNumber = 0;
+let panels: any[] = [];
+let found = false;
+
+if (isApiConfigured() && slug.length >= 5) {
+  const res = await fetchClip(slug[0], slug[1], Number(slug[2]), Number(slug[3]), Number(slug[4]));
+  if (res.data) {
+    seriesId = res.data.seriesId;
+    episodeId = res.data.episodeId;
+    pageNumber = res.data.pageNumber;
+    panels = res.data.panels;
+    found = true;
+  }
+}
+
+if (!found) {
+  const result = findPanelsBySlug(slug);
+  if (!result) {
+    return new Response(null, { status: 404, statusText: "Clip Not Found" });
+  }
+  seriesId = result.series.id;
+  episodeId = result.episode.id;
+  pageNumber = result.page.pageNumber;
+  panels = result.panels;
+  found = true;
+}
+
+const clipTitle = `Clip — Page ${pageNumber}, Panels ${panels.map((p: any) => p.panelNumber).join("-")}`;
+const clipDescription = panels.flatMap((p: any) =>
+    (p.bubbles ?? []).map((b: any) => b.textOriginal)
+).slice(0, 3).join(" / ") || `Clip from page ${pageNumber}`;
+---
+
+<BaseLayout title={clipTitle} description={clipDescription}>
+  <section class="container page-section">
+    <div class="clip-card card">
+      <div class="clip-source text-muted">
+        Page {pageNumber} — {panels.length} panel(s)
+      </div>
+      <div class="panels">
+        {panels.map((panel: any) => (
+          <div class="panel-preview">
+            <div class="panel-header">
+              <span class="badge">Panel {panel.panelNumber}</span>
+              {panel.reactionTags?.length > 0 && (
+                <span class="text-muted tags">
+                  {panel.reactionTags.join(", ")}
+                </span>
+              )}
+            </div>
+            {(panel.bubbles ?? []).map((b: any) => (
+              <div class="bubble">
+                <span class="badge bubble-type">{b.bubbleType}</span>
+                <span class="bubble-text">「{b.textOriginal}」</span>
+                {b.speaker && <span class="text-muted">— {b.speaker}</span>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div class="clip-actions">
+        <a href={`/works/${seriesId}/episodes/${episodeId}#p${pageNumber}`}>
+          エピソードを読む →
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-section { padding: var(--space-xl) 0; max-width: 32rem; margin: 0 auto; }
+  .clip-card { padding: var(--space-xl); }
+  .clip-source { font-size: 0.75rem; margin-bottom: var(--space-md); text-align: center; }
+  .panels { display: flex; flex-direction: column; gap: var(--space-md); margin-bottom: var(--space-lg); }
+  .panel-preview { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-md); }
+  .panel-header { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+  .tags { font-size: 0.75rem; }
+  .bubble { display: flex; align-items: baseline; gap: var(--space-sm); font-size: 0.875rem; padding: var(--space-xs) 0; }
+  .bubble-type { font-size: 0.625rem; }
+  .clip-actions { text-align: center; }
+  .clip-actions a { font-size: 0.875rem; font-weight: 500; }
+</style>

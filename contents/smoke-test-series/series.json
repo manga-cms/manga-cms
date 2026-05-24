@@ -1,0 +1,10 @@
+{
+  "id": "smoke-test-series",
+  "title": "Smoke Test Series",
+  "description": "Created by smoke test",
+  "status": "ongoing",
+  "cover": "cover.jpg",
+  "episodes": [
+    "ep01"
+  ]
+}

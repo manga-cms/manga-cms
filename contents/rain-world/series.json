@@ -1,0 +1,11 @@
+{
+    "id": "rain-world",
+    "title": "Rain World",
+    "description": "雨が止まない世界で、記憶を失った少年が真実を探す物語。",
+    "status": "ongoing",
+    "cover": "cover.jpg",
+    "episodes": [
+        "ep01",
+        "ep02"
+    ]
+}

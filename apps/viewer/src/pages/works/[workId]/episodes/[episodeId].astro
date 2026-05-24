@@ -1,0 +1,381 @@
+---
+/**
+ * Episode reader page (SSR).
+ *
+ * Data path:
+ *   1. If API_BASE is set → fetch from @manga/api (primary)
+ *   2. If API_BASE is not set → fall back to shared content loader
+ *
+ * Entitlement gating:
+ *   - API returns `gated: true` for locked episodes without entitlement
+ *   - Viewer shows preview + unlock CTA for gated content
+ *   - Ungated content uses delivery URLs (not raw image paths)
+ */
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import { fetchEpisode, isApiConfigured } from "../../../../lib/api-client";
+import { getSeries, getEpisode, getAdjacentEpisodes } from "../../../../data/content";
+
+// SSR — not prerendered. Required for entitlement gating.
+export const prerender = false;
+
+const { workId, episodeId } = Astro.params;
+
+if (!workId || !episodeId) {
+  return Astro.redirect("/works");
+}
+
+// --- Data resolution: API-first with loader fallback ---
+let seriesTitle = "";
+let episode: { title: string; episodeNumber: number; publishedAt: string; pages: any[] } | null = null;
+let prev: { id: string; title: string; episodeNumber: number } | null = null;
+let next: { id: string; title: string; episodeNumber: number } | null = null;
+let dataSource: "api" | "loader" | "none" = "none";
+let isGated = false;
+let gatedMessage = "";
+
+// Forward request cookies for SSR auth propagation
+const requestCookies = Astro.request.headers.get("cookie") ?? undefined;
+
+if (isApiConfigured()) {
+  const result = await fetchEpisode(workId, episodeId, requestCookies);
+  if (result.data) {
+    seriesTitle = result.data.series.title;
+    episode = result.data.episode;
+    prev = result.data.prev;
+    next = result.data.next;
+    dataSource = "api";
+    // Check for gated response from API
+    if ((result.data as any).gated === true) {
+      isGated = true;
+      gatedMessage = (result.data as any).message ?? "このエピソードを読むには購入が必要です";
+    }
+  }
+}
+
+// Fallback to shared content loader (ONLY for free episodes)
+if (!episode) {
+  const work = getSeries(workId);
+  const ep = getEpisode(workId, episodeId);
+  if (work && ep) {
+    seriesTitle = work.title;
+    // For loader fallback, only show ep1 (free). Others are gated.
+    if (ep.episodeNumber <= 1) {
+      episode = ep;
+      const adj = getAdjacentEpisodes(workId, episodeId);
+      prev = adj.prev ? { id: adj.prev.id, title: adj.prev.title, episodeNumber: adj.prev.episodeNumber } : null;
+      next = adj.next ? { id: adj.next.id, title: adj.next.title, episodeNumber: adj.next.episodeNumber } : null;
+      dataSource = "loader";
+    } else {
+      // Locked in fallback mode
+      episode = { title: ep.title, episodeNumber: ep.episodeNumber, publishedAt: ep.publishedAt, pages: [] };
+      isGated = true;
+      gatedMessage = "このエピソードを読むにはログインと購入が必要です";
+      dataSource = "loader";
+    }
+  }
+}
+
+// Check first page for gated flag (API response)
+if (episode && !isGated && dataSource === "api") {
+  // We need to check a page endpoint to see if it's gated
+  // For now, we rely on the episode metadata being available
+  // The actual gating happens when rendering pages
+}
+
+if (!episode) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+---
+
+<BaseLayout title={`${episode.title} — ${seriesTitle}`}>
+  <section class="container page-section">
+    <a href={`/works/${workId}`} class="breadcrumb text-muted">
+      ← {seriesTitle}
+    </a>
+
+    <div class="episode-header">
+      <span class="ep-number badge">Episode {episode.episodeNumber}</span>
+      <h1>{episode.title}</h1>
+      <p class="text-muted">{episode.publishedAt}</p>
+      {import.meta.env.DEV && dataSource === "loader" && !isGated && (
+        <p class="data-source-hint text-muted">⚠ API未接続 — ローカルデータ表示中（開発モード）</p>
+      )}
+    </div>
+
+    {isGated ? (
+      <div class="gated-overlay card">
+        <div class="gated-icon">🔒</div>
+        <h2>このエピソードはロックされています</h2>
+        <p class="text-muted">{gatedMessage || "このエピソードを読むには購入が必要です"}</p>
+        <div class="gated-actions">
+          <a href="/works" class="btn-viewer btn-primary-viewer">作品一覧に戻る</a>
+        </div>
+      </div>
+    ) : episode.pages.length === 0 ? (
+      <div class="placeholder-reader card">
+        <p class="text-muted">このエピソードのページはまだありません。</p>
+      </div>
+    ) : (
+      <div class="reader" id="reader">
+        {episode.pages.map((page: any) => (
+          <div class="page-frame" id={`p${page.pageNumber}`} data-page={page.pageNumber}>
+            <div class="page-image-wrap">
+              <img
+                src={page.images?.ja ?? "/placeholder-page.svg"}
+                alt={`Page ${page.pageNumber}`}
+                width={page.width}
+                height={page.height}
+                loading="lazy"
+              />
+            </div>
+            {(page.panels?.length ?? 0) > 0 && (
+              <div class="panel-badges">
+                {(page.panels ?? []).map((panel: any, i: number) => (
+                  <button
+                    class="panel-badge"
+                    data-panel={panel.panelNumber ?? i + 1}
+                    title={`Panel ${panel.panelNumber ?? i + 1}${panel.reactionTags?.length ? ` — ${panel.reactionTags.join(", ")}` : ""}`}
+                  >
+                    P{panel.panelNumber ?? i + 1}
+                    {panel.bubbles?.length > 0 && (
+                      <span class="bubble-count">{panel.bubbles.length}💬</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div class="page-info text-muted">
+              Page {page.pageNumber} — {page.panels?.length ?? 0} panels,{" "}
+              {(page.panels ?? []).reduce((sum: number, p: any) => sum + (p.bubbles?.length ?? 0), 0)} bubbles
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    <div class="episode-nav">
+      {prev && (
+        <a href={`/works/${workId}/episodes/${prev.id}`} class="nav-link">
+          ← {prev.title}
+        </a>
+      )}
+      <div class="spacer" />
+      {next && (
+        <a href={`/works/${workId}/episodes/${next.id}`} class="nav-link">
+          {next.title} →
+        </a>
+      )}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-section {
+    padding: var(--space-xl) 0;
+  }
+
+  .breadcrumb {
+    display: inline-block;
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-lg);
+  }
+
+  .episode-header {
+    margin-bottom: var(--space-xl);
+  }
+
+  .episode-header .ep-number {
+    margin-bottom: var(--space-sm);
+  }
+
+  .episode-header h1 {
+    font-size: 1.5rem;
+    margin-top: var(--space-sm);
+    margin-bottom: var(--space-xs);
+  }
+
+  .data-source-hint {
+    font-size: 0.75rem;
+    margin-top: var(--space-sm);
+  }
+
+  .placeholder-reader {
+    text-align: center;
+    padding: var(--space-2xl);
+  }
+
+  .reader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-lg);
+  }
+
+  .page-frame {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    max-width: 500px;
+    transition: border-color 0.3s ease, max-width 0.4s ease;
+  }
+
+  .page-frame.highlight {
+    border-color: var(--color-accent, #60a5fa);
+    box-shadow: 0 0 12px rgba(96, 165, 250, 0.3);
+  }
+
+  .page-frame.zoomed {
+    max-width: 90vw;
+    cursor: zoom-out;
+  }
+
+  .page-image-wrap {
+    cursor: zoom-in;
+    position: relative;
+  }
+
+  .page-frame.zoomed .page-image-wrap {
+    cursor: zoom-out;
+  }
+
+  .page-frame img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .panel-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: var(--space-xs) var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .panel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background: var(--color-bg, #1a1a2e);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .panel-badge:hover {
+    color: var(--color-accent, #60a5fa);
+    border-color: var(--color-accent, #60a5fa);
+  }
+
+  .bubble-count {
+    font-size: 0.625rem;
+  }
+
+  .page-info {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  .episode-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--space-xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .nav-link {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  /* Gated overlay */
+  .gated-overlay {
+    text-align: center;
+    padding: var(--space-2xl) var(--space-xl);
+    background: var(--color-surface);
+    border: 2px solid var(--color-border);
+  }
+
+  .gated-icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .gated-overlay h2 {
+    margin-bottom: var(--space-sm);
+  }
+
+  .gated-actions {
+    margin-top: var(--space-lg);
+    display: flex;
+    gap: var(--space-md);
+    justify-content: center;
+  }
+
+  .btn-viewer {
+    display: inline-block;
+    padding: 0.625rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.875rem;
+    text-decoration: none;
+  }
+
+  .btn-primary-viewer {
+    background: var(--color-primary);
+    color: white;
+  }
+</style>
+
+<script>
+  // ===================================================================
+  // Reader UX: Panel highlight, Zoom, Deep-link scroll
+  // ===================================================================
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // --- 1. Deep-link scroll ---
+    if (location.hash) {
+      const target = document.querySelector(location.hash);
+      if (target) {
+        setTimeout(() => {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          target.classList.add("highlight");
+          setTimeout(() => target.classList.remove("highlight"), 1500);
+        }, 300);
+      }
+    }
+
+    // --- 2. Zoom (click to toggle) ---
+    document.querySelectorAll(".page-image-wrap").forEach((wrap) => {
+      wrap.addEventListener("click", () => {
+        const frame = wrap.closest(".page-frame");
+        if (!frame) return;
+        frame.classList.toggle("zoomed");
+      });
+    });
+
+    // --- 3. Panel highlight (badge click) ---
+    document.querySelectorAll(".panel-badge").forEach((badge) => {
+      badge.addEventListener("click", () => {
+        const frame = badge.closest(".page-frame");
+        if (!frame) return;
+        frame.classList.add("highlight");
+        frame.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => frame.classList.remove("highlight"), 1500);
+      });
+    });
+  });
+</script>
+
