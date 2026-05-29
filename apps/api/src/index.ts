@@ -9,7 +9,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { join, dirname } from "node:path";
+import { extname, isAbsolute, join, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync, existsSync } from "node:fs";
 import { getEmailProvider, isEmailConfigured } from "./email.js";
@@ -19,6 +19,7 @@ import {
     createFileWriter,
     createFileIngestionRepository,
     createFileEntitlementRepository,
+    createFileFeedbackRepository,
     DefaultAccessPolicy,
     generateDeliveryToken,
     verifyDeliveryToken,
@@ -27,6 +28,7 @@ import {
     verifyAuthToken,
     type DevUser,
     type EntitlementRepository,
+    type FeedbackPayload,
     type IngestionRepository,
 } from "@manga/domain";
 
@@ -89,6 +91,9 @@ const writer = createFileWriter(CONTENTS_DIR, () => {
     (readRepo as any).loaded = false;
     (readRepo as any).seriesCache = new Map();
 });
+const FEEDBACK_DIR = process.env.FEEDBACK_DIR ?? join(__dirname, "../../../feedback");
+const feedbackRepo = createFileFeedbackRepository(FEEDBACK_DIR);
+const feedbackLimiter = new RateLimiter({ maxRequests: IS_PRODUCTION ? 10 : 60, windowSeconds: 60 });
 
 const accessPolicy = new DefaultAccessPolicy();
 
@@ -118,6 +123,13 @@ if (process.env.DATABASE_URL) {
 }
 
 const app = new Hono().basePath("/api/v1");
+
+function makeDeliveryUrl(c: any, pageId: string, token: string, locale: string): string {
+    const origin = process.env.DELIVERY_PUBLIC_ORIGIN ?? new URL(c.req.url).origin;
+    const path = `/api/v1/deliver/${encodeURIComponent(pageId)}`;
+    const params = new URLSearchParams({ token, locale });
+    return `${origin}${path}?${params.toString()}`;
+}
 
 // ---------------------------------------------------------------------------
 // CORS — env-based allowed origins for launch safety
@@ -167,6 +179,90 @@ function requireInt(c: any, raw: string, name: string): number | Response {
         return c.json({ error: { code: "BAD_REQUEST", message: `Invalid ${name}: expected integer` } }, 400);
     }
     return n;
+}
+
+function isPathInside(baseDir: string, targetPath: string): boolean {
+    const rel = relative(baseDir, targetPath);
+    return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+const FEEDBACK_ISSUE_TYPES = new Set([
+    "typo",
+    "mistranslation",
+    "better_translation",
+    "missing_note",
+    "display",
+    "broken_link",
+    "spoiler",
+    "other",
+]);
+
+const READER_MODES = new Set(["read", "explore", "completion"]);
+
+function validateFeedbackPayload(body: any): { ok: true; payload: FeedbackPayload } | { ok: false; message: string } {
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return { ok: false, message: "body must be an object" };
+    }
+    for (const field of ["series_id", "episode_id", "mode", "issue_type", "source_url"]) {
+        if (typeof body[field] !== "string" || body[field].trim().length === 0) {
+            return { ok: false, message: `${field} is required` };
+        }
+    }
+    if (!READER_MODES.has(body.mode)) {
+        return { ok: false, message: "mode is invalid" };
+    }
+    if (!FEEDBACK_ISSUE_TYPES.has(body.issue_type)) {
+        return { ok: false, message: "issue_type is invalid" };
+    }
+    try {
+        new URL(body.source_url);
+    } catch {
+        return { ok: false, message: "source_url must be a valid URL" };
+    }
+    for (const field of ["page_id", "panel_id", "bubble_id", "user_id"]) {
+        if (body[field] !== undefined && body[field] !== null && typeof body[field] !== "string") {
+            return { ok: false, message: `${field} must be a string or null` };
+        }
+    }
+    const maxLengths: Record<string, number> = {
+        comment: 1000,
+        current_text: 2000,
+        current_translation: 2000,
+        suggested_text: 2000,
+        user_agent: 500,
+        client_time: 80,
+        lang: 16,
+        website: 200,
+    };
+    for (const [field, max] of Object.entries(maxLengths)) {
+        if (body[field] !== undefined && body[field] !== null) {
+            if (typeof body[field] !== "string") return { ok: false, message: `${field} must be a string` };
+            if (body[field].length > max) return { ok: false, message: `${field} is too long` };
+        }
+    }
+
+    return {
+        ok: true,
+        payload: {
+            series_id: body.series_id,
+            episode_id: body.episode_id,
+            page_id: body.page_id ?? null,
+            panel_id: body.panel_id ?? null,
+            bubble_id: body.bubble_id ?? null,
+            mode: body.mode,
+            issue_type: body.issue_type,
+            comment: body.comment,
+            lang: body.lang,
+            current_text: body.current_text,
+            current_translation: body.current_translation,
+            suggested_text: body.suggested_text,
+            user_id: body.user_id ?? null,
+            source_url: body.source_url,
+            user_agent: body.user_agent,
+            client_time: body.client_time,
+            website: body.website,
+        },
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +355,54 @@ app.get("/health", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// Feedback — lightweight Reader reports/proposals.
+// Stored privately; does not write canonical content or packs.
+// ---------------------------------------------------------------------------
+
+app.post("/feedback", async (c) => {
+    const clientIp = getClientIp(c);
+    const limited = feedbackLimiter.check(`feedback:${clientIp}`);
+    if (!limited.allowed) {
+        return c.json({
+            ok: false,
+            error: {
+                code: "RATE_LIMITED",
+                message: `Too many feedback submissions. Retry after ${limited.retryAfterSeconds}s`,
+            },
+        }, 429);
+    }
+
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const result = validateFeedbackPayload(body);
+    if (!result.ok) {
+        return c.json({ ok: false, error: { code: "VALIDATION_ERROR", message: result.message } }, 400);
+    }
+
+    const { website, ...payload } = result.payload;
+    if (website && website.trim().length > 0) {
+        // Honeypot: pretend success but do not persist spammy submissions.
+        return c.json({ ok: true, feedback_id: "fb_ignored" }, 201);
+    }
+
+    const record = feedbackRepo.save({
+        payload: {
+            ...payload,
+            user_id: payload.user_id ?? getUser(c)?.id ?? null,
+        },
+        clientIp,
+        userAgent: c.req.header("user-agent") ?? null,
+    });
+
+    return c.json({ ok: true, feedback_id: record.feedback_id }, 201);
+});
+
+// ---------------------------------------------------------------------------
 // Reader — GET /series/:seriesId/episodes/:episodeId/pages/:pageNumber
 // ---------------------------------------------------------------------------
 
@@ -298,7 +442,7 @@ app.get("/series/:seriesId/episodes/:episodeId/pages/:pageNumber", async (c) => 
     for (const [locale, _path] of Object.entries(page.images)) {
         if (_path) {
             const token = generateDeliveryToken(page.id, userId);
-            deliveryImages[locale] = `/api/v1/deliver/${page.id}?token=${token}&locale=${locale}`;
+            deliveryImages[locale] = makeDeliveryUrl(c, page.id, token, locale);
         }
     }
 
@@ -377,7 +521,7 @@ app.get("/series/:seriesId/episodes/:episodeId", async (c) => {
             for (const [locale, _path] of Object.entries(page.images ?? {})) {
                 if (_path) {
                     const token = generateDeliveryToken(page.id, userId);
-                    deliveryImages[locale] = `/api/v1/deliver/${page.id}?token=${token}&locale=${locale}`;
+                    deliveryImages[locale] = makeDeliveryUrl(c, page.id, token, locale);
                 }
             }
             return { ...page, images: deliveryImages };
@@ -608,6 +752,53 @@ app.get("/admin/series/:id/episodes/:epId", (c) => {
     const ep = readRepo.getEpisode(seriesId, epId);
     if (!ep) return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
     return c.json(ep);
+});
+
+// GET /admin/series/:id/episodes/:epId/pages/:pageNumber/image — CMS preview image
+app.get("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const seriesId = c.req.param("id");
+    const epId = c.req.param("epId");
+    const pageNumber = requireInt(c, c.req.param("pageNumber"), "pageNumber");
+    if (pageNumber instanceof Response) return pageNumber;
+    const locale = c.req.query("locale") ?? "ja";
+
+    const ep = readRepo.getEpisode(seriesId, epId);
+    if (!ep) return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
+
+    const page = ep.pages.find((p: any) => p.pageNumber === pageNumber);
+    if (!page) return c.json({ error: { code: "NOT_FOUND", message: "Page not found" } }, 404);
+
+    const imagePath = (page.images as any)[locale] ?? (page.images as any).ja;
+    if (!imagePath) return c.json({ error: { code: "NOT_FOUND", message: "Page image not found" } }, 404);
+
+    const episodeAssetDir = resolve(CONTENTS_DIR, seriesId, epId);
+    const absPath = resolve(episodeAssetDir, imagePath);
+    if (!isPathInside(episodeAssetDir, absPath)) {
+        return c.json({ error: { code: "INVALID_IMAGE_PATH", message: "Image path escapes episode directory" } }, 400);
+    }
+
+    const ext = extname(absPath).toLowerCase();
+    const mimeMap: Record<string, string> = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    };
+    const contentType = mimeMap[ext];
+    if (!contentType) {
+        return c.json({ error: { code: "INVALID_IMAGE_PATH", message: "Unsupported image extension" } }, 400);
+    }
+    if (!existsSync(absPath)) {
+        return c.json({ error: { code: "NOT_FOUND", message: "Image file not found" } }, 404);
+    }
+
+    const fileData = readFileSync(absPath);
+    return new Response(fileData, {
+        status: 200,
+        headers: { "Content-Type": contentType, "Cache-Control": "private, no-store" },
+    });
 });
 
 // POST /admin/series/:id/publish — Reload read cache
@@ -944,14 +1135,29 @@ app.get("/deliver/:pageId", (c) => {
     // Apply watermark stub (returns path unchanged for now)
     const finalRelPath = applyWatermark(originRelPath, payload.userId);
 
-    // Resolve to absolute filesystem path
-    const absPath = join(CONTENTS_DIR, seriesId, episodeId, finalRelPath);
+    // Resolve inside the episode asset directory; content metadata must not
+    // be able to escape via "../" or absolute paths.
+    const episodeAssetDir = resolve(CONTENTS_DIR, seriesId, episodeId);
+    const absPath = resolve(episodeAssetDir, finalRelPath);
+    if (!isPathInside(episodeAssetDir, absPath)) {
+        return c.json({ error: { code: "INVALID_IMAGE_PATH", message: "Image path escapes episode directory" } }, 400);
+    }
+
+    const ext = extname(absPath).toLowerCase();
+    const mimeMap: Record<string, string> = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    };
+    const contentType = mimeMap[ext];
+    if (!contentType) {
+        return c.json({ error: { code: "INVALID_IMAGE_PATH", message: "Unsupported image extension" } }, 400);
+    }
 
     // Serve actual image bytes if file exists
     if (existsSync(absPath)) {
-        const ext = absPath.split(".").pop()?.toLowerCase() ?? "jpg";
-        const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
-        const contentType = mimeMap[ext] ?? "application/octet-stream";
         const fileData = readFileSync(absPath);
         return new Response(fileData, {
             status: 200,
@@ -965,7 +1171,6 @@ app.get("/deliver/:pageId", (c) => {
         pageId,
         locale,
         resolvedPath: finalRelPath,
-        absolutePath: absPath,
         fileExists: false,
         note: "Image file not found on disk. Place the file at the resolved path to enable delivery.",
     }, 200);
