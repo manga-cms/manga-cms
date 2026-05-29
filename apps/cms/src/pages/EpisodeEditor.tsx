@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { saveEpisode, getSeries } from "../api";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { saveEpisode, getSeries, getAdminEpisode } from "../api";
 
 interface PageInput {
     pageNumber: number;
@@ -34,14 +34,9 @@ export default function EpisodeEditor() {
             if (ep) {
                 setEpTitle(ep.title);
                 setEpNum(ep.episodeNumber);
-                // Fetch full episode via admin endpoint (bypasses gating)
-                fetch(`/api/v1/admin/series/${seriesId}/episodes/${epId}`, {
-                    credentials: "include",
-                })
-                    .then((r) => r.json())
-                    .then((data) => {
-                        // Admin endpoint returns episode directly
-                        const ep = data.episode ?? data;
+                getAdminEpisode(seriesId, epId!)
+                    .then((ep) => {
+                        if (!ep) return;
                         const pages = ep.pages ?? [];
                         if (pages.length) {
                             setPages(pages.map((p: any) => ({
@@ -186,6 +181,9 @@ export default function EpisodeEditor() {
                     <button type="submit" className="btn btn-primary" disabled={saving}>
                         {saving ? "保存中…" : "エピソードを保存"}
                     </button>
+                    <Link to={`/works/${seriesId}/episodes/${epId}/structure`} className="btn btn-outline">
+                        コマ/フキダシを編集
+                    </Link>
                     <button type="button" onClick={() => nav(`/works/${seriesId}`)} className="btn btn-outline">
                         戻る
                     </button>

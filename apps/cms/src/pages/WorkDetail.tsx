@@ -99,7 +99,7 @@ export default function WorkDetail() {
             ) : (
                 <div className="episode-list">
                     {work.episodes.map((ep) => (
-                        <Link to={`/works/${id}/episodes/${ep.id}`} key={ep.id} className="card card-link">
+                        <div key={ep.id} className="card">
                             <div className="card-title">
                                 <span className="badge" style={{ marginRight: "0.5rem" }}>EP{ep.episodeNumber}</span>
                                 {ep.title}
@@ -107,7 +107,11 @@ export default function WorkDetail() {
                             <div className="card-meta">
                                 {ep.pageCount} page(s) — {ep.publishedAt}
                             </div>
-                        </Link>
+                            <div className="section-actions">
+                                <Link to={`/works/${id}/episodes/${ep.id}`} className="btn btn-outline">Episode</Link>
+                                <Link to={`/works/${id}/episodes/${ep.id}/structure`} className="btn btn-primary">Structure Review</Link>
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}

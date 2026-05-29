@@ -18,6 +18,49 @@ export interface SeriesDetail {
     episodes: { id: string; episodeNumber: number; title: string; publishedAt: string; pageCount: number }[];
 }
 
+export interface BoundingBox {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface BubbleData {
+    id: string;
+    bubbleNumber: number;
+    shortId: string;
+    bubbleType: "speech" | "thought" | "narration" | "sfx" | "caption" | "other";
+    textOriginal: string;
+    speaker?: string;
+    bbox: BoundingBox;
+}
+
+export interface PanelData {
+    id: string;
+    panelNumber: number;
+    bbox: BoundingBox;
+    reactionTags: string[];
+    bubbles: BubbleData[];
+}
+
+export interface PageData {
+    id: string;
+    pageNumber: number;
+    displayRef?: string;
+    images: Record<string, string>;
+    width: number;
+    height: number;
+    panels: PanelData[];
+}
+
+export interface EpisodeData {
+    id: string;
+    episodeNumber: number;
+    title: string;
+    publishedAt: string;
+    pages: PageData[];
+}
+
 export async function listSeries(): Promise<SeriesItem[]> {
     const res = await fetch(`${API}/series`);
     const data = await res.json();
@@ -70,6 +113,19 @@ export async function saveEpisode(seriesId: string, input: {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message ?? "Failed to save episode");
     return data;
+}
+
+export async function getAdminEpisode(seriesId: string, episodeId: string): Promise<EpisodeData | null> {
+    const res = await fetch(`${API}/admin/series/${seriesId}/episodes/${episodeId}`, {
+        credentials: "include",
+    });
+    if (!res.ok) return null;
+    return res.json();
+}
+
+export function getAdminPageImageUrl(seriesId: string, episodeId: string, pageNumber: number, locale = "ja") {
+    const params = new URLSearchParams({ locale });
+    return `${API}/admin/series/${seriesId}/episodes/${episodeId}/pages/${pageNumber}/image?${params.toString()}`;
 }
 
 export async function publishSeries(seriesId: string) {
@@ -257,4 +313,3 @@ export async function revokeEntitlement(entitlementId: string) {
     if (!res.ok) throw new Error(data.error?.message ?? "Revoke failed");
     return data;
 }
-

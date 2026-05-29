@@ -8,6 +8,7 @@ import JobsList from "./pages/JobsList";
 import CreateJob from "./pages/CreateJob";
 import JobDetail from "./pages/JobDetail";
 import Entitlements from "./pages/Entitlements";
+import PageStructureReview from "./pages/PageStructureReview";
 
 export default function App() {
     return (
@@ -27,6 +28,7 @@ export default function App() {
                     <Route path="/works/new" element={<CreateWork />} />
                     <Route path="/works/:id" element={<WorkDetail />} />
                     <Route path="/works/:id/episodes/:epId" element={<EpisodeEditor />} />
+                    <Route path="/works/:id/episodes/:epId/structure" element={<PageStructureReview />} />
                     <Route path="/works/:id/publish" element={<Publish />} />
                     <Route path="/ingestion" element={<JobsList />} />
                     <Route path="/ingestion/new" element={<CreateJob />} />
