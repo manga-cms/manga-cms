@@ -23,6 +23,9 @@ importers:
       '@manga/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@manga/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
       hono:
         specifier: ^4.6.0
         version: 4.12.7

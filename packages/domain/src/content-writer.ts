@@ -6,10 +6,12 @@
  * or GitHub-sync implementation later.
  */
 
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { SeriesManifestSchema, EpisodeSchema } from "@manga/schemas";
 import type { Series, Episode } from "./types.js";
+import { isSafePathSegment, isSafeRelativeAssetPath } from "./path-safety.js";
 
 // ---------------------------------------------------------------------------
 // Write repository interface
@@ -50,6 +52,23 @@ export interface ContentWriteRepository {
 // Filesystem implementation
 // ---------------------------------------------------------------------------
 
+function writeJsonAtomic(filePath: string, value: unknown): void {
+    const tmpPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(value, null, 2) + "\n", "utf-8");
+    renameSync(tmpPath, filePath);
+}
+
+function validateEpisodeAssetPaths(input: SaveEpisodeInput): string | null {
+    for (const page of input.pages ?? []) {
+        for (const [locale, imagePath] of Object.entries(page.images ?? {})) {
+            if (imagePath !== undefined && !isSafeRelativeAssetPath(imagePath)) {
+                return `Invalid image path for page ${page.pageNumber} locale "${locale}"`;
+            }
+        }
+    }
+    return null;
+}
+
 export class FileContentWriter implements ContentWriteRepository {
     constructor(
         private contentsDir: string,
@@ -57,6 +76,13 @@ export class FileContentWriter implements ContentWriteRepository {
     ) { }
 
     createSeries(input: CreateSeriesInput): { success: true; series: Series } | { success: false; error: string } {
+        if (!isSafePathSegment(input.id)) {
+            return { success: false, error: "Series id must be a safe path segment" };
+        }
+        if (input.cover !== undefined && !isSafeRelativeAssetPath(input.cover)) {
+            return { success: false, error: "Cover must be a safe relative asset path" };
+        }
+
         const seriesDir = join(this.contentsDir, input.id);
 
         if (existsSync(join(seriesDir, "series.json"))) {
@@ -79,11 +105,7 @@ export class FileContentWriter implements ContentWriteRepository {
         }
 
         mkdirSync(seriesDir, { recursive: true });
-        writeFileSync(
-            join(seriesDir, "series.json"),
-            JSON.stringify(manifest, null, 2) + "\n",
-            "utf-8",
-        );
+        writeJsonAtomic(join(seriesDir, "series.json"), manifest);
 
         this.onWrite?.();
 
@@ -101,6 +123,13 @@ export class FileContentWriter implements ContentWriteRepository {
     }
 
     updateSeries(seriesId: string, input: UpdateSeriesInput): { success: true; series: Series } | { success: false; error: string } {
+        if (!isSafePathSegment(seriesId)) {
+            return { success: false, error: "Series id must be a safe path segment" };
+        }
+        if (input.cover !== undefined && !isSafeRelativeAssetPath(input.cover)) {
+            return { success: false, error: "Cover must be a safe relative asset path" };
+        }
+
         const manifestPath = join(this.contentsDir, seriesId, "series.json");
 
         if (!existsSync(manifestPath)) {
@@ -121,7 +150,7 @@ export class FileContentWriter implements ContentWriteRepository {
             return { success: false, error: `Validation failed: ${result.error.issues.map(i => i.message).join(", ")}` };
         }
 
-        writeFileSync(manifestPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
+        writeJsonAtomic(manifestPath, updated);
         this.onWrite?.();
 
         return {
@@ -138,6 +167,17 @@ export class FileContentWriter implements ContentWriteRepository {
     }
 
     saveEpisode(seriesId: string, input: SaveEpisodeInput): { success: true } | { success: false; error: string } {
+        if (!isSafePathSegment(seriesId)) {
+            return { success: false, error: "Series id must be a safe path segment" };
+        }
+        if (!isSafePathSegment(input.id)) {
+            return { success: false, error: "Episode id must be a safe path segment" };
+        }
+        const assetPathError = validateEpisodeAssetPaths(input);
+        if (assetPathError) {
+            return { success: false, error: assetPathError };
+        }
+
         const seriesDir = join(this.contentsDir, seriesId);
         const manifestPath = join(seriesDir, "series.json");
 
@@ -162,18 +202,14 @@ export class FileContentWriter implements ContentWriteRepository {
         // Write episode
         const epDir = join(seriesDir, input.id);
         mkdirSync(epDir, { recursive: true });
-        writeFileSync(
-            join(epDir, "episode.json"),
-            JSON.stringify(epData, null, 2) + "\n",
-            "utf-8",
-        );
+        writeJsonAtomic(join(epDir, "episode.json"), epData);
 
         // Update manifest episodes list
         const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
         if (!manifest.episodes.includes(input.id)) {
             manifest.episodes.push(input.id);
             manifest.episodes.sort();
-            writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+            writeJsonAtomic(manifestPath, manifest);
         }
 
         this.onWrite?.();
