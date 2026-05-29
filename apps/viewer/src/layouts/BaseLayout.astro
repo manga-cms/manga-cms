@@ -6,6 +6,7 @@ interface Props {
   description?: string;
   locale?: SupportedLocale;
   ogImage?: string;
+  ogType?: "website" | "article";
   canonicalUrl?: string;
   immersive?: boolean;
 }
@@ -15,11 +16,14 @@ const {
   description = "Open manga reading experience with structured narrative data",
   locale = "ja",
   ogImage,
+  ogType = "website",
   canonicalUrl,
   immersive = false,
 } = Astro.props;
 
 const resolvedCanonical = canonicalUrl ?? Astro.url.href;
+const resolvedOgImage = ogImage ? new URL(ogImage, Astro.url).href : undefined;
+const resolvedPathUrl = new URL(Astro.url.pathname, Astro.url).href;
 ---
 
 <!doctype html>
@@ -35,16 +39,17 @@ const resolvedCanonical = canonicalUrl ?? Astro.url.href;
     <meta property="og:description" content={description} />
     <meta property="og:url" content={resolvedCanonical} />
     <meta property="og:locale" content={locale === "ja" ? "ja_JP" : "en_US"} />
-    <meta property="og:type" content="website" />
-    {ogImage && <meta property="og:image" content={ogImage} />}
-    <meta name="twitter:card" content={ogImage ? "summary_large_image" : "summary"} />
+    <meta property="og:type" content={ogType} />
+    {resolvedOgImage && <meta property="og:image" content={resolvedOgImage} />}
+    <meta name="twitter:card" content={resolvedOgImage ? "summary_large_image" : "summary"} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
+    {resolvedOgImage && <meta name="twitter:image" content={resolvedOgImage} />}
     <link rel="canonical" href={resolvedCanonical} />
 
     <!-- i18n hreflang — extend when more locales are supported -->
-    <link rel="alternate" hreflang="ja" href={Astro.url.pathname} />
-    <link rel="alternate" hreflang="x-default" href={Astro.url.pathname} />
+    <link rel="alternate" hreflang="ja" href={resolvedPathUrl} />
+    <link rel="alternate" hreflang="x-default" href={resolvedPathUrl} />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

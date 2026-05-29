@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { readFileSync, existsSync } from "node:fs";
 import { getEmailProvider, isEmailConfigured } from "./email.js";
 import { RateLimiter } from "./rate-limit.js";
+import { FeedbackPayloadSchema } from "@manga/schemas";
 import {
     FileContentRepository,
     createFileWriter,
@@ -127,7 +128,7 @@ const app = new Hono().basePath("/api/v1");
 function makeDeliveryUrl(c: any, pageId: string, token: string, locale: string): string {
     const origin = process.env.DELIVERY_PUBLIC_ORIGIN ?? new URL(c.req.url).origin;
     const path = `/api/v1/deliver/${encodeURIComponent(pageId)}`;
-    const params = new URLSearchParams({ token, locale });
+    const params = new URLSearchParams({ token, lang: locale });
     return `${origin}${path}?${params.toString()}`;
 }
 
@@ -186,83 +187,16 @@ function isPathInside(baseDir: string, targetPath: string): boolean {
     return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
-const FEEDBACK_ISSUE_TYPES = new Set([
-    "typo",
-    "mistranslation",
-    "better_translation",
-    "missing_note",
-    "display",
-    "broken_link",
-    "spoiler",
-    "other",
-]);
-
-const READER_MODES = new Set(["read", "explore", "completion"]);
-
 function validateFeedbackPayload(body: any): { ok: true; payload: FeedbackPayload } | { ok: false; message: string } {
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-        return { ok: false, message: "body must be an object" };
-    }
-    for (const field of ["series_id", "episode_id", "mode", "issue_type", "source_url"]) {
-        if (typeof body[field] !== "string" || body[field].trim().length === 0) {
-            return { ok: false, message: `${field} is required` };
-        }
-    }
-    if (!READER_MODES.has(body.mode)) {
-        return { ok: false, message: "mode is invalid" };
-    }
-    if (!FEEDBACK_ISSUE_TYPES.has(body.issue_type)) {
-        return { ok: false, message: "issue_type is invalid" };
-    }
-    try {
-        new URL(body.source_url);
-    } catch {
-        return { ok: false, message: "source_url must be a valid URL" };
-    }
-    for (const field of ["page_id", "panel_id", "bubble_id", "user_id"]) {
-        if (body[field] !== undefined && body[field] !== null && typeof body[field] !== "string") {
-            return { ok: false, message: `${field} must be a string or null` };
-        }
-    }
-    const maxLengths: Record<string, number> = {
-        comment: 1000,
-        current_text: 2000,
-        current_translation: 2000,
-        suggested_text: 2000,
-        user_agent: 500,
-        client_time: 80,
-        lang: 16,
-        website: 200,
-    };
-    for (const [field, max] of Object.entries(maxLengths)) {
-        if (body[field] !== undefined && body[field] !== null) {
-            if (typeof body[field] !== "string") return { ok: false, message: `${field} must be a string` };
-            if (body[field].length > max) return { ok: false, message: `${field} is too long` };
-        }
+    const result = FeedbackPayloadSchema.safeParse(body);
+    if (!result.success) {
+        const message = result.error.issues
+            .map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`)
+            .join("; ");
+        return { ok: false, message };
     }
 
-    return {
-        ok: true,
-        payload: {
-            series_id: body.series_id,
-            episode_id: body.episode_id,
-            page_id: body.page_id ?? null,
-            panel_id: body.panel_id ?? null,
-            bubble_id: body.bubble_id ?? null,
-            mode: body.mode,
-            issue_type: body.issue_type,
-            comment: body.comment,
-            lang: body.lang,
-            current_text: body.current_text,
-            current_translation: body.current_translation,
-            suggested_text: body.suggested_text,
-            user_id: body.user_id ?? null,
-            source_url: body.source_url,
-            user_agent: body.user_agent,
-            client_time: body.client_time,
-            website: body.website,
-        },
-    };
+    return { ok: true, payload: result.data };
 }
 
 // ---------------------------------------------------------------------------
@@ -1100,7 +1034,7 @@ app.post("/admin/entitlements/revoke", async (c) => {
 app.get("/deliver/:pageId", (c) => {
     const pageId = c.req.param("pageId");
     const token = c.req.query("token") ?? "";
-    const locale = c.req.query("locale") ?? "ja";
+    const locale = c.req.query("lang") ?? c.req.query("locale") ?? "ja";
 
     // Verify delivery token
     const payload = verifyDeliveryToken(token);
@@ -1161,7 +1095,11 @@ app.get("/deliver/:pageId", (c) => {
         const fileData = readFileSync(absPath);
         return new Response(fileData, {
             status: 200,
-            headers: { "Content-Type": contentType, "Cache-Control": "private, max-age=300" },
+            headers: {
+                "Content-Type": contentType,
+                "Cache-Control": "private, max-age=300",
+                "X-Watermark-Applied": "false",
+            },
         });
     }
 

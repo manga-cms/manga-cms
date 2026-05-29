@@ -13,6 +13,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { SeriesManifestSchema, EpisodeSchema } from "@manga/schemas";
 import type { Series, Episode, Page, Panel, Bubble } from "./types.js";
+import { isSafePathSegment } from "./path-safety.js";
 
 // ---------------------------------------------------------------------------
 // Validation error
@@ -98,6 +99,13 @@ export class FileContentRepository implements ContentRepository {
             .map((d: { name: string }) => d.name);
 
         for (const seriesDir of dirs) {
+            if (!isSafePathSegment(seriesDir)) {
+                this.validationErrors.push(
+                    new ContentValidationError(seriesDir, "Unsafe series directory name"),
+                );
+                continue;
+            }
+
             const manifestPath = join(this.contentsDir, seriesDir, "series.json");
             if (!existsSync(manifestPath)) continue;
 
@@ -111,9 +119,22 @@ export class FileContentRepository implements ContentRepository {
                 continue; // Skip this series — don't crash
             }
             const manifest = manifestResult.data;
+            if (manifest.id !== seriesDir || !isSafePathSegment(manifest.id)) {
+                this.validationErrors.push(
+                    new ContentValidationError(manifestPath, "Series manifest id must match its safe directory name"),
+                );
+                continue;
+            }
 
             const episodes: Episode[] = [];
             for (const epId of manifest.episodes) {
+                if (!isSafePathSegment(epId)) {
+                    this.validationErrors.push(
+                        new ContentValidationError(manifestPath, `Unsafe episode id in manifest: ${epId}`),
+                    );
+                    continue;
+                }
+
                 const epPath = join(this.contentsDir, seriesDir, epId, "episode.json");
                 if (!existsSync(epPath)) continue;
 
