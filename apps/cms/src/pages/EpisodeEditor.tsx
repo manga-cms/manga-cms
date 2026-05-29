@@ -1,17 +1,31 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { saveEpisode, getSeries, getAdminEpisode } from "../api";
+import { saveEpisode, getSeries, getAdminEpisode, type PageData } from "../api";
 
 interface PageInput {
+    id?: string;
     pageNumber: number;
     imagePath: string;
+    displayRef?: string;
     width: number;
     height: number;
-    panels: unknown[];
+    images?: PageData["images"];
+    flags?: PageData["flags"];
+    panels: PageData["panels"];
 }
 
 function generateId(seriesId: string, epId: string, pageNum: number) {
     return `${seriesId}-${epId}-p${String(pageNum).padStart(2, "0")}`;
+}
+
+function makePageStubs(count: number): PageInput[] {
+    return Array.from({ length: count }, (_, i) => ({
+        pageNumber: i + 1,
+        imagePath: `pages/p${String(i + 1).padStart(2, "0")}.jpg`,
+        width: 500,
+        height: 760,
+        panels: [],
+    }));
 }
 
 export default function EpisodeEditor() {
@@ -30,35 +44,35 @@ export default function EpisodeEditor() {
         if (!seriesId) return;
         getSeries(seriesId).then((detail) => {
             if (!detail) { setLoaded(true); return; }
-            const ep = detail.episodes.find((e) => e.id === epId);
-            if (ep) {
-                setEpTitle(ep.title);
-                setEpNum(ep.episodeNumber);
+            const episodeSummary = detail.episodes.find((e) => e.id === epId);
+            if (episodeSummary) {
+                setEpTitle(episodeSummary.title);
+                setEpNum(episodeSummary.episodeNumber);
                 getAdminEpisode(seriesId, epId!)
-                    .then((ep) => {
-                        if (!ep) return;
-                        const pages = ep.pages ?? [];
+                    .then((adminEpisode) => {
+                        const pages = adminEpisode?.pages ?? [];
                         if (pages.length) {
-                            setPages(pages.map((p: any) => ({
+                            setPages(pages.map((p) => ({
+                                id: p.id,
                                 pageNumber: p.pageNumber,
                                 imagePath: p.images?.ja ?? `pages/p${String(p.pageNumber).padStart(2, "0")}.jpg`,
+                                displayRef: p.displayRef,
                                 width: p.width,
                                 height: p.height,
+                                images: p.images,
+                                flags: p.flags,
                                 panels: p.panels ?? [],
                             })));
-                        } else if (ep.pageCount > 0) {
+                        } else if (episodeSummary.pageCount > 0) {
                             // Fallback: create page stubs
-                            setPages(Array.from({ length: ep.pageCount }, (_, i) => ({
-                                pageNumber: i + 1,
-                                imagePath: `pages/p${String(i + 1).padStart(2, "0")}.jpg`,
-                                width: 500,
-                                height: 760,
-                                panels: [],
-                            })));
+                            setPages(makePageStubs(episodeSummary.pageCount));
                         }
                         setLoaded(true);
                     })
-                    .catch(() => setLoaded(true));
+                    .catch(() => {
+                        setPages(makePageStubs(episodeSummary.pageCount));
+                        setLoaded(true);
+                    });
             } else {
                 // New episode — add one default page
                 setPages([{ pageNumber: 1, imagePath: "pages/p01.jpg", width: 500, height: 760, panels: [] }]);
@@ -78,9 +92,9 @@ export default function EpisodeEditor() {
         }]);
     };
 
-    const updatePage = (idx: number, field: keyof PageInput, value: string | number) => {
+    const updatePage = (idx: number, field: keyof PageInput, value: string | number | undefined) => {
         const updated = [...pages];
-        (updated[idx] as any)[field] = value;
+        updated[idx] = { ...updated[idx], [field]: value };
         setPages(updated);
     };
 
@@ -94,11 +108,13 @@ export default function EpisodeEditor() {
 
         // Preserve existing panels when saving
         const fullPages = pages.map((p) => ({
-            id: generateId(seriesId, epId, p.pageNumber),
+            id: p.id ?? generateId(seriesId, epId, p.pageNumber),
             pageNumber: p.pageNumber,
-            images: { ja: p.imagePath },
+            displayRef: p.displayRef?.trim() || undefined,
+            images: { ...p.images, ja: p.imagePath },
             width: p.width,
             height: p.height,
+            flags: p.flags,
             panels: p.panels ?? [],
         }));
 
@@ -154,10 +170,14 @@ export default function EpisodeEditor() {
                                 削除
                             </button>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
+                        <div className="page-editor-grid">
                             <div className="form-group" style={{ margin: 0 }}>
                                 <label>Image Path</label>
                                 <input value={p.imagePath} onChange={(e) => updatePage(idx, "imagePath", e.target.value)} />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label>Display Ref</label>
+                                <input value={p.displayRef ?? ""} onChange={(e) => updatePage(idx, "displayRef", e.target.value || undefined)} placeholder={`P${p.pageNumber}`} />
                             </div>
                             <div className="form-group" style={{ margin: 0 }}>
                                 <label>Width</label>
@@ -167,6 +187,14 @@ export default function EpisodeEditor() {
                                 <label>Height</label>
                                 <input type="number" value={p.height} onChange={(e) => updatePage(idx, "height", Number(e.target.value))} />
                             </div>
+                        </div>
+                        <div className="page-editor-footer">
+                            <span className="card-meta">
+                                {p.panels.reduce((count, panel) => count + panel.bubbles.length, 0)} bubbles across {p.panels.length} panels
+                            </span>
+                            <Link to={`/works/${seriesId}/episodes/${epId}/structure`} className="btn btn-outline">
+                                Review structure
+                            </Link>
                         </div>
                     </div>
                 ))}
