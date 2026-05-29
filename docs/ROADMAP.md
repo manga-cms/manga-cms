@@ -9,7 +9,7 @@ This document tracks the path from the current repository state to a public laun
 | Target | Progress | Meaning |
 |--------|---------:|---------|
 | Public beta launch | 100% | Free/public reading experience with viewer, contents, API, CMS, publish/import, protected reading paths, and PoC validation tooling — all exit criteria met |
-| Commercial launch | 74% | Beta + CMS, ingestion, entitlement, gated delivery, production auth, and operational readiness |
+| Commercial launch | 76% | Beta + CMS, ingestion, entitlement, gated delivery, production auth, and operational readiness |
 
 ## Current Status
 
@@ -33,19 +33,42 @@ The project has moved beyond a viewer-only prototype.
 - CI pipeline validates builds, Prisma client generation, and content schemas
 - End-user production auth now exists via magic-link login, with one-time DB-backed tokens, rate limiting, and cleanup endpoint
 - Local ingestion PoC now has deterministic contracts, runner output, and fast tests that guarantee artifact/canonical separation
-- The main remaining gaps are deploy rehearsal, monitoring, backup/recovery, external commerce webhooks, OAuth/SSO, and multi-instance hardening
+- Delivery now enforces filesystem containment before serving page image bytes
+- Reader/CMS/Rights responsibilities are now split into dedicated specs for reader UX, CMS UX, translation governance, and rights/permissions
+- CMS Page Structure Review MVP exists for page-image preview, panel bbox editing, bubble bbox editing, and canonical episode save
+- Reader Feedback MVP exists for hidden Read Mode reporting, Explore Mode proposals, completion-card contribution, and private JSONL feedback storage
+- Reader deep links can resolve `focus` URLs to Page / Panel / Bubble targets and open Explore Mode with the target highlighted
+- CMS Page Structure Review includes panel layout templates so storyboard/name pages can be structured quickly before manual fine-tuning
+- The main remaining gaps are monitoring, external commerce webhooks, OAuth/SSO, multi-instance hardening, CDN/watermark hardening, and post-launch API maintainability work
+
+## Product Boundary Specs
+
+The product boundary is now explicit:
+
+- Reader: reading, sharing, approved pack display, lightweight proposals
+- CMS: content structure editing, review, pack management, publishing, Reader preview
+- Rights: role/language/pack scoped permissions for proposing, editing, reviewing, publishing, and commercial usage
+
+Authoritative specs:
+
+- `docs/reader-ux-spec.md`
+- `docs/feedback-mvp-spec.md`
+- `docs/cms-ux-spec.md`
+- `docs/translation-governance-spec.md`
+- `docs/rights-permission-spec.md`
+- `docs/storyboard-data-import.md`
 
 ## Phase Roadmap
 
 | Phase | Goal | Progress | Exit criteria |
 |------|------|---------:|---------------|
 | 1 | Domain and source-of-truth foundation | 93% | `contents/`, `packs/`, shared types, shared schemas, and repository interfaces are stable enough to build on |
-| 2 | Public reader MVP | 89% | Works, work detail, episode, quote, clip, and reaction are usable from real repository data |
+| 2 | Public reader MVP | 94% | Works, work detail, episode, quote, clip, reaction, normal/explore reading, focus links, and lightweight feedback are usable from real repository data |
 | 3 | Runtime integration | 89% | Viewer and API use the same contracts and the API can serve the public reading surface |
-| 4 | CMS and publish MVP | 72% | A creator can set up a work, add episodes/pages, review, and publish without editing JSON manually |
+| 4 | CMS and publish MVP | 79% | A creator can set up a work, add episodes/pages, template page structure, review, and publish without editing JSON manually |
 | 5 | Ingestion MVP | 84% | Upload/import, draft generation, review queue, confirmation jobs, and PoC evaluation tooling exist |
 | 6 | Commerce, entitlement, and delivery | 100% | Purchase/redeem, entitlement checks, gated delivery URLs, and watermark-capable delivery work end to end |
-| 7 | Production hardening | 95% | DB, deploy target, observability, CI/CD, backup/recovery, and incident-ready operations are in place |
+| 7 | Production hardening | 96% | DB, deploy target, observability, CI/CD, backup/recovery, and incident-ready operations are in place |
 | 8 | Scale and polish | 80% | Production auth (SSO/OAuth), full DB migration, CDN, monitoring, and operational maturity |
 
 ## Next Milestones
@@ -59,6 +82,8 @@ Priority A:
 
 - Separate `normal` reading mode from `study` mode
 - Keep structure overlays hidden in normal mode
+- Keep proposal UI lightweight in Reader; full editing belongs in CMS
+- Keep report/proposal UI hidden until target interaction in Read Mode
 - Support Page / Panel / Bubble URL resolution
 - Add canonical path URLs for share pages so OGP does not depend on fragments
 - Add selected target highlighting
@@ -76,6 +101,10 @@ Priority B:
 - Footnote Pack UI
 - Author commentary surfaced after reading
 - Translation comparison and translation review modes
+- Proposal Queue surfaced from Reader submissions and reviewed in CMS
+- CMS Feedback Triage for private Reader feedback records
+- Pack Manager MVP for Translation Pack and Footnote Pack
+- Rights/Role Manager MVP for language-specific translation work
 
 Priority C:
 
@@ -98,9 +127,9 @@ Priority C:
 
 ### Phase 2: Finish public reading
 
-- Add the missing reader interactions: panel highlighting, zoom, bubble targeting, deep-link behavior
-- Add normal/study mode separation
-- Add read-complete card
+- Polish reader interactions: panel highlighting, zoom behavior, bubble targeting, and deep-link behavior now exist but need browser QA across mobile/tablet/desktop
+- Normal/study mode separation exists; keep normal reading visually quiet as more pack UI is added
+- Read-complete card exists; next step is improving next-episode/share/official-quote actions
 - Add Page OGP, then official Quote/Clip/Reaction OGP
 - Add official Quote, official Clip, and official Reaction surfaces before user-generated sharing
 - Add spoiler_level and share_policy to shareable units
@@ -117,11 +146,22 @@ Priority C:
 ### Phase 4: Build the publish path
 
 - Add admin authentication and authorization to all write endpoints
-- Expand editing beyond page-level entry so panel/bubble structures can be edited in CMS
+- Expand editing beyond page-level entry so panel/bubble structures can be edited in CMS; template-assisted panel creation now exists, but bubble auto-detection/import still needs ingestion integration
 - Replace cache-reload internals with an explicit invalidation/reload mechanism
 - Add safer validation and error UX around publish failures
 - Add CMS fields for official Quote / Clip / Reaction curation
 - Add CMS controls for spoiler_level and share_policy
+- Expand CMS Page Structure Review with ingestion candidate approval, reading-order tools, and proposal handling
+- Add Bubble Editor as the main workspace for translation, footnotes, comments, speaker, and proposals
+- Add Reader preview inside CMS so pack quality can be judged in reading context
+
+### Phase 4.5: Translation, proposal, and pack governance
+
+- Add Proposal Queue for translation, typo, footnote, commentary, tag, and structure proposals
+- Add Translation Workspace with original text, current translation, target language, glossary, character voice, bubble fit, and surrounding panels
+- Add Pack Manager with draft, in_review, approved, published, deprecated, and archived statuses
+- Add Rights/Role Manager with owner, editor, translator, reviewer, contributor, moderator, and viewer roles
+- Keep translation proposals separate from official translation rights and pack publication rights
 
 ### Phase 5: Build ingestion
 
@@ -141,7 +181,8 @@ Priority C:
 - ✅ CI pipeline (`.github/workflows/ci.yml`) for builds, Prisma, and content validation
 - ✅ `.env.example` documenting all environment variables
 - ✅ `prisma db push` works — SQLite dev.db with all 5 tables confirmed
-- Remaining: deploy rehearsal, full monitoring stack, backup/recovery, restore drill
+- ✅ `/deliver/:pageId` now verifies resolved image paths remain inside the episode asset directory
+- Remaining: full monitoring stack, production incident response, and deeper recovery drills
 
 ### Phase 8: Scale and polish
 
@@ -158,7 +199,7 @@ Priority C:
 - ✅ Purchase audit: `createdBy`, `metadata` fields; RedeemCode `redeemedIp`; MagicLinkToken `requestIp`
 - ✅ Proxy trust boundary is explicit via `TRUST_PROXY`; spoofable `X-Forwarded-For` is ignored by default
 - Session policy: HMAC-signed cookies (stateless); revocation requires secret rotation (documented)
-- Remaining: OAuth/SSO, Stripe webhooks, scheduled cleanup automation, Redis-backed rate limiting for multi-instance, CDN, full monitoring, backup/recovery
+- Remaining: OAuth/SSO, Stripe webhooks, scheduled cleanup automation, Redis-backed rate limiting for multi-instance, CDN, full monitoring, API route modularization, Zod validator consolidation, and Prisma schema source-of-truth cleanup
 
 ## Launch Path
 

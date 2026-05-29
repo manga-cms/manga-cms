@@ -28,6 +28,8 @@ cp .env.example .env
 | `EMAIL_FROM` | Sender address for magic links |
 | `APP_URL` | Public-facing API URL (e.g. `https://app.example.com/api/v1`) |
 | `API_BASE` | Internal API URL for viewer SSR |
+| `DELIVERY_PUBLIC_ORIGIN` | Optional public API origin for signed image URLs when different from `API_BASE` |
+| `FEEDBACK_DIR` | Private runtime JSONL storage for reader feedback |
 | `TRUST_PROXY` | `1` if behind reverse proxy (Cloudflare, nginx) |
 | `ALLOWED_ORIGINS` | Comma-separated allowed CORS origins (e.g. `https://manga.example.com,http://localhost:4321`) |
 
@@ -93,6 +95,13 @@ npx serve apps/cms/dist -l 5173
 ```
 
 Or deploy to any static hosting (Cloudflare Pages, Vercel, Netlify).
+
+For local CMS development, `apps/cms/vite.config.ts` proxies `/api` to
+`http://localhost:3000` by default. Override it when the API is on another port:
+
+```bash
+API_PROXY_TARGET=http://localhost:3100 pnpm --filter @manga/cms dev
+```
 
 ## Quick Validation
 

@@ -126,6 +126,12 @@ cd apps/cms
 pnpm dev
 ```
 
+If the API is not running on port 3000, set the CMS proxy target:
+
+```bash
+API_PROXY_TARGET=http://localhost:3100 pnpm dev
+```
+
 Default CMS:
 
 ```text
@@ -157,6 +163,16 @@ See [docs/CONTENT_GUIDE.md](docs/CONTENT_GUIDE.md) for the current content
 format and publication workflow.
 
 ## Core Concepts
+
+### Reader, CMS, And Rights
+
+Reader, CMS, and Rights are separate product surfaces.
+
+- Reader is for reading, sharing, approved pack display, and lightweight proposals.
+- CMS is for structure editing, proposal review, pack management, publishing, and Reader preview.
+- Rights controls who can propose, edit, review, publish, and use content by series, language, pack, and usage.
+
+This separation keeps the reading experience clean while still allowing translation, footnote, and structure work to move through review.
 
 ### Stable IDs
 
@@ -203,6 +219,12 @@ Images / PSD / text export
 - [Entitlement specification](entitlement-spec.md)
 - [Ingestion specification](ingestion-spec.md)
 - [Content guide](docs/CONTENT_GUIDE.md)
+- [Reader UX spec](docs/reader-ux-spec.md)
+- [Reader feedback MVP spec](docs/feedback-mvp-spec.md)
+- [CMS UX spec](docs/cms-ux-spec.md)
+- [Translation governance spec](docs/translation-governance-spec.md)
+- [Rights and permission spec](docs/rights-permission-spec.md)
+- [Storyboard data import](docs/storyboard-data-import.md)
 - [Next actions](docs/NEXT_ACTIONS.md)
 - [Public release checklist](docs/PUBLIC_RELEASE_CHECKLIST.md)
 - [Deployment](docs/DEPLOY.md)

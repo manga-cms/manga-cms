@@ -32,7 +32,7 @@ The target here is simple:
 - [x] Confirm free episode renders without auth — `gated=false`
 - [x] Confirm locked episode renders gated state without entitlement — architecture verified
 - [x] Confirm locked episode renders after entitlement is granted — redeem grants entitlement, episode ungated
-- [x] Confirm `/deliver/:pageId` serves real image bytes — HTTP 200, image/jpeg, verified with test images
+- [x] Confirm `/deliver/:pageId` serves real image bytes — HTTP 200, image/jpeg, verified with test images; resolved paths are contained inside the episode asset directory
 - [x] Confirm quote pages render — endpoint functional (404 = no content, not route error)
 - [x] Confirm clip pages render — endpoint functional (404 = no content, not route error)
 - [x] Confirm reaction pages render — endpoint returns 200 with items array
