@@ -27,7 +27,15 @@ export interface BoundingBox {
 // Content hierarchy
 // ---------------------------------------------------------------------------
 
-export type BubbleType = "speech" | "thought" | "narration" | "sfx";
+export type BubbleType = "speech" | "thought" | "narration" | "sfx" | "caption" | "other";
+export type TextDirection = "horizontal" | "vertical";
+export type SpeakerConfidence = "confirmed" | "inferred" | "unknown";
+
+export interface ContentFlags {
+    shareable: boolean;
+    feedback_enabled: boolean;
+    contains_spoiler?: boolean;
+}
 
 export interface Bubble {
     id: string;
@@ -36,6 +44,10 @@ export interface Bubble {
     bubbleType: BubbleType;
     textOriginal: string;
     speaker?: string;
+    speakerConfidence?: SpeakerConfidence;
+    textDirection?: TextDirection;
+    lang?: string;
+    flags?: ContentFlags;
     bbox: BoundingBox;
 }
 
@@ -44,6 +56,7 @@ export interface Panel {
     panelNumber: number;
     bbox: BoundingBox;
     reactionTags: string[];
+    flags?: ContentFlags;
     bubbles: Bubble[];
 }
 
@@ -64,6 +77,8 @@ export interface Page {
     images: PageImageSet;
     width: number;
     height: number;
+    displayRef?: string;
+    flags?: ContentFlags;
     panels: Panel[];
 }
 

@@ -22,7 +22,15 @@ export const BoundingBoxSchema = z.object({
 // Content hierarchy
 // ---------------------------------------------------------------------------
 
-export const BubbleTypeSchema = z.enum(["speech", "thought", "narration", "sfx"]);
+export const BubbleTypeSchema = z.enum(["speech", "thought", "narration", "sfx", "caption", "other"]);
+export const TextDirectionSchema = z.enum(["horizontal", "vertical"]);
+export const SpeakerConfidenceSchema = z.enum(["confirmed", "inferred", "unknown"]);
+
+export const ContentFlagsSchema = z.object({
+    shareable: z.boolean().default(true),
+    feedback_enabled: z.boolean().default(true),
+    contains_spoiler: z.boolean().optional(),
+});
 
 export const BubbleSchema = z.object({
     id: z.string().min(1),
@@ -31,6 +39,10 @@ export const BubbleSchema = z.object({
     bubbleType: BubbleTypeSchema,
     textOriginal: z.string(),
     speaker: z.string().optional(),
+    speakerConfidence: SpeakerConfidenceSchema.optional(),
+    textDirection: TextDirectionSchema.optional(),
+    lang: z.string().optional(),
+    flags: ContentFlagsSchema.optional(),
     bbox: BoundingBoxSchema,
 });
 
@@ -39,6 +51,7 @@ export const PanelSchema = z.object({
     panelNumber: z.number().int().positive(),
     bbox: BoundingBoxSchema,
     reactionTags: z.array(z.string()).default([]),
+    flags: ContentFlagsSchema.optional(),
     bubbles: z.array(BubbleSchema).default([]),
 });
 
@@ -50,6 +63,8 @@ export const PageSchema = z.object({
     images: PageImageSetSchema,
     width: z.number().positive(),
     height: z.number().positive(),
+    displayRef: z.string().optional(),
+    flags: ContentFlagsSchema.optional(),
     panels: z.array(PanelSchema).default([]),
 });
 
