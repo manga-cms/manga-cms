@@ -7,6 +7,7 @@ interface Props {
   locale?: SupportedLocale;
   ogImage?: string;
   canonicalUrl?: string;
+  immersive?: boolean;
 }
 
 const {
@@ -15,6 +16,7 @@ const {
   locale = "ja",
   ogImage,
   canonicalUrl,
+  immersive = false,
 } = Astro.props;
 
 const resolvedCanonical = canonicalUrl ?? Astro.url.href;
@@ -52,24 +54,28 @@ const resolvedCanonical = canonicalUrl ?? Astro.url.href;
     />
   </head>
   <body>
-    <header class="site-header">
-      <nav class="container nav-bar">
-        <a href="/" class="logo">📖 Manga</a>
-        <ul class="nav-links">
-          <li><a href="/works">Works</a></li>
-        </ul>
-      </nav>
-    </header>
+    {!immersive && (
+      <header class="site-header">
+        <nav class="container nav-bar">
+          <a href="/" class="logo">📖 Manga</a>
+          <ul class="nav-links">
+            <li><a href="/works">Works</a></li>
+          </ul>
+        </nav>
+      </header>
+    )}
 
     <main>
       <slot />
     </main>
 
-    <footer class="site-footer">
-      <div class="container">
-        <p class="text-muted">Manga Infrastructure — Open Publishing Layer for Comics</p>
-      </div>
-    </footer>
+    {!immersive && (
+      <footer class="site-footer">
+        <div class="container">
+          <p class="text-muted">Manga Infrastructure — Open Publishing Layer for Comics</p>
+        </div>
+      </footer>
+    )}
   </body>
 </html>
 

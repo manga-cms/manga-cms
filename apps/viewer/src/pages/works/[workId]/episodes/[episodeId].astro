@@ -85,22 +85,57 @@ if (episode && !isGated && dataSource === "api") {
 if (!episode) {
   return new Response(null, { status: 404, statusText: "Not Found" });
 }
+
+const viewerPages = episode.pages.map((page: any) => ({
+  id: page.id,
+  pageNumber: page.pageNumber,
+  displayRef: page.displayRef,
+  src: page.images?.ja ?? "/placeholder-page.svg",
+  width: page.width,
+  height: page.height,
+  panels: (page.panels ?? []).map((panel: any) => ({
+    id: panel.id,
+    panelNumber: panel.panelNumber,
+    bbox: panel.bbox,
+    feedbackEnabled: panel.flags?.feedback_enabled !== false,
+    shareable: panel.flags?.shareable !== false,
+    bubbles: (panel.bubbles ?? []).map((bubble: any) => ({
+      id: bubble.id,
+      bubbleNumber: bubble.bubbleNumber,
+      shortId: bubble.shortId,
+      bubbleType: bubble.bubbleType,
+      textOriginal: bubble.textOriginal,
+      speaker: bubble.speaker,
+      bbox: bubble.bbox,
+      feedbackEnabled: bubble.flags?.feedback_enabled !== false,
+      shareable: bubble.flags?.shareable !== false,
+    })),
+  })),
+}));
+const viewerPagesJson = JSON.stringify(viewerPages).replace(/</g, "\\u003c");
+const feedbackApiBase = (import.meta.env.API_BASE ?? "").replace(/\/$/, "") || "/api/v1";
+const feedbackApiBaseJson = JSON.stringify(feedbackApiBase).replace(/</g, "\\u003c");
+const isReaderAvailable = !isGated && episode.pages.length > 0;
 ---
 
-<BaseLayout title={`${episode.title} — ${seriesTitle}`}>
-  <section class="container page-section">
-    <a href={`/works/${workId}`} class="breadcrumb text-muted">
-      ← {seriesTitle}
-    </a>
+<BaseLayout title={`${episode.title} — ${seriesTitle}`} immersive>
+  <section class:list={["container", "page-section", { "is-reader-page": isReaderAvailable }]}>
+    {!isReaderAvailable && (
+      <>
+        <a href={`/works/${workId}`} class="breadcrumb text-muted">
+          ← {seriesTitle}
+        </a>
 
-    <div class="episode-header">
-      <span class="ep-number badge">Episode {episode.episodeNumber}</span>
-      <h1>{episode.title}</h1>
-      <p class="text-muted">{episode.publishedAt}</p>
-      {import.meta.env.DEV && dataSource === "loader" && !isGated && (
-        <p class="data-source-hint text-muted">⚠ API未接続 — ローカルデータ表示中（開発モード）</p>
-      )}
-    </div>
+        <div class="episode-header">
+          <span class="ep-number badge">Episode {episode.episodeNumber}</span>
+          <h1>{episode.title}</h1>
+          <p class="text-muted">{episode.publishedAt}</p>
+          {import.meta.env.DEV && dataSource === "loader" && !isGated && (
+            <p class="data-source-hint text-muted">⚠ API未接続 — ローカルデータ表示中（開発モード）</p>
+          )}
+        </div>
+      </>
+    )}
 
     {isGated ? (
       <div class="gated-overlay card">
@@ -116,62 +151,132 @@ if (!episode) {
         <p class="text-muted">このエピソードのページはまだありません。</p>
       </div>
     ) : (
-      <div class="reader" id="reader">
-        {episode.pages.map((page: any) => (
-          <div class="page-frame" id={`p${page.pageNumber}`} data-page={page.pageNumber}>
-            <div class="page-image-wrap">
-              <img
-                src={page.images?.ja ?? "/placeholder-page.svg"}
-                alt={`Page ${page.pageNumber}`}
-                width={page.width}
-                height={page.height}
-                loading="lazy"
-              />
-            </div>
-            {(page.panels?.length ?? 0) > 0 && (
-              <div class="panel-badges">
-                {(page.panels ?? []).map((panel: any, i: number) => (
-                  <button
-                    class="panel-badge"
-                    data-panel={panel.panelNumber ?? i + 1}
-                    title={`Panel ${panel.panelNumber ?? i + 1}${panel.reactionTags?.length ? ` — ${panel.reactionTags.join(", ")}` : ""}`}
-                  >
-                    P{panel.panelNumber ?? i + 1}
-                    {panel.bubbles?.length > 0 && (
-                      <span class="bubble-count">{panel.bubbles.length}💬</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div class="page-info text-muted">
-              Page {page.pageNumber} — {page.panels?.length ?? 0} panels,{" "}
-              {(page.panels ?? []).reduce((sum: number, p: any) => sum + (p.bubbles?.length ?? 0), 0)} bubbles
-            </div>
+      <div class="reader-shell" data-work-id={workId} data-episode-id={episodeId}>
+        <div class="reader-toolbar" aria-label="Reader controls">
+          <div class="reader-meta">
+            <a href={`/works/${workId}`} class="reader-back">← {seriesTitle}</a>
+            <span>{episode.title}</span>
           </div>
-        ))}
+          <div class="reader-mode">
+            <button type="button" class="reader-mode-button is-active" data-mode-button="normal">Read</button>
+            <button type="button" class="reader-mode-button" data-mode-button="study">Explore / くわしく見る</button>
+          </div>
+          <div class="reader-progress">
+            <span data-current-page>1</span> / {episode.pages.length}
+          </div>
+          <p class="reader-hint text-muted">スワイプ・左右キー・画面左右タップでページ送り</p>
+        </div>
+
+        <div class="reader-stage" data-reader-stage>
+          <button type="button" class="reader-nav-zone reader-nav-next" data-reader-next aria-label="次のページへ">←</button>
+          <div class="reader-viewport" id="reader" tabindex="0" aria-label="Manga reader">
+            <div class="reader-track" data-reader-track></div>
+          </div>
+          <button type="button" class="reader-nav-zone reader-nav-prev" data-reader-prev aria-label="前のページへ">→</button>
+        </div>
+
+        <aside class="study-panel" data-study-panel>
+          <div>
+            <p class="study-panel-kicker">Explore / Feedback</p>
+            <h2 data-explore-title>Page <span data-note-page>1</span></h2>
+            <p class="text-muted" data-explore-summary>フキダシやコマを選ぶと、原文確認や軽い提案ができます。本格レビューとPack反映はCMS側で扱います。</p>
+          </div>
+          <div class="explore-detail" data-explore-detail>
+            <p class="text-muted">Explore Modeでページ内のフキダシ/コマを選択してください。</p>
+          </div>
+          <label>
+            <span>脚注・翻訳メモ</span>
+            <textarea
+              data-note-input
+              rows="5"
+              placeholder="例: このセリフはPackの説明で補足したい、翻訳では別案がありそう、など"
+            ></textarea>
+          </label>
+          <div class="study-target-grid">
+            <label>
+              <span>対象</span>
+              <select data-note-scope>
+                <option value="page">ページ全体</option>
+                <option value="panel">コマ</option>
+                <option value="bubble">フキダシ</option>
+                <option value="region">任意位置</option>
+              </select>
+            </label>
+            <label>
+              <span>対象メモ</span>
+              <input data-note-target placeholder="例: 右上のフキダシ / 2コマ目 / 画面中央" />
+            </label>
+          </div>
+          <p class="text-muted study-panel-note" data-note-anchor>位置指定なし。Study modeでページ画像をクリックすると、注の位置候補を保存できます。</p>
+          <p class="text-muted study-panel-note">Readerでは軽い報告/提案だけを受け付けます。正式編集はCMSで行います。</p>
+        </aside>
+        <script type="application/json" id="reader-pages" set:html={viewerPagesJson}></script>
+        <script type="application/json" id="feedback-api-base" set:html={feedbackApiBaseJson}></script>
+        <div class="reader-context-menu" data-reader-context-menu hidden></div>
+        <div class="reader-toast" data-reader-toast hidden></div>
+        <div class="feedback-modal" data-feedback-modal hidden>
+          <div class="feedback-modal-backdrop" data-feedback-close></div>
+          <form class="feedback-dialog" data-feedback-form>
+            <input type="text" name="website" autocomplete="off" tabindex="-1" class="feedback-honeypot" aria-hidden="true" />
+            <div>
+              <p class="study-panel-kicker" data-feedback-kicker>Feedback</p>
+              <h2 data-feedback-title>報告する</h2>
+              <p class="text-muted" data-feedback-target>対象を選択中</p>
+            </div>
+            <label>
+              <span>種類</span>
+              <select name="issue_type" data-feedback-issue>
+                <option value="typo">誤字</option>
+                <option value="mistranslation">誤訳</option>
+                <option value="display">表示崩れ</option>
+                <option value="better_translation">よりよい訳</option>
+                <option value="missing_note">注釈提案</option>
+                <option value="other">その他</option>
+              </select>
+            </label>
+            <label>
+              <span>コメント</span>
+              <textarea name="comment" data-feedback-comment maxlength="1000" rows="4" placeholder="気づいた点を短く書いてください"></textarea>
+            </label>
+            <label data-feedback-suggested-wrap hidden>
+              <span>提案文</span>
+              <textarea name="suggested_text" data-feedback-suggested maxlength="2000" rows="3" placeholder="翻訳案や注釈案があれば入力してください"></textarea>
+            </label>
+            <div class="feedback-actions">
+              <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-close>閉じる</button>
+              <button type="submit" class="btn-viewer btn-primary-viewer">送信</button>
+            </div>
+          </form>
+        </div>
       </div>
     )}
 
-    <div class="episode-nav">
-      {prev && (
-        <a href={`/works/${workId}/episodes/${prev.id}`} class="nav-link">
-          ← {prev.title}
-        </a>
-      )}
-      <div class="spacer" />
-      {next && (
-        <a href={`/works/${workId}/episodes/${next.id}`} class="nav-link">
-          {next.title} →
-        </a>
-      )}
-    </div>
+    {!isReaderAvailable && (
+      <div class="episode-nav">
+        {prev && (
+          <a href={`/works/${workId}/episodes/${prev.id}`} class="nav-link">
+            ← {prev.title}
+          </a>
+        )}
+        <div class="spacer" />
+        {next && (
+          <a href={`/works/${workId}/episodes/${next.id}`} class="nav-link">
+            {next.title} →
+          </a>
+        )}
+      </div>
+    )}
   </section>
 </BaseLayout>
 
 <style>
   .page-section {
     padding: var(--space-xl) 0;
+  }
+
+  .page-section.is-reader-page {
+    max-width: none;
+    padding: 0;
   }
 
   .breadcrumb {
@@ -204,35 +309,227 @@ if (!episode) {
     padding: var(--space-2xl);
   }
 
-  .reader {
-    display: flex;
-    flex-direction: column;
+  .reader-shell {
+    background: #0b0d12;
+    border: 0;
+    border-radius: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    position: relative;
+    scroll-margin-top: 0;
+  }
+
+  .reader-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: grid;
     align-items: center;
-    gap: var(--space-lg);
+    grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr);
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(11, 13, 18, 0.92);
+    border-bottom: 1px solid var(--color-border);
+    backdrop-filter: blur(12px);
+  }
+
+  .reader-meta {
+    align-items: center;
+    color: var(--color-text-muted);
+    display: flex;
+    gap: 0.65rem;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .reader-meta span {
+    color: var(--color-text);
+    font-size: 0.75rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .reader-back {
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  .reader-back:hover,
+  .reader-back:focus-visible {
+    color: var(--color-text);
+  }
+
+  .reader-mode {
+    display: inline-flex;
+    gap: 6px;
+  }
+
+  .reader-mode-button {
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 6px 12px;
+  }
+
+  .reader-mode-button.is-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+  }
+
+  .reader-progress {
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .reader-hint {
+    justify-self: end;
+    font-size: 0.6875rem;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .reader-stage {
+    background: #050609;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .reader-viewport {
+    height: 100%;
+    outline: none;
+    overflow: hidden;
+    position: relative;
+    touch-action: pan-y;
+    user-select: none;
+  }
+
+  .reader-track {
+    display: flex;
+    flex-direction: row-reverse;
+    height: 100%;
+    transform: translate3d(0, 0, 0);
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+
+  .manga-view {
+    align-items: center;
+    display: flex;
+    flex: 0 0 100%;
+    gap: 0;
+    height: 100%;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .manga-view.is-single.is-right {
+    justify-content: center;
+    padding-right: 0;
+  }
+
+  .manga-view.is-end {
+    color: var(--color-text);
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .reader-end-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    max-width: 520px;
+    padding: var(--space-xl);
+  }
+
+  .reader-nav-zone {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    bottom: 0;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    display: flex;
+    font-size: 1.45rem;
+    font-weight: 900;
+    justify-content: center;
+    opacity: 0;
+    position: absolute;
+    top: 0;
+    transition: opacity 0.2s ease;
+    width: clamp(40px, 7vw, 72px);
+    z-index: 4;
+  }
+
+  .reader-stage:hover .reader-nav-zone,
+  .reader-nav-zone:focus-visible {
+    opacity: 1;
+  }
+
+  .reader-nav-next {
+    left: 0;
+  }
+
+  .reader-nav-prev {
+    right: 0;
   }
 
   .page-frame {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    max-width: 500px;
-    transition: border-color 0.3s ease, max-width 0.4s ease;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: row;
+    height: 100%;
+    justify-content: center;
+    max-height: 100%;
+    max-width: 50%;
+    overflow: visible;
+    position: relative;
+    transition: max-width 0.4s ease;
+  }
+
+  .manga-view.is-single .page-frame {
+    max-width: 100%;
   }
 
   .page-frame.highlight {
     border-color: var(--color-accent, #60a5fa);
-    box-shadow: 0 0 12px rgba(96, 165, 250, 0.3);
+    outline: 2px solid rgba(96, 165, 250, 0.7);
+    outline-offset: -2px;
   }
 
   .page-frame.zoomed {
-    max-width: 90vw;
+    max-width: 100%;
     cursor: zoom-out;
   }
 
   .page-image-wrap {
+    align-items: center;
     cursor: zoom-in;
+    display: flex;
+    flex: 1;
+    height: 100%;
+    justify-content: center;
+    min-height: 0;
     position: relative;
+    width: 100%;
   }
 
   .page-frame.zoomed .page-image-wrap {
@@ -240,9 +537,14 @@ if (!episode) {
   }
 
   .page-frame img {
-    width: 100%;
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
     height: auto;
     display: block;
+    box-shadow: none;
+    filter: none;
+    object-fit: contain;
   }
 
   .panel-badges {
@@ -278,9 +580,169 @@ if (!episode) {
   }
 
   .page-info {
+    display: none;
     padding: var(--space-sm) var(--space-md);
     font-size: 0.75rem;
     text-align: center;
+  }
+
+  .study-panel {
+    display: none;
+    align-content: start;
+    border: 1px solid var(--color-border);
+    bottom: 16px;
+    gap: var(--space-md);
+    grid-template-columns: 1fr;
+    overflow: auto;
+    padding: var(--space-md);
+    position: absolute;
+    right: 16px;
+    top: calc(49px + 16px);
+    width: min(420px, calc(100vw - 32px));
+    z-index: 8;
+    background:
+      radial-gradient(circle at 16% 16%, rgba(250, 204, 21, 0.12), transparent 26%),
+      rgba(11, 13, 18, 0.96);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+  }
+
+  .reader-shell[data-mode="study"] .study-panel {
+    display: grid;
+  }
+
+  .study-panel-kicker {
+    color: var(--color-primary);
+    font-size: 0.6875rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    margin: 0 0 6px;
+    text-transform: uppercase;
+  }
+
+  .study-panel h2 {
+    font-size: 1rem;
+    margin: 0 0 8px;
+  }
+
+  .study-panel label {
+    display: grid;
+    gap: 8px;
+  }
+
+  .study-panel span {
+    color: var(--color-text);
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  .study-panel textarea {
+    width: 100%;
+    resize: none;
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font: inherit;
+    padding: 10px;
+  }
+
+  .study-target-grid {
+    display: grid;
+    gap: var(--space-sm);
+    grid-template-columns: 1fr;
+  }
+
+  .study-target-grid label {
+    display: grid;
+    gap: 8px;
+  }
+
+  .study-panel select,
+  .study-panel input {
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font: inherit;
+    padding: 10px;
+  }
+
+  .study-panel p {
+    font-size: 0.6875rem;
+  }
+
+  .explore-detail {
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    padding: var(--space-md);
+  }
+
+  .explore-actions,
+  .feedback-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: var(--space-sm);
+  }
+
+  .study-panel-note {
+    grid-column: 1 / -1;
+    margin: 8px 0 0;
+  }
+
+  @media (max-width: 720px) {
+    .reader-toolbar {
+      grid-template-columns: 1fr auto;
+    }
+
+    .reader-meta {
+      grid-column: 1 / -1;
+    }
+
+    .reader-hint {
+      display: none;
+    }
+
+    .reader-nav-zone {
+      display: none;
+    }
+
+    .reader-stage,
+    .reader-viewport {
+      height: 100%;
+      min-height: 0;
+    }
+
+    .manga-view {
+      padding: 0;
+    }
+
+    .manga-view.is-single.is-right {
+      justify-content: center;
+      padding-right: 0;
+    }
+
+    .page-frame {
+      max-width: 100%;
+    }
+
+    .page-frame img {
+      max-height: 100%;
+    }
+
+    .study-panel {
+      bottom: 0;
+      left: 0;
+      max-height: 46dvh;
+      right: 0;
+      top: auto;
+      width: auto;
+    }
+
+    .reader-shell[data-mode="study"] .study-panel {
+      display: block;
+    }
   }
 
   .episode-nav {
@@ -337,45 +799,955 @@ if (!episode) {
     background: var(--color-primary);
     color: white;
   }
+
+  .btn-ghost-viewer {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+  }
+</style>
+
+<style is:global>
+  .manga-view {
+    align-items: center;
+    display: flex;
+    flex: 0 0 100%;
+    gap: 0;
+    height: 100%;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .manga-view.is-single.is-right {
+    justify-content: center;
+    padding-right: 0;
+  }
+
+  .manga-view.is-end {
+    color: var(--color-text);
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .reader-end-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    max-width: 520px;
+    padding: var(--space-xl);
+  }
+
+  .page-frame {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: row;
+    height: 100%;
+    justify-content: center;
+    max-height: 100%;
+    max-width: 50%;
+    overflow: visible;
+    position: relative;
+    transition: max-width 0.4s ease;
+  }
+
+  .manga-view.is-single .page-frame {
+    max-width: 100%;
+  }
+
+  .page-frame.highlight {
+    border-color: var(--color-accent, #60a5fa);
+    outline: 2px solid rgba(96, 165, 250, 0.7);
+    outline-offset: -2px;
+  }
+
+  .page-frame.zoomed {
+    cursor: zoom-out;
+    max-width: 100%;
+  }
+
+  .page-image-wrap {
+    align-items: center;
+    cursor: zoom-in;
+    display: flex;
+    flex: 1;
+    height: 100%;
+    justify-content: center;
+    min-height: 0;
+    position: relative;
+    width: 100%;
+  }
+
+  .reader-shell[data-mode="study"] .page-image-wrap {
+    cursor: crosshair;
+  }
+
+  .page-frame.zoomed .page-image-wrap {
+    cursor: zoom-out;
+  }
+
+  .page-frame img {
+    display: block;
+    height: auto;
+    max-height: 100%;
+    max-width: 100%;
+    box-shadow: none;
+    filter: none;
+    object-fit: contain;
+    width: auto;
+  }
+
+  .note-anchor-marker {
+    background: rgba(250, 204, 21, 0.94);
+    border: 2px solid #111;
+    border-radius: 999px;
+    box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.22);
+    height: 18px;
+    pointer-events: none;
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    z-index: 2;
+  }
+
+  .reader-target-layer {
+    inset: 0;
+    position: absolute;
+    z-index: 3;
+  }
+
+  .reader-target {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    position: absolute;
+    touch-action: pan-y;
+  }
+
+  .reader-panel-target {
+    border-radius: 6px;
+  }
+
+  .reader-bubble-target {
+    border-radius: 999px;
+    z-index: 4;
+  }
+
+  .reader-shell[data-mode="study"] .reader-panel-target {
+    background: rgba(56, 189, 248, 0.08);
+    outline: 2px solid rgba(56, 189, 248, 0.75);
+  }
+
+  .reader-shell[data-mode="study"] .reader-bubble-target {
+    background: rgba(250, 204, 21, 0.12);
+    outline: 2px solid rgba(250, 204, 21, 0.85);
+  }
+
+  .reader-target.is-selected {
+    outline: 2px solid rgba(129, 140, 248, 0.78);
+    outline-offset: 2px;
+  }
+
+  .reader-context-menu {
+    background: rgba(12, 14, 20, 0.96);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.42);
+    color: var(--color-text);
+    min-width: 180px;
+    padding: 8px;
+    position: fixed;
+    z-index: 50;
+  }
+
+  .reader-context-menu strong {
+    display: block;
+    font-size: 0.75rem;
+    margin: 4px 8px 8px;
+  }
+
+  .reader-context-menu button {
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    color: var(--color-text);
+    cursor: pointer;
+    display: block;
+    font: inherit;
+    padding: 9px 10px;
+    text-align: left;
+    width: 100%;
+  }
+
+  .reader-context-menu button:hover,
+  .reader-context-menu button:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+    outline: none;
+  }
+
+  .reader-context-menu button:disabled {
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+  }
+
+  .feedback-modal[hidden],
+  .reader-context-menu[hidden],
+  .reader-toast[hidden] {
+    display: none;
+  }
+
+  .feedback-modal {
+    align-items: center;
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 18px;
+    position: fixed;
+    z-index: 60;
+  }
+
+  .feedback-modal-backdrop {
+    background: rgba(0, 0, 0, 0.62);
+    inset: 0;
+    position: absolute;
+  }
+
+  .feedback-dialog {
+    background: #10131a;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+    color: var(--color-text);
+    display: grid;
+    gap: var(--space-md);
+    max-width: 460px;
+    padding: var(--space-lg);
+    position: relative;
+    width: min(100%, 460px);
+  }
+
+  .feedback-dialog label {
+    display: grid;
+    gap: 8px;
+  }
+
+  .feedback-dialog span {
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+
+  .feedback-dialog select,
+  .feedback-dialog textarea {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    font: inherit;
+    padding: 10px;
+    width: 100%;
+  }
+
+  .feedback-honeypot {
+    height: 1px;
+    left: -9999px;
+    opacity: 0;
+    position: absolute;
+    width: 1px;
+  }
+
+  .reader-toast {
+    background: rgba(34, 197, 94, 0.96);
+    border-radius: 999px;
+    bottom: 24px;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35);
+    color: #04130a;
+    font-size: 0.875rem;
+    font-weight: 900;
+    left: 50%;
+    padding: 10px 16px;
+    position: fixed;
+    transform: translateX(-50%);
+    z-index: 70;
+  }
+
+  .page-info {
+    display: none;
+    font-size: 0.75rem;
+    padding: var(--space-sm) var(--space-md);
+    text-align: center;
+  }
+
+  @media (max-width: 720px) {
+    .manga-view {
+      padding: 0;
+    }
+
+    .manga-view.is-single.is-right {
+      justify-content: center;
+      padding-right: 0;
+    }
+
+    .page-frame {
+      max-width: 100%;
+    }
+
+    .page-frame img {
+      max-height: 100%;
+    }
+  }
 </style>
 
 <script>
   // ===================================================================
-  // Reader UX: Panel highlight, Zoom, Deep-link scroll
+  // Fast manga reader: RTL paging, spread layout, and buffered image loading.
   // ===================================================================
 
   document.addEventListener("DOMContentLoaded", () => {
-    // --- 1. Deep-link scroll ---
-    if (location.hash) {
-      const target = document.querySelector(location.hash);
-      if (target) {
-        setTimeout(() => {
-          target.scrollIntoView({ behavior: "smooth", block: "center" });
-          target.classList.add("highlight");
-          setTimeout(() => target.classList.remove("highlight"), 1500);
-        }, 300);
+    const viewport = document.querySelector("#reader");
+    const track = document.querySelector("[data-reader-track]");
+    const shell = document.querySelector("[data-work-id][data-episode-id]");
+    const currentPage = document.querySelector("[data-current-page]");
+    const pagesScript = document.querySelector("#reader-pages");
+    const feedbackApiBaseScript = document.querySelector("#feedback-api-base");
+    const pages = pagesScript ? JSON.parse(pagesScript.textContent || "[]") : [];
+    const feedbackApiBase = feedbackApiBaseScript ? JSON.parse(feedbackApiBaseScript.textContent || '"/api/v1"') : "/api/v1";
+
+    if (viewport && track && shell && pages.length > 0) {
+      shell.setAttribute("data-mode", "normal");
+      const storagePrefix = `manga-note:${shell.getAttribute("data-work-id")}:${shell.getAttribute("data-episode-id")}`;
+      const seriesId = shell.getAttribute("data-work-id") || "";
+      const episodeIdValue = shell.getAttribute("data-episode-id") || "";
+      const noteInput = document.querySelector("[data-note-input]");
+      const notePage = document.querySelector("[data-note-page]");
+      const noteScope = document.querySelector("[data-note-scope]");
+      const noteTarget = document.querySelector("[data-note-target]");
+      const noteAnchor = document.querySelector("[data-note-anchor]");
+      const exploreTitle = document.querySelector("[data-explore-title]");
+      const exploreSummary = document.querySelector("[data-explore-summary]");
+      const exploreDetail = document.querySelector("[data-explore-detail]");
+      const contextMenu = document.querySelector("[data-reader-context-menu]");
+      const toast = document.querySelector("[data-reader-toast]");
+      const feedbackModal = document.querySelector("[data-feedback-modal]");
+      const feedbackForm = document.querySelector("[data-feedback-form]");
+      const feedbackTitle = document.querySelector("[data-feedback-title]");
+      const feedbackTarget = document.querySelector("[data-feedback-target]");
+      const feedbackIssue = document.querySelector("[data-feedback-issue]");
+      const feedbackSuggestedWrap = document.querySelector("[data-feedback-suggested-wrap]");
+      const feedbackComment = document.querySelector("[data-feedback-comment]");
+      const feedbackSuggested = document.querySelector("[data-feedback-suggested]");
+      let activePage = "1";
+      let selectedTarget = null;
+      let feedbackTargetState = null;
+      let longPressTimer = null;
+      let currentViewIndex = 0;
+      let views = [];
+      let isDragging = false;
+      let startX = 0;
+      let dragOffset = 0;
+      let lastWidth = viewport.clientWidth;
+      let suppressNextImageClick = false;
+
+      const noteKey = (page) => `${storagePrefix}:p${page}`;
+      const readNote = (page) => {
+        try {
+          return JSON.parse(localStorage.getItem(noteKey(page)) || "{}");
+        } catch {
+          return {};
+        }
+      };
+      const writeNotePatch = (patch) => {
+        const current = readNote(activePage);
+        localStorage.setItem(noteKey(activePage), JSON.stringify({ ...current, ...patch }));
+      };
+      const updateAnchorLabel = (anchor) => {
+        if (!noteAnchor) return;
+        if (!anchor) {
+          noteAnchor.textContent = "位置指定なし。Study modeでページ画像をクリックすると、注の位置候補を保存できます。";
+          return;
+        }
+        noteAnchor.textContent = `位置候補: x=${Math.round(anchor.x * 100)}%, y=${Math.round(anchor.y * 100)}%`;
+      };
+      const renderAnchorMarker = (page, anchor) => {
+        track.querySelectorAll(".note-anchor-marker").forEach((el) => el.remove());
+        if (!anchor || String(page) !== activePage) return;
+        const frame = track.querySelector(`[data-page="${activePage}"]`);
+        const wrap = frame?.querySelector(".page-image-wrap");
+        if (!wrap) return;
+        const marker = document.createElement("span");
+        marker.className = "note-anchor-marker";
+        marker.style.left = `${anchor.x * 100}%`;
+        marker.style.top = `${anchor.y * 100}%`;
+        wrap.appendChild(marker);
+      };
+      const loadNote = (page) => {
+        activePage = page;
+        const saved = readNote(page);
+        if (notePage) notePage.textContent = page;
+        if (noteInput) noteInput.value = saved.text ?? "";
+        if (noteScope) noteScope.value = saved.scope ?? "page";
+        if (noteTarget) noteTarget.value = saved.target ?? "";
+        updateAnchorLabel(saved.anchor);
+        renderAnchorMarker(page, saved.anchor);
+      };
+
+      const getPageId = (page) => page?.id ?? `p${String(page?.pageNumber ?? "").padStart(3, "0")}`;
+      const boxStyle = (bbox, page) => {
+        if (!bbox || !page?.width || !page?.height) return "";
+        return [
+          `left:${(bbox.x / page.width) * 100}%`,
+          `top:${(bbox.y / page.height) * 100}%`,
+          `width:${(bbox.width / page.width) * 100}%`,
+          `height:${(bbox.height / page.height) * 100}%`,
+        ].join(";");
+      };
+      const showToast = (message) => {
+        if (!toast) return;
+        toast.textContent = message;
+        toast.hidden = false;
+        window.setTimeout(() => {
+          toast.hidden = true;
+        }, 1800);
+      };
+      const closeContextMenu = () => {
+        if (contextMenu) contextMenu.hidden = true;
+      };
+      const setReaderMode = (mode) => {
+        shell.setAttribute("data-mode", mode);
+        document.querySelectorAll("[data-mode-button]").forEach((button) => {
+          button.classList.toggle("is-active", button.getAttribute("data-mode-button") === mode);
+        });
+      };
+      const sourceUrlFor = (target) => {
+        const url = new URL(window.location.href);
+        if (target?.bubble) url.searchParams.set("focus", target.bubble.id);
+        else if (target?.panel) url.searchParams.set("focus", target.panel.id);
+        else if (target?.page) url.searchParams.set("page", getPageId(target.page));
+        return url.toString();
+      };
+      const makePayloadBase = (target, mode) => ({
+        series_id: seriesId,
+        episode_id: episodeIdValue,
+        page_id: target?.page ? getPageId(target.page) : null,
+        panel_id: target?.panel?.id ?? null,
+        bubble_id: target?.bubble?.id ?? null,
+        mode,
+        lang: "ja",
+        current_text: target?.bubble?.textOriginal ?? "",
+        source_url: sourceUrlFor(target),
+        client_time: new Date().toISOString(),
+      });
+      const selectTarget = (target) => {
+        selectedTarget = target;
+        track.querySelectorAll(".reader-target.is-selected").forEach((el) => el.classList.remove("is-selected"));
+        const selector = target?.bubble
+          ? `[data-bubble-id="${CSS.escape(target.bubble.id)}"]`
+          : target?.panel
+            ? `[data-panel-id="${CSS.escape(target.panel.id)}"]`
+            : "";
+        if (selector) {
+          track.querySelectorAll(selector).forEach((el) => el.classList.add("is-selected"));
+        }
+        if (!exploreTitle || !exploreSummary || !exploreDetail) return;
+        if (target?.bubble) {
+          exploreTitle.textContent = "このセリフ";
+          exploreSummary.textContent = target.bubble.textOriginal || "原文未設定のフキダシです。";
+          exploreDetail.innerHTML = `
+            <p class="text-muted">Bubble ${target.bubble.shortId || target.bubble.bubbleNumber}</p>
+            <h3>${target.bubble.textOriginal || "原文未設定"}</h3>
+            <p class="text-muted">Speaker: ${target.bubble.speaker || "unknown"} / Type: ${target.bubble.bubbleType || "speech"}</p>
+            <div class="explore-actions">
+              <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-action="share">共有する</button>
+              <button type="button" class="btn-viewer btn-primary-viewer" data-feedback-action="better_translation">よりよい訳を提案</button>
+              <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-action="mistranslation">誤訳を報告</button>
+              <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-action="missing_note">注釈を提案</button>
+            </div>
+          `;
+        } else if (target?.panel) {
+          exploreTitle.textContent = "このコマ";
+          exploreSummary.textContent = `Panel ${target.panel.panelNumber}`;
+          exploreDetail.innerHTML = `
+            <p class="text-muted">Panel ${target.panel.panelNumber} / ${target.panel.bubbles?.length || 0} bubbles</p>
+            <div class="explore-actions">
+              <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-action="share">共有する</button>
+              <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-action="display">表示崩れを報告</button>
+              <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-action="missing_note">注釈を提案</button>
+            </div>
+          `;
+        }
+      };
+      const openFeedbackModal = (target, issueType = "other", mode = shell.getAttribute("data-mode") === "study" ? "explore" : "read") => {
+        feedbackTargetState = target;
+        if (feedbackTitle) feedbackTitle.textContent = mode === "completion" ? "この話に貢献する" : mode === "explore" ? "提案する" : "報告する";
+        if (feedbackTarget) {
+          feedbackTarget.textContent = target?.bubble
+            ? `対象: ${target.bubble.shortId || target.bubble.id}`
+            : target?.panel
+              ? `対象: Panel ${target.panel.panelNumber}`
+              : target?.page
+                ? `対象: Page ${target.page.pageNumber}`
+                : "対象: Episode";
+        }
+        if (feedbackIssue) feedbackIssue.value = issueType;
+        if (feedbackComment) feedbackComment.value = "";
+        if (feedbackSuggested) feedbackSuggested.value = "";
+        if (feedbackSuggestedWrap) feedbackSuggestedWrap.hidden = !(issueType === "better_translation" || issueType === "missing_note");
+        if (feedbackModal) feedbackModal.hidden = false;
+        closeContextMenu();
+      };
+      const openContextMenu = (event, target) => {
+        if (!contextMenu) return;
+        event.preventDefault();
+        selectTarget(target);
+        const isBubble = Boolean(target.bubble);
+        contextMenu.innerHTML = `
+          <strong>${isBubble ? "このセリフ" : "このコマ"}</strong>
+          <button type="button" data-menu-action="share">共有する</button>
+          ${isBubble ? "" : "<button type=\"button\" data-menu-action=\"clip\" disabled>Clipに追加（準備中）</button>"}
+          <button type="button" data-menu-action="explore">くわしく見る</button>
+          <button type="button" data-menu-action="report">報告する</button>
+        `;
+        contextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - 210)}px`;
+        contextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - 220)}px`;
+        contextMenu.hidden = false;
+      };
+      const startLongPress = (event, target) => {
+        window.clearTimeout(longPressTimer);
+        longPressTimer = window.setTimeout(() => {
+          suppressNextImageClick = true;
+          openContextMenu(event, target);
+        }, 620);
+      };
+      const openContextMenuAtElement = (element, target) => {
+        if (!contextMenu) return;
+        const rect = element.getBoundingClientRect();
+        openContextMenu({
+          preventDefault() { },
+          clientX: rect.left + Math.min(rect.width / 2, 120),
+          clientY: rect.top + Math.min(rect.height / 2, 120),
+        }, target);
+      };
+
+      document.querySelectorAll("[data-mode-button]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const mode = button.getAttribute("data-mode-button") ?? "normal";
+          setReaderMode(mode);
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (contextMenu && !contextMenu.hidden && !contextMenu.contains(event.target)) {
+          closeContextMenu();
+        }
+      });
+
+      contextMenu?.addEventListener("click", async (event) => {
+        const target = event.target;
+        const button = target?.closest ? target.closest("button[data-menu-action]") : null;
+        if (!button || !selectedTarget) return;
+        const action = button.getAttribute("data-menu-action");
+        if (action === "share") {
+          await navigator.clipboard?.writeText(sourceUrlFor(selectedTarget));
+          showToast("リンクをコピーしました");
+          closeContextMenu();
+        } else if (action === "explore") {
+          setReaderMode("study");
+          selectTarget(selectedTarget);
+          closeContextMenu();
+        } else if (action === "report") {
+          openFeedbackModal(selectedTarget, "other", "read");
+        }
+      });
+
+      exploreDetail?.addEventListener("click", async (event) => {
+        const target = event.target;
+        const button = target?.closest ? target.closest("button[data-feedback-action]") : null;
+        if (!button || !selectedTarget) return;
+        const action = button.getAttribute("data-feedback-action");
+        if (action === "share") {
+          await navigator.clipboard?.writeText(sourceUrlFor(selectedTarget));
+          showToast("リンクをコピーしました");
+          return;
+        }
+        openFeedbackModal(selectedTarget, action || "other", "explore");
+      });
+
+      document.querySelectorAll("[data-feedback-close]").forEach((close) => {
+        close.addEventListener("click", () => {
+          if (feedbackModal) feedbackModal.hidden = true;
+        });
+      });
+
+      feedbackIssue?.addEventListener("change", () => {
+        if (feedbackSuggestedWrap) {
+          feedbackSuggestedWrap.hidden = !(feedbackIssue.value === "better_translation" || feedbackIssue.value === "missing_note");
+        }
+      });
+
+      feedbackForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const formData = new FormData(form);
+        const issueType = String(formData.get("issue_type") || "other");
+        const mode = feedbackTargetState?.modeOverride || (shell.getAttribute("data-mode") === "study" ? "explore" : "read");
+        const payload = {
+          ...makePayloadBase(feedbackTargetState, mode),
+          issue_type: issueType,
+          comment: String(formData.get("comment") || "").trim(),
+          suggested_text: String(formData.get("suggested_text") || "").trim(),
+          website: String(formData.get("website") || ""),
+          user_agent: navigator.userAgent,
+        };
+        try {
+          const res = await fetch(`${feedbackApiBase}/feedback`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok || data.ok === false) {
+            throw new Error(data.error?.message || "Feedback failed");
+          }
+          if (feedbackModal) feedbackModal.hidden = true;
+          showToast(mode === "completion" ? "送信しました" : "報告を送信しました");
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : "送信に失敗しました");
+        }
+      });
+
+      if (noteInput) {
+        noteInput.addEventListener("input", () => {
+          writeNotePatch({ text: noteInput.value });
+        });
+      }
+
+      noteScope?.addEventListener("change", () => {
+        writeNotePatch({ scope: noteScope.value });
+      });
+
+      noteTarget?.addEventListener("input", () => {
+        writeNotePatch({ target: noteTarget.value });
+      });
+
+      const getPage = (pageNumber) => pages.find((page) => page.pageNumber === pageNumber);
+      const findTargetById = (id) => {
+        if (!id) return null;
+        for (const page of pages) {
+          if (page.id === id || getPageId(page) === id || `p${page.pageNumber}` === id) {
+            return { page };
+          }
+          for (const panel of page.panels || []) {
+            if (panel.id === id) return { page, panel };
+            for (const bubble of panel.bubbles || []) {
+              if (bubble.id === id || bubble.shortId === id) return { page, panel, bubble };
+            }
+          }
+        }
+        return null;
+      };
+
+      const calculateViews = () => {
+        const useSpread = viewport.clientWidth >= 900 && viewport.clientHeight >= 620;
+        const nextViews = [];
+        if (!useSpread) {
+          for (const page of pages) {
+            nextViews.push({ id: `p${page.pageNumber}`, pages: [page], single: true, align: "center" });
+          }
+        } else {
+          nextViews.push({ id: "p1", pages: [pages[0]], single: true, align: "right" });
+          for (let i = 1; i < pages.length; i += 2) {
+            const rightPage = pages[i];
+            const leftPage = pages[i + 1];
+            nextViews.push({
+              id: `spread-${rightPage.pageNumber}`,
+              pages: leftPage ? [leftPage, rightPage] : [rightPage],
+              single: !leftPage,
+              align: leftPage ? "center" : "right",
+            });
+          }
+        }
+        nextViews.push({ id: "end", type: "end", pages: [] });
+        return nextViews;
+      };
+
+      const createPageFrame = (page) => {
+        const frame = document.createElement("article");
+        frame.className = "page-frame";
+        frame.dataset.page = String(page.pageNumber);
+        frame.innerHTML = `
+          <div class="page-image-wrap">
+            <img
+              data-src="${page.src}"
+              alt="Page ${page.pageNumber}"
+              width="${page.width}"
+              height="${page.height}"
+              decoding="async"
+              draggable="false"
+            />
+            <div class="reader-target-layer"></div>
+          </div>
+          <div class="page-info text-muted">
+            Page ${page.pageNumber} — ${page.panels?.length || 0} panels, ${(page.panels || []).reduce((sum, panel) => sum + (panel.bubbles?.length || 0), 0)} bubbles
+          </div>
+        `;
+        const layer = frame.querySelector(".reader-target-layer");
+        for (const panel of page.panels || []) {
+          if (panel.feedbackEnabled !== false) {
+            const panelTarget = document.createElement("button");
+            panelTarget.type = "button";
+            panelTarget.className = "reader-target reader-panel-target";
+            panelTarget.dataset.panelId = panel.id;
+            panelTarget.setAttribute("aria-label", `Panel ${panel.panelNumber}`);
+            panelTarget.setAttribute("style", boxStyle(panel.bbox, page));
+            const target = { page, panel };
+            panelTarget.addEventListener("contextmenu", (event) => openContextMenu(event, target));
+            panelTarget.addEventListener("keydown", (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openContextMenuAtElement(panelTarget, target);
+              }
+            });
+            panelTarget.addEventListener("click", (event) => {
+              if (suppressNextImageClick) {
+                event.preventDefault();
+                event.stopPropagation();
+                suppressNextImageClick = false;
+                return;
+              }
+              if (shell.getAttribute("data-mode") !== "study") return;
+              event.stopPropagation();
+              selectTarget(target);
+            });
+            panelTarget.addEventListener("pointerdown", (event) => startLongPress(event, target));
+            panelTarget.addEventListener("pointerup", () => window.clearTimeout(longPressTimer));
+            panelTarget.addEventListener("pointercancel", () => window.clearTimeout(longPressTimer));
+            panelTarget.addEventListener("pointermove", () => window.clearTimeout(longPressTimer));
+            layer?.appendChild(panelTarget);
+          }
+          for (const bubble of panel.bubbles || []) {
+            if (bubble.feedbackEnabled === false) continue;
+            const bubbleTarget = document.createElement("button");
+            bubbleTarget.type = "button";
+            bubbleTarget.className = "reader-target reader-bubble-target";
+            bubbleTarget.dataset.bubbleId = bubble.id;
+            bubbleTarget.setAttribute("aria-label", `Bubble ${bubble.shortId || bubble.bubbleNumber}`);
+            bubbleTarget.setAttribute("style", boxStyle(bubble.bbox, page));
+            const target = { page, panel, bubble };
+            bubbleTarget.addEventListener("contextmenu", (event) => openContextMenu(event, target));
+            bubbleTarget.addEventListener("keydown", (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openContextMenuAtElement(bubbleTarget, target);
+              }
+            });
+            bubbleTarget.addEventListener("click", (event) => {
+              if (suppressNextImageClick) {
+                event.preventDefault();
+                event.stopPropagation();
+                suppressNextImageClick = false;
+                return;
+              }
+              if (shell.getAttribute("data-mode") !== "study") return;
+              event.stopPropagation();
+              selectTarget(target);
+            });
+            bubbleTarget.addEventListener("pointerdown", (event) => startLongPress(event, target));
+            bubbleTarget.addEventListener("pointerup", () => window.clearTimeout(longPressTimer));
+            bubbleTarget.addEventListener("pointercancel", () => window.clearTimeout(longPressTimer));
+            bubbleTarget.addEventListener("pointermove", () => window.clearTimeout(longPressTimer));
+            layer?.appendChild(bubbleTarget);
+          }
+        }
+        frame.querySelector(".page-image-wrap")?.addEventListener("click", () => {
+          if (suppressNextImageClick) {
+            suppressNextImageClick = false;
+            return;
+          }
+          if (shell.getAttribute("data-mode") !== "study") {
+            frame.classList.toggle("zoomed");
+          }
+        });
+        frame.querySelector(".page-image-wrap")?.addEventListener("pointerdown", (event) => {
+          if (shell.getAttribute("data-mode") !== "study") return;
+          event.stopPropagation();
+          const rect = event.currentTarget.getBoundingClientRect();
+          const anchor = {
+            x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+            y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+          };
+          activePage = String(page.pageNumber);
+          writeNotePatch({ anchor, scope: noteScope?.value === "page" ? "region" : noteScope?.value ?? "region" });
+          loadNote(activePage);
+        });
+        return frame;
+      };
+
+      const buildDOM = () => {
+        views = calculateViews();
+        track.innerHTML = "";
+        for (const view of views) {
+          const viewEl = document.createElement("div");
+          viewEl.className = `manga-view${view.single ? " is-single" : ""}${view.align === "right" ? " is-right" : ""}${view.type === "end" ? " is-end" : ""}`;
+          viewEl.dataset.view = view.id;
+          if (view.type === "end") {
+            viewEl.innerHTML = `
+              <div class="reader-end-card">
+                <h2>この話を読み終えました</h2>
+                <p>共有や名セリフ確認、軽い貢献ができます。</p>
+                <div class="explore-actions">
+                  <button type="button" class="btn-viewer btn-ghost-viewer" data-completion-action="share">この話を共有する</button>
+                  <button type="button" class="btn-viewer btn-ghost-viewer" disabled>名セリフを見る（準備中）</button>
+                  <button type="button" class="btn-viewer btn-primary-viewer" data-completion-action="contribute">この話に貢献する</button>
+                </div>
+              </div>
+            `;
+            viewEl.querySelector("[data-completion-action='share']")?.addEventListener("click", async () => {
+              await navigator.clipboard?.writeText(window.location.href.split("#")[0]);
+              showToast("リンクをコピーしました");
+            });
+            viewEl.querySelector("[data-completion-action='contribute']")?.addEventListener("click", () => {
+              openFeedbackModal({ modeOverride: "completion" }, "other", "completion");
+            });
+          } else {
+            for (const page of view.pages) {
+              viewEl.appendChild(createPageFrame(page));
+            }
+          }
+          track.appendChild(viewEl);
+        }
+      };
+
+      const loadBufferedImages = () => {
+        for (let i = currentViewIndex - 2; i <= currentViewIndex + 2; i++) {
+          const viewEl = track.children[i];
+          if (!viewEl) continue;
+          viewEl.querySelectorAll("img[data-src]").forEach((img) => {
+            if (!img.getAttribute("src")) {
+              img.setAttribute("src", img.dataset.src);
+            }
+          });
+        }
+      };
+
+      const updateActivePage = () => {
+        const view = views[currentViewIndex];
+        const page = view?.pages?.[view.pages.length - 1] ?? view?.pages?.[0] ?? pages[pages.length - 1];
+        if (!page) return;
+        activePage = String(page.pageNumber);
+        if (currentPage) currentPage.textContent = page.displayRef ? `${page.displayRef} · ${activePage}` : activePage;
+        loadNote(activePage);
+        const nextUrl = new URL(window.location.href);
+        nextUrl.hash = `p${activePage}`;
+        history.replaceState(null, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+      };
+
+      const render = (offset = 0, animate = true) => {
+        track.style.transition = animate ? "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)" : "none";
+        // Match medamayaki's RTL invariant: row-reverse track + positive offset
+        // advances to the next manga view from right to left.
+        const x = currentViewIndex * lastWidth + offset;
+        track.style.transform = `translate3d(${x}px, 0, 0)`;
+        loadBufferedImages();
+      };
+
+      const goToView = (index) => {
+        currentViewIndex = Math.max(0, Math.min(index, views.length - 1));
+        render(0, true);
+        updateActivePage();
+      };
+
+      const next = () => goToView(currentViewIndex + 1);
+      const prev = () => goToView(currentViewIndex - 1);
+
+      const goToPage = (pageNumber) => {
+        const index = views.findIndex((view) => view.pages?.some((page) => page.pageNumber === pageNumber));
+        if (index >= 0) goToView(index);
+      };
+      const applyInitialFocus = () => {
+        const url = new URL(window.location.href);
+        const focus = url.searchParams.get("focus");
+        const pageParam = url.searchParams.get("page");
+        const target = findTargetById(focus || pageParam);
+        if (!target) return false;
+        goToPage(target.page.pageNumber);
+        setReaderMode("study");
+        requestAnimationFrame(() => {
+          selectTarget(target);
+          revealReader();
+        });
+        return true;
+      };
+
+      const revealReader = () => {
+        const scrollToReaderTop = () => {
+          const shellTop = shell.getBoundingClientRect().top + window.scrollY;
+          window.scrollTo({ top: Math.max(0, shellTop), left: 0, behavior: "auto" });
+        };
+
+        scrollToReaderTop();
+        requestAnimationFrame(() => {
+          scrollToReaderTop();
+          window.setTimeout(() => {
+            scrollToReaderTop();
+          }, 80);
+        });
+      };
+
+      document.querySelector("[data-reader-next]")?.addEventListener("click", next);
+      document.querySelector("[data-reader-prev]")?.addEventListener("click", prev);
+
+      viewport.addEventListener("wheel", (event) => {
+        event.preventDefault();
+      }, { passive: false });
+
+      viewport.addEventListener("pointerdown", (event) => {
+        isDragging = true;
+        startX = event.clientX;
+        dragOffset = 0;
+        viewport.setPointerCapture?.(event.pointerId);
+        render(0, false);
+      });
+
+      viewport.addEventListener("pointermove", (event) => {
+        if (!isDragging) return;
+        dragOffset = event.clientX - startX;
+        render(dragOffset, false);
+      });
+
+      viewport.addEventListener("pointerup", () => {
+        if (!isDragging) return;
+        isDragging = false;
+        const threshold = Math.min(lastWidth * 0.12, 96);
+        if (dragOffset > threshold) next();
+        else if (dragOffset < -threshold) prev();
+        else render(0, true);
+        dragOffset = 0;
+      });
+
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") next();
+        if (event.key === "ArrowRight") prev();
+      });
+
+      window.addEventListener("resize", () => {
+        const active = Number(activePage);
+        lastWidth = viewport.clientWidth;
+        buildDOM();
+        const index = views.findIndex((view) => view.pages?.some((page) => page.pageNumber === active));
+        currentViewIndex = Math.max(0, index);
+        render(0, false);
+      });
+
+      buildDOM();
+      lastWidth = viewport.clientWidth;
+      const initialPage = Number(location.hash.replace("#p", "")) || 1;
+      goToPage(getPage(initialPage) ? initialPage : 1);
+      loadNote(activePage);
+      if (!applyInitialFocus() && location.hash.startsWith("#p")) {
+        requestAnimationFrame(revealReader);
       }
     }
-
-    // --- 2. Zoom (click to toggle) ---
-    document.querySelectorAll(".page-image-wrap").forEach((wrap) => {
-      wrap.addEventListener("click", () => {
-        const frame = wrap.closest(".page-frame");
-        if (!frame) return;
-        frame.classList.toggle("zoomed");
-      });
-    });
-
-    // --- 3. Panel highlight (badge click) ---
-    document.querySelectorAll(".panel-badge").forEach((badge) => {
-      badge.addEventListener("click", () => {
-        const frame = badge.closest(".page-frame");
-        if (!frame) return;
-        frame.classList.add("highlight");
-        frame.scrollIntoView({ behavior: "smooth", block: "center" });
-        setTimeout(() => frame.classList.remove("highlight"), 1500);
-      });
-    });
   });
 </script>
-
