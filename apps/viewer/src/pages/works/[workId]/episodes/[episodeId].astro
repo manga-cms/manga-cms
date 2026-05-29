@@ -27,6 +27,7 @@ if (!workId || !episodeId) {
 // --- Data resolution: API-first with loader fallback ---
 let seriesTitle = "";
 let episode: { title: string; episodeNumber: number; publishedAt: string; pages: any[] } | null = null;
+let seriesCoverUrl = "";
 let prev: { id: string; title: string; episodeNumber: number } | null = null;
 let next: { id: string; title: string; episodeNumber: number } | null = null;
 let dataSource: "api" | "loader" | "none" = "none";
@@ -58,6 +59,7 @@ if (!episode) {
   const ep = getEpisode(workId, episodeId);
   if (work && ep) {
     seriesTitle = work.title;
+    seriesCoverUrl = work.coverUrl;
     // For loader fallback, only show ep1 (free). Others are gated.
     if (ep.episodeNumber <= 1) {
       episode = ep;
@@ -112,13 +114,23 @@ const viewerPages = episode.pages.map((page: any) => ({
     })),
   })),
 }));
+seriesCoverUrl ||= getSeries(workId)?.coverUrl ?? "";
 const viewerPagesJson = JSON.stringify(viewerPages).replace(/</g, "\\u003c");
 const feedbackApiBase = (import.meta.env.API_BASE ?? "").replace(/\/$/, "") || "/api/v1";
 const feedbackApiBaseJson = JSON.stringify(feedbackApiBase).replace(/</g, "\\u003c");
 const isReaderAvailable = !isGated && episode.pages.length > 0;
+const episodeDescription = `${seriesTitle} Episode ${episode.episodeNumber}: ${episode.title}`;
+const hasPublicCoverUrl = seriesCoverUrl.startsWith("/") || /^https?:\/\//.test(seriesCoverUrl);
+const episodeOgImage = viewerPages[0]?.src || (hasPublicCoverUrl ? seriesCoverUrl : "/placeholder-cover.svg");
 ---
 
-<BaseLayout title={`${episode.title} — ${seriesTitle}`} immersive>
+<BaseLayout
+  title={`${episode.title} — ${seriesTitle}`}
+  description={episodeDescription}
+  ogImage={episodeOgImage}
+  ogType="article"
+  immersive
+>
   <section class:list={["container", "page-section", { "is-reader-page": isReaderAvailable }]}>
     {!isReaderAvailable && (
       <>
@@ -159,7 +171,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
           </div>
           <div class="reader-mode">
             <button type="button" class="reader-mode-button is-active" data-mode-button="normal">Read</button>
-            <button type="button" class="reader-mode-button" data-mode-button="study">Explore / くわしく見る</button>
+            <button type="button" class="reader-mode-button" data-mode-button="explore">Explore / くわしく見る</button>
           </div>
           <div class="reader-progress">
             <span data-current-page>1</span> / {episode.pages.length}
@@ -207,7 +219,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
               <input data-note-target placeholder="例: 右上のフキダシ / 2コマ目 / 画面中央" />
             </label>
           </div>
-          <p class="text-muted study-panel-note" data-note-anchor>位置指定なし。Study modeでページ画像をクリックすると、注の位置候補を保存できます。</p>
+          <p class="text-muted study-panel-note" data-note-anchor>位置指定なし。Explore Modeでページ画像をクリックすると、注の位置候補を保存できます。</p>
           <p class="text-muted study-panel-note">Readerでは軽い報告/提案だけを受け付けます。正式編集はCMSで行います。</p>
         </aside>
         <script type="application/json" id="reader-pages" set:html={viewerPagesJson}></script>
@@ -593,7 +605,8 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
     bottom: 16px;
     gap: var(--space-md);
     grid-template-columns: 1fr;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: var(--space-md);
     position: absolute;
     right: 16px;
@@ -606,7 +619,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
     box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
   }
 
-  .reader-shell[data-mode="study"] .study-panel {
+  .reader-shell[data-mode="explore"] .study-panel {
     display: grid;
   }
 
@@ -627,6 +640,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
   .study-panel label {
     display: grid;
     gap: 8px;
+    min-width: 0;
   }
 
   .study-panel span {
@@ -650,6 +664,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
     display: grid;
     gap: var(--space-sm);
     grid-template-columns: 1fr;
+    min-width: 0;
   }
 
   .study-target-grid label {
@@ -675,6 +690,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
     background: rgba(255, 255, 255, 0.045);
     border: 1px solid var(--color-border);
     border-radius: 0;
+    min-width: 0;
     padding: var(--space-md);
   }
 
@@ -691,7 +707,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
     margin: 8px 0 0;
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 900px) {
     .reader-toolbar {
       grid-template-columns: 1fr auto;
     }
@@ -740,7 +756,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
       width: auto;
     }
 
-    .reader-shell[data-mode="study"] .study-panel {
+    .reader-shell[data-mode="explore"] .study-panel {
       display: block;
     }
   }
@@ -789,14 +805,16 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
   .btn-viewer {
     display: inline-block;
     padding: 0.625rem 1.25rem;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius);
     font-weight: 500;
     font-size: 0.875rem;
     text-decoration: none;
+    text-align: center;
+    white-space: normal;
   }
 
   .btn-primary-viewer {
-    background: var(--color-primary);
+    background: var(--color-accent);
     color: white;
   }
 
@@ -880,7 +898,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
     width: 100%;
   }
 
-  .reader-shell[data-mode="study"] .page-image-wrap {
+  .reader-shell[data-mode="explore"] .page-image-wrap {
     cursor: crosshair;
   }
 
@@ -935,12 +953,12 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
     z-index: 4;
   }
 
-  .reader-shell[data-mode="study"] .reader-panel-target {
+  .reader-shell[data-mode="explore"] .reader-panel-target {
     background: rgba(56, 189, 248, 0.08);
     outline: 2px solid rgba(56, 189, 248, 0.75);
   }
 
-  .reader-shell[data-mode="study"] .reader-bubble-target {
+  .reader-shell[data-mode="explore"] .reader-bubble-target {
     background: rgba(250, 204, 21, 0.12);
     outline: 2px solid rgba(250, 204, 21, 0.85);
   }
@@ -1148,6 +1166,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
       let dragOffset = 0;
       let lastWidth = viewport.clientWidth;
       let suppressNextImageClick = false;
+      let suppressNextTap = false;
 
       const noteKey = (page) => `${storagePrefix}:p${page}`;
       const readNote = (page) => {
@@ -1164,7 +1183,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
       const updateAnchorLabel = (anchor) => {
         if (!noteAnchor) return;
         if (!anchor) {
-          noteAnchor.textContent = "位置指定なし。Study modeでページ画像をクリックすると、注の位置候補を保存できます。";
+          noteAnchor.textContent = "位置指定なし。Explore Modeでページ画像をクリックすると、注の位置候補を保存できます。";
           return;
         }
         noteAnchor.textContent = `位置候補: x=${Math.round(anchor.x * 100)}%, y=${Math.round(anchor.y * 100)}%`;
@@ -1213,6 +1232,11 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
       const closeContextMenu = () => {
         if (contextMenu) contextMenu.hidden = true;
       };
+      const isEditableTarget = (target) =>
+        Boolean(target?.closest?.("input, textarea, select, [contenteditable='true']"));
+      const isFeedbackOpen = () => Boolean(feedbackModal && !feedbackModal.hidden);
+      const shouldIgnoreReaderShortcut = (event) =>
+        isFeedbackOpen() || isEditableTarget(event.target);
       const setReaderMode = (mode) => {
         shell.setAttribute("data-mode", mode);
         document.querySelectorAll("[data-mode-button]").forEach((button) => {
@@ -1277,7 +1301,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
           `;
         }
       };
-      const openFeedbackModal = (target, issueType = "other", mode = shell.getAttribute("data-mode") === "study" ? "explore" : "read") => {
+      const openFeedbackModal = (target, issueType = "other", mode = shell.getAttribute("data-mode") === "explore" ? "explore" : "read") => {
         feedbackTargetState = target;
         if (feedbackTitle) feedbackTitle.textContent = mode === "completion" ? "この話に貢献する" : mode === "explore" ? "提案する" : "報告する";
         if (feedbackTarget) {
@@ -1352,7 +1376,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
           showToast("リンクをコピーしました");
           closeContextMenu();
         } else if (action === "explore") {
-          setReaderMode("study");
+          setReaderMode("explore");
           selectTarget(selectedTarget);
           closeContextMenu();
         } else if (action === "report") {
@@ -1390,7 +1414,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
         const form = event.currentTarget;
         const formData = new FormData(form);
         const issueType = String(formData.get("issue_type") || "other");
-        const mode = feedbackTargetState?.modeOverride || (shell.getAttribute("data-mode") === "study" ? "explore" : "read");
+        const mode = feedbackTargetState?.modeOverride || (shell.getAttribute("data-mode") === "explore" ? "explore" : "read");
         const payload = {
           ...makePayloadBase(feedbackTargetState, mode),
           issue_type: issueType,
@@ -1516,11 +1540,14 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
                 suppressNextImageClick = false;
                 return;
               }
-              if (shell.getAttribute("data-mode") !== "study") return;
+              if (shell.getAttribute("data-mode") !== "explore") return;
               event.stopPropagation();
               selectTarget(target);
             });
-            panelTarget.addEventListener("pointerdown", (event) => startLongPress(event, target));
+            panelTarget.addEventListener("pointerdown", (event) => {
+              if (shell.getAttribute("data-mode") === "explore") event.stopPropagation();
+              startLongPress(event, target);
+            });
             panelTarget.addEventListener("pointerup", () => window.clearTimeout(longPressTimer));
             panelTarget.addEventListener("pointercancel", () => window.clearTimeout(longPressTimer));
             panelTarget.addEventListener("pointermove", () => window.clearTimeout(longPressTimer));
@@ -1549,28 +1576,35 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
                 suppressNextImageClick = false;
                 return;
               }
-              if (shell.getAttribute("data-mode") !== "study") return;
+              if (shell.getAttribute("data-mode") !== "explore") return;
               event.stopPropagation();
               selectTarget(target);
             });
-            bubbleTarget.addEventListener("pointerdown", (event) => startLongPress(event, target));
+            bubbleTarget.addEventListener("pointerdown", (event) => {
+              if (shell.getAttribute("data-mode") === "explore") event.stopPropagation();
+              startLongPress(event, target);
+            });
             bubbleTarget.addEventListener("pointerup", () => window.clearTimeout(longPressTimer));
             bubbleTarget.addEventListener("pointercancel", () => window.clearTimeout(longPressTimer));
             bubbleTarget.addEventListener("pointermove", () => window.clearTimeout(longPressTimer));
             layer?.appendChild(bubbleTarget);
           }
         }
-        frame.querySelector(".page-image-wrap")?.addEventListener("click", () => {
+        frame.querySelector(".page-image-wrap")?.addEventListener("click", (event) => {
           if (suppressNextImageClick) {
             suppressNextImageClick = false;
             return;
           }
-          if (shell.getAttribute("data-mode") !== "study") {
+          if (shell.getAttribute("data-mode") !== "explore") {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const xRatio = (event.clientX - rect.left) / rect.width;
+            if (xRatio < 0.4 || xRatio > 0.6) return;
+            event.stopPropagation();
             frame.classList.toggle("zoomed");
           }
         });
         frame.querySelector(".page-image-wrap")?.addEventListener("pointerdown", (event) => {
-          if (shell.getAttribute("data-mode") !== "study") return;
+          if (shell.getAttribute("data-mode") !== "explore") return;
           event.stopPropagation();
           const rect = event.currentTarget.getBoundingClientRect();
           const anchor = {
@@ -1672,7 +1706,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
         const target = findTargetById(focus || pageParam);
         if (!target) return false;
         goToPage(target.page.pageNumber);
-        setReaderMode("study");
+        setReaderMode("explore");
         requestAnimationFrame(() => {
           selectTarget(target);
           revealReader();
@@ -1703,6 +1737,7 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
       }, { passive: false });
 
       viewport.addEventListener("pointerdown", (event) => {
+        if (shouldIgnoreReaderShortcut(event)) return;
         isDragging = true;
         startX = event.clientX;
         dragOffset = 0;
@@ -1719,14 +1754,37 @@ const isReaderAvailable = !isGated && episode.pages.length > 0;
       viewport.addEventListener("pointerup", () => {
         if (!isDragging) return;
         isDragging = false;
+        suppressNextTap = Math.abs(dragOffset) > 8;
         const threshold = Math.min(lastWidth * 0.12, 96);
         if (dragOffset > threshold) next();
         else if (dragOffset < -threshold) prev();
         else render(0, true);
         dragOffset = 0;
+        window.setTimeout(() => {
+          suppressNextTap = false;
+        }, 0);
+      });
+
+      viewport.addEventListener("click", (event) => {
+        if (suppressNextTap || shouldIgnoreReaderShortcut(event) || shell.getAttribute("data-mode") === "explore") {
+          return;
+        }
+        const rect = viewport.getBoundingClientRect();
+        const xRatio = (event.clientX - rect.left) / rect.width;
+        if (xRatio < 0.42) next();
+        else if (xRatio > 0.58) prev();
       });
 
       window.addEventListener("keydown", (event) => {
+        if (shouldIgnoreReaderShortcut(event)) {
+          if (event.key === "Escape" && isFeedbackOpen()) feedbackModal.hidden = true;
+          return;
+        }
+        if (event.key === "Escape") {
+          if (contextMenu && !contextMenu.hidden) closeContextMenu();
+          else if (shell.getAttribute("data-mode") === "explore") setReaderMode("normal");
+          return;
+        }
         if (event.key === "ArrowLeft") next();
         if (event.key === "ArrowRight") prev();
       });
