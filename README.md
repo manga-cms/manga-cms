@@ -1,263 +1,227 @@
-Manga Infrastructure
+# Manga CMS
 
-Open source infrastructure for publishing manga on the web.
+Open source infrastructure for publishing structured manga on the web.
 
-This project provides everything needed to build a manga site:
-	•	⚡ Fast manga viewer
-	•	🛠 Creator CMS
-	•	🌐 Translation system
-	•	💬 Quote sharing
-	•	🔐 Entitlement / purchase unlock
-	•	🧠 Narrative graph structure
-	•	📦 Pack-based extensions
+Manga CMS treats a manga episode as more than a stack of page images. It keeps
+stable references for pages, panels, and speech bubbles so the same content can
+support precise sharing, translation packs, annotations, access control, and
+future ingestion tooling.
 
-The goal is simple:
+## Status
 
-Anyone should be able to clone this repository and launch a manga website the same day.
+This repository is ready for public open source iteration, but it is still an
+early project.
 
-⸻
+Works today:
 
-Why this project exists
+- Public manga viewer powered by Astro.
+- Hono API for series, episodes, pages, quotes, clips, reactions, auth, delivery,
+  entitlements, and admin workflows.
+- React creator CMS for basic series and episode editing.
+- File-backed `contents/` source data with Zod validation.
+- Prisma-backed runtime state for DB mode.
+- Tokenized image delivery path and entitlement checks.
+- Ingestion proof of concept with draft/review/confirm separation.
 
-Most manga sites treat comics as flat images.
+Still early:
 
-But manga actually contains structure:
-	•	pages
-	•	panels
-	•	speech bubbles
-	•	quotes
-	•	commentary
-	•	translations
+- Image upload from the CMS is not a complete production workflow.
+- Panel and bubble editing is still minimal.
+- OCR, PSD, and Clip Studio ingestion are PoC-level.
+- Watermark compositing is currently a stub.
+- External commerce webhooks, CDN strategy, monitoring, and multi-instance
+  hardening are not finished.
 
-This project converts manga into structured data so that it becomes programmable media.
+For the detailed task list, see [docs/PUBLIC_RELEASE_CHECKLIST.md](docs/PUBLIC_RELEASE_CHECKLIST.md)
+and [docs/ROADMAP.md](docs/ROADMAP.md).
 
-Once structured, a manga page can support things like:
-	•	quote sharing
-	•	multilingual reading
-	•	commentary layers
-	•	educational annotations
-	•	AI navigation
-	•	community translations
+## Why This Exists
 
-⸻
+Most manga websites treat comics as flat images. Manga CMS keeps the image
+reading experience, but adds a structured layer:
 
-Core Ideas
-
-Narrative Graph
-
-A manga is not just images.
-
-It is a graph of narrative units.
-
+```text
 Series
-  └ Episode
-      └ Page
-          └ Panel
-              └ Bubble
+  Episode
+    Page
+      Panel
+        Bubble
+```
 
-This structure allows the system to support:
-	•	quotes
-	•	references
-	•	commentary
-	•	reactions
+That structure enables:
 
-⸻
+- Quote sharing at the speech-bubble level.
+- Clip sharing across panel ranges.
+- Reaction search for reusable panels.
+- Translation, commentary, learning, and accessibility packs.
+- Entitlement-based access control for free, paid, promo, and contributor access.
+- A future ingestion pipeline that turns raw manuscripts into reviewable
+  structured drafts.
 
-Packs
+## Repository Layout
 
-Additional information is stored in packs.
-
-Examples:
-	•	translation packs
-	•	author commentary
-	•	educational notes
-	•	community annotations
-
-Packs do not modify the original content.
-
-They extend it.
-
-contents/
-packs/
-
-
-⸻
-
-Quote-based sharing
-
-Instead of sharing entire pages, readers can share quotes.
-
-A quote references a bubble.
-
-Example share URL:
-
-/quote/s01e01p03b04
-
-This allows precise referencing of moments in a story.
-
-⸻
-
-Entitlement
-
-Access control is based on entitlements.
-
-Examples:
-	•	purchased episode
-	•	redeemed code
-	•	subscriber access
-
-This enables flexible publishing models such as:
-	•	free chapters
-	•	paid chapters
-	•	bonus packs
-	•	supporter content
-
-⸻
-
-Ingestion Pipeline
-
-Creators upload raw manga files.
-
-The system converts them into structured data.
-
-Pipeline:
-
-Images / PSD / Text export
-        ↓
-Panel detection
-        ↓
-Bubble detection
-        ↓
-OCR assist
-        ↓
-Matching
-        ↓
-Draft JSON
-        ↓
-CMS review
-        ↓
-Git source of truth
-
-The goal is not full automation.
-
-The goal is reducing manual structuring work.
-
-⸻
-
-Architecture
-
-The project is built as a monorepo.
-
+```text
 apps/
-  viewer/      → public manga viewer (Astro)
-  cms/         → creator CMS (React)
-  api/         → API server (Hono)
+  api/       Hono API server
+  cms/       React + Vite creator CMS
+  viewer/    Astro public viewer
 
 packages/
-  domain/      → shared domain logic
-  db/          → database schema
-  ingestion/   → isolated ingestion PoC (artifacts + canonical drafts)
-  schemas/     → JSON schemas
+  db/         Prisma schema and database repository layer
+  domain/     shared domain types and filesystem repositories
+  ingestion/  ingestion PoC package
+  schemas/    Zod schemas for content and pack validation
 
-contents/      → source manga content
-packs/         → extensions (translations etc)
-scripts/       → ingestion and maintenance
+contents/     manga source data
+packs/        translation/commentary/learning/accessibility packs
+docs/         launch, deployment, and operations docs
+scripts/      smoke tests and local runners
+```
 
+## Quick Start
 
-⸻
+Requirements:
 
-Technology Stack
+- Node.js 20 or newer
+- pnpm 9.5.0
 
-Layer	Technology
-Viewer	Astro
-CMS	React + Vite
-API	Hono
-DB	Prisma
-Storage	R2 / local filesystem
-Infra	Cloudflare
-Images	AVIF / WebP fallback
+Install and build:
 
-This stack was chosen to support both:
-	•	Starter mode (local)
-	•	Production deployment
-
-⸻
-
-Starter Mode
-
-Starter mode allows running everything locally.
-
-git clone repo
-cd project
+```bash
 pnpm install
+pnpm --filter @manga/db db:generate
+pnpm build
+```
+
+Run the API:
+
+```bash
+cd apps/api
 pnpm dev
+```
 
-This launches:
-	•	viewer
-	•	cms
-	•	api
+Default API health endpoint:
 
-You can create a manga site immediately.
+```text
+http://localhost:3000/api/v1/health
+```
 
-No cloud services required.
+Run the viewer:
 
-⸻
+```bash
+cd apps/viewer
+API_BASE=http://localhost:3000/api/v1 pnpm dev
+```
 
-Production Mode
+Default viewer:
 
-Production mode is designed for edge deployment.
+```text
+http://localhost:4321
+```
 
-Recommended stack:
-	•	Cloudflare Pages
-	•	Cloudflare Workers
-	•	R2 storage
-	•	Postgres / Neon / Supabase
+Run the CMS:
 
-The architecture remains identical.
+```bash
+cd apps/cms
+pnpm dev
+```
 
-⸻
+Default CMS:
 
-Example Workflow
+```text
+http://localhost:5173
+```
 
-Create a manga site in minutes.
+## Publishing Manga Content
 
-1. Setup site
-2. Create work
-3. Create episode
-4. Upload pages
-5. Review structure
-6. Publish
+The most reliable path today is to add content files manually or through the
+current CMS publish flow.
 
-That’s it.
+Minimum required structure:
 
-⸻
+```text
+contents/
+  your-series/
+    series.json
+    ep01/
+      episode.json
+      pages/
+        p01.jpg
+        p02.jpg
+```
 
-Project Status
+Pages can render with an empty `panels` array. Quote, clip, reaction,
+translation, and annotation features require panel and bubble data.
 
-This project is currently in active development.
+See [docs/CONTENT_GUIDE.md](docs/CONTENT_GUIDE.md) for the current content
+format and publication workflow.
 
-Planned milestones:
-	•	Viewer MVP
-	•	CMS MVP
-	•	Ingestion pipeline
-	•	Pack system
-	•	Quote sharing
-	•	Entitlement
-	•	Translation workflow
+## Core Concepts
 
-⸻
+### Stable IDs
 
-Contributing
+Pages, panels, and bubbles have stable IDs. These IDs let the system resolve
+deep links, quote pages, clip pages, packs, proposals, and entitlement checks
+without depending on fragile screen coordinates alone.
 
-Contributions are welcome.
+### Packs
 
-Areas where help is especially valuable:
-	•	viewer performance
-	•	OCR accuracy
-	•	panel detection
-	•	CMS UX
-	•	translation workflow
-	•	accessibility
+Packs add information without rewriting the original manga content.
+
+Supported pack categories include:
+
+- Translation
+- Footnote
+- Commentary
+- Learning
+- Accessibility
+
+### Entitlements
+
+Access control is based on entitlements rather than purchase records alone.
+Purchases, promo codes, contributor rewards, admin grants, and subscriptions can
+all grant the same kind of read access.
+
+### Ingestion
+
+The ingestion pipeline is designed to reduce manual structuring work, not to
+fully automate editorial judgment. The intended flow is:
+
+```text
+Images / PSD / text export
+  -> panel and text-region candidates
+  -> OCR/source-text matching
+  -> draft JSON
+  -> CMS review
+  -> contents/ source of truth
+```
+
+## Documentation
+
+- [Architecture](ARCHITECTURE.md)
+- [Comic domain specification](comic-domain-spec.md)
+- [Entitlement specification](entitlement-spec.md)
+- [Ingestion specification](ingestion-spec.md)
+- [Content guide](docs/CONTENT_GUIDE.md)
+- [Public release checklist](docs/PUBLIC_RELEASE_CHECKLIST.md)
+- [Deployment](docs/DEPLOY.md)
+- [Backup and restore](docs/BACKUP-RESTORE.md)
+
+## Contributing
+
+Contributions are welcome. The most useful areas right now are:
+
+- Content format examples and validation.
+- CMS UX for page, panel, and bubble editing.
+- Manuscript ingestion from image, PSD, text export, and Clip Studio workflows.
+- Viewer interactions such as highlighting, zoom, and deep links.
+- Accessibility, localization, and translation workflows.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
 
 ⸻
 
