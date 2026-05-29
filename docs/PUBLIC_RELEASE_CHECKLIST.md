@@ -30,10 +30,12 @@ Status: not ready without more operations work.
 - [x] Add contribution guidelines.
 - [x] Explain current project status in README.
 - [x] Document the current content format.
+- [x] Document GitHub account and repository naming plan.
 - [x] Remove local metadata files from version control if tracked.
 - [x] Confirm no obvious real secrets are committed.
 - [ ] Confirm sample content is either original, licensed, or clearly placeholder.
-- [ ] Create the GitHub repository.
+- [ ] Create a GitHub Organization or choose the owner account.
+- [ ] Create the GitHub repository. Recommended name: `manga-cms`.
 - [ ] Add the remote.
 - [ ] Push `main`.
 - [ ] Add repository topics and a short description.
