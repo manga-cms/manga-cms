@@ -30,8 +30,8 @@ jobs:
 
       - name: Validate content schemas
         run: |
-          node -e "
-            const { FileContentRepository } = require('@manga/domain');
+          node --input-type=module -e "
+            import { FileContentRepository } from './packages/domain/dist/index.js';
             const repo = new FileContentRepository('./contents');
             const series = repo.listSeries();
             console.log('Content validation passed:', series.length, 'series');
