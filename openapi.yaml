@@ -1,11 +1,10 @@
 openapi: 3.1.0
 info:
-  title: Manga Infrastructure API
+  title: Manga CMS API
   version: 0.1.0
   description: >
-    API specification for Manga Infrastructure.
-    This API supports structured manga reading, quote/clip sharing,
-    community proposals, pack retrieval, entitlements, and purchase code redemption.
+    Contract for the current manga-cms API. Canonical content remains in
+    contents/ and uses Series -> Episode -> Page -> Panel -> Bubble terms.
 
 servers:
   - url: https://api.example.com/api/v1
@@ -14,56 +13,111 @@ servers:
     description: Local development
 
 tags:
+  - name: Health
   - name: Reader
+  - name: Feedback
   - name: Delivery
-    description: >
-      Image delivery with entitlement gating and per-user watermark injection.
-      Viewer pages embed delivery URLs (not origin URLs) in <img> tags.
-  - name: Quotes
-  - name: Clips
-  - name: Reactions
-  - name: Packs
-  - name: Proposals
-  - name: Review
+  - name: AdminContent
+  - name: Ingestion
+  - name: Auth
   - name: Entitlements
+  - name: RuntimeAdmin
   - name: Redeem
 
-security:
-  - bearerAuth: []
-
 paths:
-  /series/{seriesId}/episodes/{episodeId}/pages/{pageNumber}:
+  /health:
+    get:
+      tags: [Health]
+      summary: API and dependency health
+      security: []
+      responses:
+        "200":
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /series:
     get:
       tags: [Reader]
-      summary: Get reader page payload
+      summary: List public Series summaries
+      security: []
+      responses:
+        "200":
+          description: Series summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SeriesSummary"
+
+  /series/{seriesId}:
+    get:
+      tags: [Reader]
+      summary: Read Series detail and Episode summaries
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      responses:
+        "200":
+          description: Series detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /series/{seriesId}/episodes/{episodeId}:
+    get:
+      tags: [Reader]
+      summary: Read Episode metadata and navigation
       description: >
-        Returns page metadata, page images for available languages,
-        panel/bubble references, and published packs relevant to the page.
+        Returns delivery URLs for entitled/free content. Locked episodes return
+        `gated: true` and no page payloads.
       security:
         - {}
         - bearerAuth: []
-      description: >
-        Returns page metadata, delivery image URLs, panel/bubble references,
-        and published packs. Accepts optional auth — if the episode requires
-        entitlement and no valid token is provided, returns a gated response
-        with `locked: true` and preview-only data.
-        Image URLs in the response are tokenized delivery URLs pointing to
-        /deliver/{pageId}, not origin file URLs.
       parameters:
-        - $ref: '#/components/parameters/seriesId'
-        - $ref: '#/components/parameters/episodeId'
-        - name: pageNumber
-          in: path
-          required: true
-          schema:
-            type: integer
-            minimum: 1
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+      responses:
+        "200":
+          description: Episode payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EpisodeResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /series/{seriesId}/episodes/{episodeId}/pages/{pageNumber}:
+    get:
+      tags: [Reader]
+      summary: Get reader Page payload
+      description: >
+        Returns page metadata, tokenized delivery image URLs, panel/bubble
+        references, and available packs. Locked pages return `gated: true` and
+        omit image URLs and panel details.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
         - name: lang
           in: query
           required: false
           schema:
             type: string
-            description: ISO 639-1 language code, e.g. en, ja
+            default: ja
         - name: packs
           in: query
           required: false
@@ -73,68 +127,46 @@ paths:
               type: string
           style: form
           explode: false
-          description: Optional pack IDs to load
       responses:
-        '200':
-          description: Reader page payload
+        "200":
+          description: Reader Page payload
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReaderPageResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/ReaderPageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /quotes/{seriesId}/{episodeId}/{pageNumber}/{panelNumber}/{bubbleNumber}:
     get:
-      tags: [Quotes]
-      summary: Get quote payload
-      description: >
-        Returns a quote (bubble) with related panel preview, original text,
-        available translations, footnotes, and commentary.
+      tags: [Reader]
+      summary: Read Bubble quote payload
       security: []
       parameters:
-        - $ref: '#/components/parameters/seriesId'
-        - $ref: '#/components/parameters/episodeId'
-        - $ref: '#/components/parameters/pageNumber'
-        - name: panelNumber
-          in: path
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-        - name: bubbleNumber
-          in: path
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-        - name: lang
-          in: query
-          required: false
-          schema:
-            type: string
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
+        - $ref: "#/components/parameters/panelNumber"
+        - $ref: "#/components/parameters/bubbleNumber"
       responses:
-        '200':
+        "200":
           description: Quote payload
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/QuoteResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/QuoteResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /clips/{seriesId}/{episodeId}/{pageNumber}/{panelStart}/{panelEnd}:
     get:
-      tags: [Clips]
-      summary: Get clip payload
-      description: >
-        Returns a clip (panel range) including panel previews, dialogues,
-        and related translations/footnotes.
+      tags: [Reader]
+      summary: Read Panel range clip payload
       security: []
       parameters:
-        - $ref: '#/components/parameters/seriesId'
-        - $ref: '#/components/parameters/episodeId'
-        - $ref: '#/components/parameters/pageNumber'
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
         - name: panelStart
           in: path
           required: true
@@ -147,36 +179,29 @@ paths:
           schema:
             type: integer
             minimum: 1
-        - name: lang
-          in: query
-          required: false
-          schema:
-            type: string
       responses:
-        '200':
+        "200":
           description: Clip payload
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ClipResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/ClipResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /reactions:
     get:
-      tags: [Reactions]
-      summary: Search reaction panels
-      description: Returns published reaction panels filtered by tag and/or series.
+      tags: [Reader]
+      summary: Search official reaction Panels
       security: []
       parameters:
         - name: tag
           in: query
-          required: false
+          required: true
           schema:
             type: string
-          description: Reaction tag such as surprised, crying, angry
         - name: seriesId
           in: query
           required: false
@@ -189,254 +214,811 @@ paths:
             type: integer
             minimum: 1
             maximum: 100
-            default: 20
-        - name: cursor
-          in: query
-          required: false
-          schema:
-            type: string
       responses:
-        '200':
+        "200":
           description: Reaction search results
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReactionSearchResponse'
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReactionItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
-  /packs/{packId}:
+  /feedback:
+    post:
+      tags: [Feedback]
+      summary: Submit reader feedback
+      description: Stores private reader feedback and does not mutate canonical content.
+      security:
+        - {}
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackPayload"
+      responses:
+        "201":
+          description: Feedback accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /deliver/{pageId}:
     get:
-      tags: [Packs]
-      summary: Get pack metadata and items
-      description: Returns published pack metadata and optionally items.
+      tags: [Delivery]
+      summary: Token-verified image delivery
+      description: >
+        Serves a page image only when the short-lived delivery token matches
+        the requested page. The current implementation accepts `lang` and the
+        legacy `locale` query name.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: pageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+        - name: locale
+          in: query
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Image bytes, or a JSON placeholder when the image file is absent locally.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+            X-Watermark-Applied:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/series:
+    post:
+      tags: [AdminContent]
+      summary: Create Series
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSeriesInput"
+      responses:
+        "201":
+          description: Created Series
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Series"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/series/{seriesId}:
+    put:
+      tags: [AdminContent]
+      summary: Update Series metadata
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeriesInput"
+      responses:
+        "200":
+          description: Updated Series
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Series"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/series/{seriesId}/episodes:
+    post:
+      tags: [AdminContent]
+      summary: Create or save Episode
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Episode"
+      responses:
+        "201":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/series/{seriesId}/episodes/{episodeId}:
+    get:
+      tags: [AdminContent]
+      summary: Read full Episode for CMS editing
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+      responses:
+        "200":
+          description: Episode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Episode"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [AdminContent]
+      summary: Update Episode
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Episode"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/series/{seriesId}/episodes/{episodeId}/pages/{pageNumber}/image:
+    get:
+      tags: [AdminContent]
+      summary: Read admin Page image preview
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+      responses:
+        "200":
+          description: Image bytes
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/series/{seriesId}/publish:
+    post:
+      tags: [AdminContent]
+      summary: Reload/publish Series data
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      responses:
+        "200":
+          description: Publish result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs:
+    get:
+      tags: [Ingestion]
+      summary: List ingestion jobs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ingestion jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestionJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Ingestion]
+      summary: Create ingestion job
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                draft:
+                  $ref: "#/components/schemas/DraftPayload"
+      responses:
+        "201":
+          description: Created ingestion job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/ingestion/jobs/{jobId}:
+    get:
+      tags: [Ingestion]
+      summary: Read ingestion job detail and draft
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          description: Ingestion job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs/{jobId}/draft:
+    put:
+      tags: [Ingestion]
+      summary: Update ingestion draft payload
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftPayload"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/ingestion/jobs/{jobId}/submit:
+    post:
+      tags: [Ingestion]
+      summary: Submit draft for review
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/ingestion/jobs/{jobId}/confirm:
+    post:
+      tags: [Ingestion]
+      summary: Confirm draft into contents/
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          description: Confirm result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [confirmed, seriesId]
+                properties:
+                  confirmed:
+                    type: boolean
+                  seriesId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/ingestion/jobs/{jobId}/cancel:
+    post:
+      tags: [Ingestion]
+      summary: Cancel ingestion job
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /auth/dev-login:
+    post:
+      tags: [Auth]
+      summary: Development login
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Session token and user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Magic-link login request
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Login link result
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          description: Email or DB not configured
+
+  /auth/verify:
+    get:
+      tags: [Auth]
+      summary: Magic-link verification
       security: []
       parameters:
-        - name: packId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: includeItems
+        - name: token
           in: query
-          required: false
-          schema:
-            type: boolean
-            default: true
-      responses:
-        '200':
-          description: Pack payload
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PackResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /proposals:
-    get:
-      tags: [Proposals]
-      summary: List proposals
-      description: Returns proposals visible to the current user.
-      parameters:
-        - name: status
-          in: query
-          required: false
-          schema:
-            $ref: '#/components/schemas/ProposalStatus'
-        - name: type
-          in: query
-          required: false
-          schema:
-            $ref: '#/components/schemas/ProposalType'
-        - name: bubbleId
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: panelId
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: pageId
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: language
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-        - name: cursor
-          in: query
-          required: false
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Proposal list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProposalListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-    post:
-      tags: [Proposals]
-      summary: Create proposal
-      description: >
-        Creates a new proposal for translation, footnote, commentary, or correction.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateProposalRequest'
-      responses:
-        '201':
-          description: Proposal created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProposalResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /proposals/{proposalId}:
-    get:
-      tags: [Proposals]
-      summary: Get proposal detail
-      parameters:
-        - name: proposalId
-          in: path
           required: true
           schema:
             type: string
       responses:
-        '200':
-          description: Proposal detail
+        "200":
+          description: Authenticated user
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProposalResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          description: DB not configured
 
-  /proposals/{proposalId}/comments:
-    post:
-      tags: [Review]
-      summary: Add review comment
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [content]
-              properties:
-                content:
-                  type: string
-      responses:
-        '201':
-          description: Review comment created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReviewCommentResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /proposals/{proposalId}/review:
-    post:
-      tags: [Review]
-      summary: Review proposal
-      description: Reviewer/admin changes proposal status.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [action]
-              properties:
-                action:
-                  type: string
-                  enum: [review, approve, reject, merge]
-                comment:
-                  type: string
-      responses:
-        '200':
-          description: Proposal review updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProposalResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /entitlements:
+  /auth/me:
     get:
+      tags: [Auth]
+      summary: Current user
+      security:
+        - {}
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authenticated]
+                properties:
+                  authenticated:
+                    type: boolean
+                    const: false
+
+  /admin/entitlements/grant:
+    post:
       tags: [Entitlements]
-      summary: List current user entitlements
+      summary: Grant entitlement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantEntitlementInput"
       responses:
-        '200':
-          description: Entitlement list
+        "201":
+          description: Entitlement
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EntitlementListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/Entitlement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /entitlements/check:
     get:
       tags: [Entitlements]
-      summary: Check access for a target
+      summary: Check current entitlement for an episode
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
-        - name: targetType
+        - name: seriesId
           in: query
           required: true
           schema:
-            $ref: '#/components/schemas/EntitlementTargetType'
-        - name: targetId
+            type: string
+        - name: episodeId
           in: query
           required: true
           schema:
             type: string
       responses:
-        '200':
+        "200":
           description: Access check result
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EntitlementCheckResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/EntitlementCheckResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /admin/entitlements/list:
+    get:
+      tags: [Entitlements]
+      summary: List entitlements for a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Entitlements
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Entitlement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/entitlements/revoke:
+    post:
+      tags: [Entitlements]
+      summary: Revoke entitlement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entitlementId]
+              properties:
+                entitlementId:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/api-keys:
+    get:
+      tags: [RuntimeAdmin]
+      summary: List API keys
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: API keys
+          content:
+            application/json:
+              schema:
+                type: object
+        "501":
+          description: Requires DATABASE_URL
+    post:
+      tags: [RuntimeAdmin]
+      summary: Create API key
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+      responses:
+        "201":
+          description: API key
+          content:
+            application/json:
+              schema:
+                type: object
+        "501":
+          description: Requires DATABASE_URL
+
+  /admin/api-keys/{id}/revoke:
+    post:
+      tags: [RuntimeAdmin]
+      summary: Revoke API key
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "501":
+          description: Requires DATABASE_URL
+
+  /admin/purchases:
+    get:
+      tags: [RuntimeAdmin]
+      summary: List purchase records
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Purchases
+          content:
+            application/json:
+              schema:
+                type: object
+        "501":
+          description: Requires DATABASE_URL
+    post:
+      tags: [RuntimeAdmin]
+      summary: Create purchase record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, codes]
+              properties:
+                productId:
+                  type: string
+                codes:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "201":
+          description: Purchase
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "501":
+          description: Requires DATABASE_URL
+
+  /admin/auth/cleanup:
+    post:
+      tags: [RuntimeAdmin]
+      summary: Cleanup expired and consumed auth tokens
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cleanup result
+          content:
+            application/json:
+              schema:
+                type: object
+        "501":
+          description: Requires DATABASE_URL
 
   /redeem:
     post:
       tags: [Redeem]
-      summary: Redeem purchase/unlock code
-      description: Redeems a purchase code and issues entitlements to the current user/session.
+      summary: Redeem code
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -448,99 +1030,25 @@ paths:
                 code:
                   type: string
       responses:
-        '200':
-          description: Code redeemed
+        "200":
+          description: Redeem result
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RedeemResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: Code already redeemed or invalid state
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  # ---------------------------------------------------------------------------
-  # Image Delivery
-  # ---------------------------------------------------------------------------
-  /deliver/{pageId}:
-    get:
-      tags: [Delivery]
-      summary: Deliver a watermarked page image
-      description: >
-        Returns a page image with per-user watermark injected.
-        Requires a short-lived signed token (issued by the reader endpoint)
-        or a valid bearer token with an active entitlement.
-
-        The watermark seed is derived from:
-          HMAC(secret, entitlement_id + page_id + lang + session_bucket)
-
-        For free content, a generic watermark (no entitlement ID) is applied.
-        The response is cacheable per (token, lang) pair but NOT globally.
-      parameters:
-        - name: pageId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: lang
-          in: query
-          required: false
-          schema:
-            type: string
-            default: ja
-            description: ISO 639-1 code. Selects the language variant of the page image.
-        - name: token
-          in: query
-          required: false
-          schema:
-            type: string
-            description: >
-              Short-lived signed token issued by the reader endpoint.
-              If absent, falls back to bearer auth.
-      security:
-        - {}
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Watermarked page image
-          headers:
-            Cache-Control:
-              schema:
-                type: string
-                example: private, max-age=300
-            X-Watermark-Applied:
-              schema:
-                type: boolean
-          content:
-            image/avif:
-              schema:
-                type: string
-                format: binary
-            image/webp:
-              schema:
-                type: string
-                format: binary
-        '403':
-          description: Entitlement required but not present
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                type: object
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "501":
+          description: Requires DATABASE_URL
 
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
+      bearerFormat: HMAC session token
 
   parameters:
     seriesId:
@@ -562,132 +1070,331 @@ components:
       schema:
         type: integer
         minimum: 1
+    panelNumber:
+      name: panelNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    bubbleNumber:
+      name: bubbleNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    jobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
 
   responses:
+    Ok:
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok]
+            properties:
+              ok:
+                type: boolean
     BadRequest:
       description: Bad request
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     Unauthorized:
       description: Authentication required
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     Forbidden:
       description: Permission denied
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     NotFound:
       description: Resource not found
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limited
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 
   schemas:
-    ProposalType:
-      type: string
-      enum: [TRANSLATION, FOOTNOTE, COMMENTARY, CORRECTION]
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
 
-    ProposalStatus:
-      type: string
-      enum: [DRAFT, REVIEW, APPROVED, REJECTED, MERGED]
-
-    PackType:
-      type: string
-      enum: [TRANSLATION, FOOTNOTE, COMMENTARY, LEARNING, ACCESSIBILITY]
-
-    EntitlementTargetType:
-      type: string
-      enum: [SERIES, EPISODE, VOLUME, PACK, BUNDLE]
-
-    EntitlementSource:
-      type: string
-      enum: [PURCHASE, CONTRIBUTOR_REWARD, PROMO, ADMIN_GRANT, SUBSCRIPTION]
+    HealthResponse:
+      type: object
+      required: [status, env, seriesCount, checks, ready]
+      properties:
+        status:
+          type: string
+        env:
+          type: string
+        seriesCount:
+          type: integer
+        checks:
+          type: object
+        ready:
+          type: boolean
 
     BoundingBox:
       type: object
       required: [x, y, width, height]
       properties:
         x:
-          type: integer
+          type: number
         y:
-          type: integer
+          type: number
         width:
-          type: integer
+          type: number
         height:
-          type: integer
+          type: number
 
-    BubbleRef:
+    ContentFlags:
       type: object
-      required: [id, bubbleNumber, bbox, textOriginal]
+      required: [shareable, feedback_enabled]
+      properties:
+        shareable:
+          type: boolean
+        feedback_enabled:
+          type: boolean
+        contains_spoiler:
+          type: boolean
+
+    Bubble:
+      type: object
+      required: [id, bubbleNumber, shortId, bubbleType, textOriginal, bbox]
       properties:
         id:
           type: string
-        shortId:
-          type: string
-          nullable: true
         bubbleNumber:
           type: integer
+        shortId:
+          type: string
         bubbleType:
           type: string
-          nullable: true
-        bbox:
-          $ref: '#/components/schemas/BoundingBox'
+          enum: [speech, thought, narration, sfx, caption, other]
         textOriginal:
           type: string
         speaker:
           type: string
           nullable: true
+        speakerConfidence:
+          type: string
+          enum: [confirmed, inferred, unknown]
+        textDirection:
+          type: string
+          enum: [horizontal, vertical]
+        lang:
+          type: string
+        flags:
+          $ref: "#/components/schemas/ContentFlags"
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
 
-    PanelRef:
+    Panel:
       type: object
-      required: [id, panelNumber, bbox]
+      required: [id, panelNumber, bbox, reactionTags, bubbles]
       properties:
         id:
           type: string
         panelNumber:
           type: integer
         bbox:
-          $ref: '#/components/schemas/BoundingBox'
+          $ref: "#/components/schemas/BoundingBox"
         reactionTags:
           type: array
           items:
             type: string
+        flags:
+          $ref: "#/components/schemas/ContentFlags"
         bubbles:
           type: array
           items:
-            $ref: '#/components/schemas/BubbleRef'
+            $ref: "#/components/schemas/Bubble"
 
-    PageImageSet:
+    Page:
       type: object
-      description: >
-        Locale-keyed delivery URLs. These are NOT raw origin file URLs.
-        Each URL points to /deliver/{pageId}?lang={locale}&token={signed_token}.
-        The delivery endpoint validates entitlement and injects watermark.
+      required: [id, pageNumber, images, width, height, panels]
       properties:
-        ja:
+        id:
           type: string
-          nullable: true
-          description: Delivery URL for the Japanese variant
-        en:
-          type: string
-          nullable: true
-          description: Delivery URL for the English variant
-        other:
+        pageNumber:
+          type: integer
+        images:
           type: object
           additionalProperties:
             type: string
-          description: Additional locale delivery URLs
+        width:
+          type: number
+        height:
+          type: number
+        displayRef:
+          type: string
+        flags:
+          $ref: "#/components/schemas/ContentFlags"
+        panels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Panel"
+
+    Episode:
+      type: object
+      required: [id, episodeNumber, title, publishedAt, pages]
+      properties:
+        id:
+          type: string
+        episodeNumber:
+          type: integer
+        title:
+          type: string
+        publishedAt:
+          type: string
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Page"
+
+    Series:
+      type: object
+      required: [id, title, description, status, coverUrl, episodes]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        coverUrl:
+          type: string
+        episodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Episode"
+
+    SeriesSummary:
+      type: object
+      required: [id, title, description, status, coverUrl, episodeCount]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        coverUrl:
+          type: string
+        episodeCount:
+          type: integer
+
+    SeriesDetail:
+      type: object
+      required: [id, title, description, status, coverUrl, episodes]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        coverUrl:
+          type: string
+        episodes:
+          type: array
+          items:
+            type: object
+            required: [id, episodeNumber, title, publishedAt, pageCount]
+            properties:
+              id:
+                type: string
+              episodeNumber:
+                type: integer
+              title:
+                type: string
+              publishedAt:
+                type: string
+              pageCount:
+                type: integer
+
+    EpisodeNav:
+      type: object
+      required: [id, title, episodeNumber]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        episodeNumber:
+          type: integer
+
+    EpisodeResponse:
+      type: object
+      required: [series, episode, gated, prev, next]
+      properties:
+        series:
+          type: object
+          required: [id, title]
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+        episode:
+          $ref: "#/components/schemas/Episode"
+        gated:
+          type: boolean
+        message:
+          type: string
+        prev:
+          anyOf:
+            - $ref: "#/components/schemas/EpisodeNav"
+            - type: "null"
+        next:
+          anyOf:
+            - $ref: "#/components/schemas/EpisodeNav"
+            - type: "null"
 
     ReaderPageResponse:
       type: object
-      required: [seriesId, episodeId, pageId, pageNumber, panels]
+      required: [seriesId, episodeId, pageId, pageNumber, width, height, gated]
       properties:
         seriesId:
           type: string
@@ -698,25 +1405,29 @@ components:
         pageNumber:
           type: integer
         images:
-          $ref: '#/components/schemas/PageImageSet'
+          type: object
+          additionalProperties:
+            type: string
         width:
-          type: integer
-          nullable: true
+          type: number
         height:
-          type: integer
-          nullable: true
+          type: number
+        gated:
+          type: boolean
+        message:
+          type: string
         panels:
           type: array
           items:
-            $ref: '#/components/schemas/PanelRef'
+            $ref: "#/components/schemas/Panel"
         availablePacks:
           type: array
           items:
-            $ref: '#/components/schemas/PackSummary'
+            type: object
 
     QuoteResponse:
       type: object
-      required: [seriesId, episodeId, pageId, panelId, bubble]
+      required: [seriesId, episodeId, pageId, panelId, pageNumber, panelNumber, bubble, panelPreview]
       properties:
         seriesId:
           type: string
@@ -731,26 +1442,13 @@ components:
         panelNumber:
           type: integer
         bubble:
-          $ref: '#/components/schemas/BubbleRef'
-        panelImageUrl:
-          type: string
-          nullable: true
-        translations:
-          type: array
-          items:
-            $ref: '#/components/schemas/PackItemResponse'
-        footnotes:
-          type: array
-          items:
-            $ref: '#/components/schemas/PackItemResponse'
-        commentary:
-          type: array
-          items:
-            $ref: '#/components/schemas/PackItemResponse'
+          $ref: "#/components/schemas/Bubble"
+        panelPreview:
+          $ref: "#/components/schemas/Panel"
 
     ClipResponse:
       type: object
-      required: [seriesId, episodeId, pageId, panels]
+      required: [seriesId, episodeId, pageId, pageNumber, panelStart, panelEnd, panels]
       properties:
         seriesId:
           type: string
@@ -767,318 +1465,255 @@ components:
         panels:
           type: array
           items:
-            $ref: '#/components/schemas/PanelRef'
-        translations:
-          type: array
-          items:
-            $ref: '#/components/schemas/PackItemResponse'
-        footnotes:
-          type: array
-          items:
-            $ref: '#/components/schemas/PackItemResponse'
+            $ref: "#/components/schemas/Panel"
 
-    ReactionPanelResponse:
+    ReactionItem:
       type: object
-      required: [panelId, seriesId, episodeId, pageId, pageNumber, panelNumber, panelImageUrl]
+      required: [seriesId, seriesTitle, episodeId, episodeNumber, pageNumber, panel]
       properties:
-        panelId:
-          type: string
         seriesId:
+          type: string
+        seriesTitle:
           type: string
         episodeId:
           type: string
-        pageId:
-          type: string
+        episodeNumber:
+          type: integer
         pageNumber:
           type: integer
-        panelNumber:
-          type: integer
-        panelImageUrl:
-          type: string
-        reactionTags:
-          type: array
-          items:
-            type: string
+        panel:
+          $ref: "#/components/schemas/Panel"
 
-    ReactionSearchResponse:
+    FeedbackPayload:
       type: object
-      required: [items]
+      additionalProperties: false
+      required: [series_id, episode_id, mode, issue_type, source_url]
       properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ReactionPanelResponse'
-        nextCursor:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        page_id:
           type: string
           nullable: true
+        panel_id:
+          type: string
+          nullable: true
+        bubble_id:
+          type: string
+          nullable: true
+        mode:
+          type: string
+          enum: [read, explore, completion]
+        issue_type:
+          type: string
+          enum: [typo, mistranslation, better_translation, missing_note, display, broken_link, spoiler, other]
+        comment:
+          type: string
+          maxLength: 1000
+        lang:
+          type: string
+          maxLength: 16
+        current_text:
+          type: string
+          maxLength: 2000
+        current_translation:
+          type: string
+          maxLength: 2000
+        suggested_text:
+          type: string
+          maxLength: 2000
+        user_id:
+          type: string
+          nullable: true
+          maxLength: 120
+        source_url:
+          type: string
+          format: uri
+        user_agent:
+          type: string
+          maxLength: 500
+        client_time:
+          type: string
+          maxLength: 80
+        website:
+          type: string
+          maxLength: 200
 
-    PackSummary:
+    FeedbackResponse:
       type: object
-      required: [id, type, version, isPublished]
+      required: [ok, feedback_id]
+      properties:
+        ok:
+          type: boolean
+        feedback_id:
+          type: string
+
+    CreateSeriesInput:
+      type: object
+      required: [id, title]
       properties:
         id:
           type: string
-        type:
-          $ref: '#/components/schemas/PackType'
-        language:
-          type: string
-          nullable: true
-        version:
-          type: integer
         title:
           type: string
-          nullable: true
-        authorLabel:
+        description:
           type: string
-          nullable: true
-        isPublished:
-          type: boolean
-
-    PackItemResponse:
-      type: object
-      required: [id, text]
-      properties:
-        id:
-          type: string
-        packId:
-          type: string
-        bubbleId:
-          type: string
-          nullable: true
-        panelId:
-          type: string
-          nullable: true
-        pageId:
-          type: string
-          nullable: true
-        text:
-          type: string
-        notes:
-          type: string
-          nullable: true
-
-    PackResponse:
-      type: object
-      required: [pack]
-      properties:
-        pack:
-          $ref: '#/components/schemas/PackSummary'
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/PackItemResponse'
-
-    ProposalResponse:
-      type: object
-      required: [id, type, status, authorId, content, createdAt, updatedAt]
-      properties:
-        id:
-          type: string
-        type:
-          $ref: '#/components/schemas/ProposalType'
         status:
-          $ref: '#/components/schemas/ProposalStatus'
-        authorId:
           type: string
-        reviewerId:
+          enum: [ongoing, completed, hiatus]
+        cover:
           type: string
-          nullable: true
+
+    UpdateSeriesInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        cover:
+          type: string
+
+    PublishResponse:
+      type: object
+      required: [published, seriesId, episodeCount, viewerUrl, apiUrl]
+      properties:
+        published:
+          type: boolean
         seriesId:
           type: string
-          nullable: true
+        episodeCount:
+          type: integer
+        viewerUrl:
+          type: string
+        apiUrl:
+          type: string
+
+    DraftPayload:
+      type: object
+      required: [seriesId, seriesTitle, episodeId, episodeNumber, episodeTitle, pages]
+      properties:
+        seriesId:
+          type: string
+        seriesTitle:
+          type: string
+        seriesDescription:
+          type: string
+        seriesStatus:
+          type: string
+          enum: [ongoing, completed, hiatus]
         episodeId:
           type: string
-          nullable: true
-        pageId:
+        episodeNumber:
+          type: integer
+        episodeTitle:
           type: string
-          nullable: true
-        panelId:
+        pages:
+          type: array
+          items:
+            type: object
+
+    IngestionJob:
+      type: object
+      required: [id, status, createdAt, updatedAt, label, draft]
+      properties:
+        id:
           type: string
-          nullable: true
-        bubbleId:
+        status:
           type: string
-          nullable: true
-        language:
-          type: string
-          nullable: true
-        title:
-          type: string
-          nullable: true
-        content:
-          type: string
-        rationale:
-          type: string
-          nullable: true
-        sourcePackId:
-          type: string
-          nullable: true
-        mergedPackId:
-          type: string
-          nullable: true
-        reviewedAt:
-          type: string
-          format: date-time
-          nullable: true
-        mergedAt:
-          type: string
-          format: date-time
-          nullable: true
+          enum: [queued, draft, waiting_review, confirmed, failed, canceled]
         createdAt:
           type: string
-          format: date-time
         updatedAt:
           type: string
-          format: date-time
-        comments:
-          type: array
-          items:
-            $ref: '#/components/schemas/ReviewCommentResponse'
+        label:
+          type: string
+        draft:
+          anyOf:
+            - $ref: "#/components/schemas/DraftPayload"
+            - type: "null"
+        errorMessage:
+          type: string
 
-    ProposalListResponse:
+    User:
       type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ProposalResponse'
-        nextCursor:
-          type: string
-          nullable: true
-
-    CreateProposalRequest:
-      type: object
-      required: [type, content]
-      properties:
-        type:
-          $ref: '#/components/schemas/ProposalType'
-        seriesId:
-          type: string
-          nullable: true
-        episodeId:
-          type: string
-          nullable: true
-        pageId:
-          type: string
-          nullable: true
-        panelId:
-          type: string
-          nullable: true
-        bubbleId:
-          type: string
-          nullable: true
-        language:
-          type: string
-          nullable: true
-        title:
-          type: string
-          nullable: true
-        content:
-          type: string
-        rationale:
-          type: string
-          nullable: true
-        sourcePackId:
-          type: string
-          nullable: true
-
-    ReviewCommentResponse:
-      type: object
-      required: [id, proposalId, authorId, content, createdAt]
+      required: [id, name, role]
       properties:
         id:
           type: string
-        proposalId:
+        name:
           type: string
-        authorId:
+        role:
           type: string
-        content:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
+          enum: [admin, user]
 
-    EntitlementResponse:
+    AuthResponse:
       type: object
-      required: [id, targetType, targetId, source, status, createdAt]
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    MeResponse:
+      type: object
+      required: [authenticated, user]
+      properties:
+        authenticated:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/User"
+
+    GrantEntitlementInput:
+      type: object
+      required: [userId, targetId]
+      properties:
+        userId:
+          type: string
+        targetType:
+          type: string
+          enum: [SERIES, EPISODE, VOLUME, PACK, BUNDLE]
+          default: EPISODE
+        targetId:
+          type: string
+        source:
+          type: string
+          enum: [PURCHASE, CONTRIBUTOR_REWARD, PROMO, ADMIN_GRANT, SUBSCRIPTION]
+          default: ADMIN_GRANT
+
+    Entitlement:
+      type: object
+      required: [id, userId, targetType, targetId, source, status, grantedAt]
       properties:
         id:
           type: string
         userId:
           type: string
-          nullable: true
-        seriesId:
-          type: string
-          nullable: true
         targetType:
-          $ref: '#/components/schemas/EntitlementTargetType'
+          type: string
         targetId:
           type: string
         source:
-          $ref: '#/components/schemas/EntitlementSource'
+          type: string
         status:
           type: string
-          enum: [ACTIVE, EXPIRED, REVOKED]
-        purchaseRecordId:
+        grantedAt:
           type: string
-          nullable: true
-        packId:
-          type: string
-          nullable: true
-        grantedByUserId:
-          type: string
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-        expiresAt:
-          type: string
-          format: date-time
-          nullable: true
-        revokedAt:
-          type: string
-          format: date-time
-          nullable: true
-
-    EntitlementListResponse:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/EntitlementResponse'
 
     EntitlementCheckResponse:
       type: object
-      required: [allowed]
+      required: [entitled]
       properties:
-        allowed:
+        entitled:
           type: boolean
-        entitlement:
-          $ref: '#/components/schemas/EntitlementResponse'
-          nullable: true
-
-    RedeemResponse:
-      type: object
-      required: [success, entitlements]
-      properties:
-        success:
+        free:
           type: boolean
-        entitlements:
-          type: array
-          items:
-            $ref: '#/components/schemas/EntitlementResponse'
-
-    ErrorResponse:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: object
-          required: [code, message]
-          properties:
-            code:
-              type: string
-            message:
-              type: string
+        userId:
+          type: string
+        reason:
+          type: string

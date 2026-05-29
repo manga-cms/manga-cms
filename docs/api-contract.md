@@ -217,6 +217,22 @@ Public reader endpoints must be safe for unauthenticated requests unless the
 route explicitly accepts optional auth. Entitlement-gated content must return a
 gated response or omit protected image URLs rather than leaking origin paths.
 
+Current CMS/Reader endpoint coverage:
+
+- CMS uses `/series`, `/series/{id}`, `/admin/series`,
+  `/admin/series/{id}`, `/admin/series/{id}/episodes`,
+  `/admin/series/{id}/episodes/{epId}`,
+  `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image`,
+  `/admin/series/{id}/publish`, ingestion routes, auth routes, and entitlement
+  admin routes. These are implemented by `apps/api`.
+- Reader SSR uses `/series/{seriesId}/episodes/{episodeId}`, `/quotes/...`,
+  `/clips/...`, `/reactions`, `/feedback`, and tokenized `/deliver/{pageId}`.
+  These are implemented by `apps/api`.
+- `/packs/{packId}`, proposal review routes, and public proposal listing are
+  not implemented in `apps/api` and are not part of the current core contract.
+  Reintroduce them in `openapi.yaml` only when the implementation exists or a
+  task explicitly schedules that surface.
+
 ## CMS Admin Endpoints
 
 Base path: `/api/v1`
@@ -233,6 +249,29 @@ Base path: `/api/v1`
 
 Admin endpoints require authenticated admin access. Browser CMS calls should
 send credentials so the `manga_auth` cookie is included.
+
+### Image Upload And Storage State
+
+Current image handling is path-based:
+
+- Canonical Episode JSON stores Page image references as locale-keyed relative
+  paths under `contents/{seriesId}/{episodeId}/`, for example
+  `pages/p01.jpg`.
+- CMS admin preview reads those existing files through
+  `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image?locale=ja`.
+- Public reader payloads replace origin paths with short-lived delivery URLs.
+  Newly generated delivery URLs use `/deliver/{pageId}?lang={locale}&token=...`.
+  The delivery route also accepts the legacy `locale` query name.
+- `ContentWriteRepository` writes JSON metadata and validates Series/Episode
+  identifiers plus stored asset paths, but it does not copy or persist binary
+  image uploads.
+
+Current gap:
+
+- There is no multipart or direct binary upload endpoint for Page images.
+  A future upload API needs to define accepted MIME types, per-series storage
+  location, overwrite behavior, size limits, checksum behavior, and whether the
+  API or CMS creates the final `pages/*.jpg|png|webp` relative path.
 
 ## Ingestion Endpoints
 

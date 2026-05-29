@@ -6,7 +6,7 @@
  * Current implementation: base64-encoded JSON with expiry.
  */
 
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -41,10 +41,17 @@ export function verifyDeliveryToken(token: string): DeliveryTokenPayload | null 
     if (!data || !sig) return null;
 
     const expectedSig = createHmac("sha256", DELIVERY_SECRET).update(data).digest("base64url");
-    if (sig !== expectedSig) return null;
+    const sigBuffer = Buffer.from(sig);
+    const expectedSigBuffer = Buffer.from(expectedSig);
+    if (sigBuffer.length !== expectedSigBuffer.length || !timingSafeEqual(sigBuffer, expectedSigBuffer)) {
+        return null;
+    }
 
     try {
         const payload = JSON.parse(Buffer.from(data, "base64url").toString()) as DeliveryTokenPayload;
+        if (typeof payload.pageId !== "string" || typeof payload.userId !== "string" || !Number.isFinite(payload.exp)) {
+            return null;
+        }
         if (payload.exp < Math.floor(Date.now() / 1000)) return null;
         return payload;
     } catch {
