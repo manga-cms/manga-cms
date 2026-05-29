@@ -23,3 +23,9 @@ coverage/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Runtime private storage
+feedback/
+
+# Local/private storyboard verification content
+contents/storyboard-ui-check/
