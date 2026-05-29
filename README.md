@@ -203,6 +203,7 @@ Images / PSD / text export
 - [Entitlement specification](entitlement-spec.md)
 - [Ingestion specification](ingestion-spec.md)
 - [Content guide](docs/CONTENT_GUIDE.md)
+- [Next actions](docs/NEXT_ACTIONS.md)
 - [Public release checklist](docs/PUBLIC_RELEASE_CHECKLIST.md)
 - [Deployment](docs/DEPLOY.md)
 - [Backup and restore](docs/BACKUP-RESTORE.md)
@@ -218,6 +219,8 @@ Contributions are welcome. The most useful areas right now are:
 - Accessibility, localization, and translation workflows.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+For security-sensitive issues, see [SECURITY.md](SECURITY.md).
 
 ## License
 

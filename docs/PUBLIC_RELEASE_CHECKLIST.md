@@ -28,9 +28,12 @@ Status: not ready without more operations work.
 
 - [x] Add an explicit open source license.
 - [x] Add contribution guidelines.
+- [x] Add issue templates.
+- [x] Add security policy.
 - [x] Explain current project status in README.
 - [x] Document the current content format.
 - [x] Document GitHub account and repository naming plan.
+- [x] Document next actions and owner split.
 - [x] Remove local metadata files from version control if tracked.
 - [x] Confirm no obvious real secrets are committed.
 - [ ] Confirm sample content is either original, licensed, or clearly placeholder.
