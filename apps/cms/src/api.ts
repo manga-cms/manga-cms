@@ -32,7 +32,17 @@ export interface BubbleData {
     bubbleType: "speech" | "thought" | "narration" | "sfx" | "caption" | "other";
     textOriginal: string;
     speaker?: string;
+    speakerConfidence?: "confirmed" | "inferred" | "unknown";
+    textDirection?: "horizontal" | "vertical";
+    lang?: string;
+    flags?: ContentFlags;
     bbox: BoundingBox;
+}
+
+export interface ContentFlags {
+    shareable: boolean;
+    feedback_enabled: boolean;
+    contains_spoiler?: boolean;
 }
 
 export interface PanelData {
@@ -40,6 +50,7 @@ export interface PanelData {
     panelNumber: number;
     bbox: BoundingBox;
     reactionTags: string[];
+    flags?: ContentFlags;
     bubbles: BubbleData[];
 }
 
@@ -50,6 +61,7 @@ export interface PageData {
     images: Record<string, string>;
     width: number;
     height: number;
+    flags?: ContentFlags;
     panels: PanelData[];
 }
 
