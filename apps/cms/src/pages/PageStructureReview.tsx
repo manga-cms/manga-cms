@@ -23,6 +23,10 @@ type DragState = {
 
 const MIN_BOX_SIZE = 18;
 type PanelTemplate = "two-one-two" | "one-one-two" | "three-rows" | "six-plus-wide";
+type ReviewDecision = "pending" | "accepted" | "rejected";
+type ReviewDecisions = Record<string, ReviewDecision>;
+
+const DEFAULT_FLAGS: NonNullable<BubbleData["flags"]> = { shareable: true, feedback_enabled: true };
 
 function pad(n: number) {
     return String(n).padStart(3, "0");
@@ -58,6 +62,60 @@ function makeBubbleId(panel: PanelData, bubbleNumber: number) {
 
 function makeBubbleShortId(page: PageData, panel: PanelData, bubbleNumber: number) {
     return `p${page.pageNumber}-k${panel.panelNumber}-f${bubbleNumber}`;
+}
+
+function nextPanelIdNumber(page: PageData) {
+    return Math.max(0, ...page.panels.map((panel) => Number(panel.id.match(/-k(\d+)$/)?.[1] ?? panel.panelNumber))) + 1;
+}
+
+function nextBubbleIdNumber(panel: PanelData) {
+    return Math.max(0, ...panel.bubbles.map((bubble) => Number(bubble.id.match(/-f(\d+)$/)?.[1] ?? bubble.bubbleNumber))) + 1;
+}
+
+function panelReviewKey(panel: PanelData) {
+    return `panel:${panel.id}`;
+}
+
+function bubbleReviewKey(bubble: BubbleData) {
+    return `bubble:${bubble.id}`;
+}
+
+function seedAcceptedDecisions(episode: EpisodeData): ReviewDecisions {
+    const decisions: ReviewDecisions = {};
+    episode.pages.forEach((page) => {
+        page.panels.forEach((panel) => {
+            decisions[panelReviewKey(panel)] = "accepted";
+            panel.bubbles.forEach((bubble) => {
+                decisions[bubbleReviewKey(bubble)] = "accepted";
+            });
+        });
+    });
+    return decisions;
+}
+
+function markPanels(decisions: ReviewDecisions, panels: PanelData[], decision: ReviewDecision) {
+    const next = { ...decisions };
+    panels.forEach((panel) => {
+        next[panelReviewKey(panel)] = decision;
+        panel.bubbles.forEach((bubble) => {
+            next[bubbleReviewKey(bubble)] = decision;
+        });
+    });
+    return next;
+}
+
+function renumberPanels(page: PageData, panels: PanelData[]) {
+    return panels.map((panel, panelIndex) => {
+        const nextPanel = { ...panel, panelNumber: panelIndex + 1 };
+        return {
+            ...nextPanel,
+            bubbles: nextPanel.bubbles.map((bubble, bubbleIndex) => ({
+                ...bubble,
+                bubbleNumber: bubbleIndex + 1,
+                shortId: makeBubbleShortId(page, nextPanel, bubbleIndex + 1),
+            })),
+        };
+    });
 }
 
 function templateBox(page: PageData, x: number, y: number, width: number, height: number): BoundingBox {
@@ -152,6 +210,7 @@ export default function PageStructureReview() {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [scriptAssistText, setScriptAssistText] = useState("");
+    const [reviewDecisions, setReviewDecisions] = useState<ReviewDecisions>({});
 
     useEffect(() => {
         if (!seriesId || !epId) return;
@@ -162,6 +221,7 @@ export default function PageStructureReview() {
                     return;
                 }
                 setEpisode(ep);
+                setReviewDecisions(seedAcceptedDecisions(ep));
                 setSelectedPanelIndex(ep.pages[0]?.panels.length ? 0 : null);
             })
             .catch((e) => setError((e as Error).message));
@@ -170,11 +230,24 @@ export default function PageStructureReview() {
     const page = episode?.pages[pageIndex] ?? null;
     const selectedPanel = page && selectedPanelIndex !== null ? page.panels[selectedPanelIndex] : null;
     const selectedBubble = selectedPanel && selectedBubbleIndex !== null ? selectedPanel.bubbles[selectedBubbleIndex] : null;
+    const selectedPanelDecision = selectedPanel ? reviewDecisions[panelReviewKey(selectedPanel)] ?? "pending" : null;
+    const selectedBubbleDecision = selectedBubble ? reviewDecisions[bubbleReviewKey(selectedBubble)] ?? "pending" : null;
 
     const imageUrl = useMemo(() => {
         if (!seriesId || !epId || !page) return "";
         return getAdminPageImageUrl(seriesId, epId, page.pageNumber);
     }, [seriesId, epId, page]);
+
+    const reviewSummary = useMemo(() => {
+        if (!page) return { pending: 0, accepted: 0, rejected: 0 };
+        return page.panels.reduce((acc, panel) => {
+            acc[reviewDecisions[panelReviewKey(panel)] ?? "pending"] += 1;
+            panel.bubbles.forEach((bubble) => {
+                acc[reviewDecisions[bubbleReviewKey(bubble)] ?? "pending"] += 1;
+            });
+            return acc;
+        }, { pending: 0, accepted: 0, rejected: 0 } as Record<ReviewDecision, number>);
+    }, [page, reviewDecisions]);
 
     const updatePage = useCallback((nextPage: PageData) => {
         setEpisode((current) => {
@@ -195,9 +268,9 @@ export default function PageStructureReview() {
 
     const addPanel = () => {
         if (!page) return;
-        const panelNumber = Math.max(0, ...page.panels.map((p) => p.panelNumber)) + 1;
+        const panelNumber = page.panels.length + 1;
         const panel: PanelData = {
-            id: makePanelId(page, panelNumber),
+            id: makePanelId(page, nextPanelIdNumber(page)),
             panelNumber,
             bbox: {
                 x: Math.round(page.width * 0.08),
@@ -209,13 +282,14 @@ export default function PageStructureReview() {
             bubbles: [],
         };
         updatePage({ ...page, panels: [...page.panels, panel] });
+        setReviewDecisions((current) => markPanels(current, [panel], "pending"));
         setSelectedPanelIndex(page.panels.length);
         setSelectedBubbleIndex(null);
     };
 
     const deletePanel = () => {
         if (!page || selectedPanelIndex === null) return;
-        const panels = page.panels.filter((_, i) => i !== selectedPanelIndex);
+        const panels = renumberPanels(page, page.panels.filter((_, i) => i !== selectedPanelIndex));
         updatePage({ ...page, panels });
         setSelectedPanelIndex(panels.length ? Math.min(selectedPanelIndex, panels.length - 1) : null);
         setSelectedBubbleIndex(null);
@@ -228,6 +302,7 @@ export default function PageStructureReview() {
         }
         const panels = buildTemplatePanels(page, template);
         updatePage({ ...page, panels });
+        setReviewDecisions((current) => markPanels(current, panels, "pending"));
         setSelectedPanelIndex(panels.length ? 0 : null);
         setSelectedBubbleIndex(null);
     };
@@ -242,11 +317,11 @@ export default function PageStructureReview() {
 
     const addBubble = () => {
         if (!page || !selectedPanel || selectedPanelIndex === null) return;
-        const bubbleNumber = Math.max(0, ...selectedPanel.bubbles.map((b) => b.bubbleNumber)) + 1;
+        const bubbleNumber = selectedPanel.bubbles.length + 1;
         const width = Math.max(60, Math.round(selectedPanel.bbox.width * 0.38));
         const height = Math.max(48, Math.round(selectedPanel.bbox.height * 0.34));
         const bubble: BubbleData = {
-            id: makeBubbleId(selectedPanel, bubbleNumber),
+            id: makeBubbleId(selectedPanel, nextBubbleIdNumber(selectedPanel)),
             bubbleNumber,
             shortId: makeBubbleShortId(page, selectedPanel, bubbleNumber),
             bubbleType: "speech",
@@ -259,14 +334,60 @@ export default function PageStructureReview() {
             }, page),
         };
         updatePanel(selectedPanelIndex, { ...selectedPanel, bubbles: [...selectedPanel.bubbles, bubble] });
+        setReviewDecisions((current) => ({ ...current, [bubbleReviewKey(bubble)]: "pending" }));
         setSelectedBubbleIndex(selectedPanel.bubbles.length);
     };
 
     const deleteBubble = () => {
         if (!selectedPanel || selectedPanelIndex === null || selectedBubbleIndex === null) return;
         const bubbles = selectedPanel.bubbles.filter((_, i) => i !== selectedBubbleIndex);
-        updatePanel(selectedPanelIndex, { ...selectedPanel, bubbles });
+        const nextPanel = renumberPanels(page!, [{ ...selectedPanel, bubbles }])[0];
+        updatePanel(selectedPanelIndex, nextPanel);
         setSelectedBubbleIndex(bubbles.length ? Math.min(selectedBubbleIndex, bubbles.length - 1) : null);
+    };
+
+    const movePanel = (fromIndex: number, direction: -1 | 1) => {
+        if (!page) return;
+        const toIndex = fromIndex + direction;
+        if (toIndex < 0 || toIndex >= page.panels.length) return;
+        const panels = [...page.panels];
+        [panels[fromIndex], panels[toIndex]] = [panels[toIndex], panels[fromIndex]];
+        updatePage({ ...page, panels: renumberPanels(page, panels) });
+        setSelectedPanelIndex(toIndex);
+        setSelectedBubbleIndex(null);
+    };
+
+    const moveBubble = (fromIndex: number, direction: -1 | 1) => {
+        if (!page || !selectedPanel || selectedPanelIndex === null) return;
+        const toIndex = fromIndex + direction;
+        if (toIndex < 0 || toIndex >= selectedPanel.bubbles.length) return;
+        const bubbles = [...selectedPanel.bubbles];
+        [bubbles[fromIndex], bubbles[toIndex]] = [bubbles[toIndex], bubbles[fromIndex]];
+        const nextPanel = renumberPanels(page, [{ ...selectedPanel, bubbles }])[0];
+        updatePanel(selectedPanelIndex, nextPanel);
+        setSelectedBubbleIndex(toIndex);
+    };
+
+    const acceptPanel = (panel: PanelData) => {
+        setReviewDecisions((current) => markPanels(current, [panel], "accepted"));
+        setError("");
+    };
+
+    const acceptBubble = (bubble: BubbleData) => {
+        setReviewDecisions((current) => ({ ...current, [bubbleReviewKey(bubble)]: "accepted" }));
+        setError("");
+    };
+
+    const rejectSelectedPanel = () => {
+        if (!selectedPanel) return;
+        setReviewDecisions((current) => markPanels(current, [selectedPanel], "rejected"));
+        deletePanel();
+    };
+
+    const rejectSelectedBubble = () => {
+        if (!selectedBubble) return;
+        setReviewDecisions((current) => ({ ...current, [bubbleReviewKey(selectedBubble)]: "rejected" }));
+        deleteBubble();
     };
 
     const startDrag = (
@@ -367,7 +488,8 @@ export default function PageStructureReview() {
             return;
         }
 
-        const startNumber = Math.max(0, ...selectedPanel.bubbles.map((b) => b.bubbleNumber)) + 1;
+        const startNumber = selectedPanel.bubbles.length + 1;
+        const startIdNumber = nextBubbleIdNumber(selectedPanel);
         const width = Math.max(72, Math.round(selectedPanel.bbox.width * 0.34));
         const height = Math.max(52, Math.round(selectedPanel.bbox.height * 0.26));
         const gutter = 12;
@@ -375,7 +497,7 @@ export default function PageStructureReview() {
             const bubbleNumber = startNumber + index;
             const yOffset = 18 + index * (height + gutter);
             return {
-                id: makeBubbleId(selectedPanel, bubbleNumber),
+                id: makeBubbleId(selectedPanel, startIdNumber + index),
                 bubbleNumber,
                 shortId: makeBubbleShortId(page, selectedPanel, bubbleNumber),
                 bubbleType: entry.bubbleType,
@@ -394,6 +516,13 @@ export default function PageStructureReview() {
             ...selectedPanel,
             bubbles: [...selectedPanel.bubbles, ...nextBubbles],
         });
+        setReviewDecisions((current) => {
+            const next = { ...current };
+            nextBubbles.forEach((bubble) => {
+                next[bubbleReviewKey(bubble)] = "pending";
+            });
+            return next;
+        });
         setSelectedBubbleIndex(selectedPanel.bubbles.length);
         setScriptAssistText("");
         setError("");
@@ -401,6 +530,10 @@ export default function PageStructureReview() {
 
     const save = async () => {
         if (!seriesId || !episode) return;
+        if (reviewSummary.pending > 0) {
+            setError(`${reviewSummary.pending} 件の未確認 Panel / Bubble 候補があります。Accept または Reject してから保存してください。`);
+            return;
+        }
         setSaving(true);
         setError("");
         try {
@@ -434,6 +567,7 @@ export default function PageStructureReview() {
                 <div>
                     <h1>Page Structure Review</h1>
                     <p className="card-meta">{seriesId} / {episode.id} — panel and bubble structure stays in canonical content only after save.</p>
+                    <p className="card-meta">Ingestion candidate decisions are local-only until Thread A adds a persisted review endpoint.</p>
                 </div>
                 <div className="section-actions">
                     <Link to={`/works/${seriesId}/episodes/${episode.id}`} className="btn btn-outline">Episode</Link>
@@ -477,6 +611,11 @@ export default function PageStructureReview() {
                             />
                         </div>
                     )}
+
+                    <div className="review-summary">
+                        <span className="badge badge-warn">Pending {reviewSummary.pending}</span>
+                        <span className="badge badge-ok">Accepted {reviewSummary.accepted}</span>
+                    </div>
 
                     <div className="structure-toolbar">
                         <button type="button" className="btn btn-outline" onClick={addPanel}>+ Panel</button>
@@ -523,33 +662,49 @@ export default function PageStructureReview() {
                     <h2>Panels</h2>
                     <div className="structure-list">
                         {page?.panels.map((panel, index) => (
-                            <button
-                                type="button"
+                            <div
                                 key={panel.id}
-                                className={`structure-list-item ${selectedPanelIndex === index ? "is-active" : ""}`}
-                                onClick={() => {
-                                    setSelectedPanelIndex(index);
-                                    setSelectedBubbleIndex(null);
-                                }}
+                                className={`structure-list-row ${selectedPanelIndex === index ? "is-active" : ""}`}
                             >
-                                <span>Panel {panel.panelNumber}</span>
-                                <small>{panel.bubbles.length} bubbles</small>
-                            </button>
+                                <button
+                                    type="button"
+                                    className="structure-list-item"
+                                    onClick={() => {
+                                        setSelectedPanelIndex(index);
+                                        setSelectedBubbleIndex(null);
+                                    }}
+                                >
+                                    <span>Panel {panel.panelNumber}</span>
+                                    <small>{panel.bubbles.length} bubbles · {reviewDecisions[panelReviewKey(panel)] ?? "pending"}</small>
+                                </button>
+                                <div className="order-controls">
+                                    <button type="button" onClick={() => movePanel(index, -1)} disabled={index === 0} aria-label="Move panel earlier">↑</button>
+                                    <button type="button" onClick={() => movePanel(index, 1)} disabled={index === page.panels.length - 1} aria-label="Move panel later">↓</button>
+                                </div>
+                            </div>
                         ))}
                     </div>
 
                     <h2>Bubbles</h2>
                     <div className="structure-list">
                         {selectedPanel?.bubbles.map((bubble, index) => (
-                            <button
-                                type="button"
+                            <div
                                 key={bubble.id}
-                                className={`structure-list-item ${selectedBubbleIndex === index ? "is-active" : ""}`}
-                                onClick={() => setSelectedBubbleIndex(index)}
+                                className={`structure-list-row ${selectedBubbleIndex === index ? "is-active" : ""}`}
                             >
-                                <span>Bubble {bubble.bubbleNumber}</span>
-                                <small>{bubble.textOriginal || "No text"}</small>
-                            </button>
+                                <button
+                                    type="button"
+                                    className="structure-list-item"
+                                    onClick={() => setSelectedBubbleIndex(index)}
+                                >
+                                    <span>Bubble {bubble.bubbleNumber}</span>
+                                    <small>{bubble.textOriginal || "No text"} · {reviewDecisions[bubbleReviewKey(bubble)] ?? "pending"}</small>
+                                </button>
+                                <div className="order-controls">
+                                    <button type="button" onClick={() => moveBubble(index, -1)} disabled={index === 0} aria-label="Move bubble earlier">↑</button>
+                                    <button type="button" onClick={() => moveBubble(index, 1)} disabled={index === selectedPanel.bubbles.length - 1} aria-label="Move bubble later">↓</button>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </aside>
@@ -566,7 +721,7 @@ export default function PageStructureReview() {
                                         style={toBoxStyle(panel.bbox, page)}
                                         onPointerDown={(e) => startDrag(e, "panel", "move", panelIndex)}
                                     >
-                                        <span className="bbox-label">P{panel.panelNumber}</span>
+                                        <span className="bbox-label">P{panel.panelNumber} · {reviewDecisions[panelReviewKey(panel)] ?? "pending"}</span>
                                         <button
                                             type="button"
                                             className="bbox-resize"
@@ -583,6 +738,9 @@ export default function PageStructureReview() {
                                         onPointerDown={(e) => startDrag(e, "bubble", "move", panelIndex, bubbleIndex)}
                                     >
                                         <span className="bbox-label">B{bubble.bubbleNumber}</span>
+                                        {bubble.textOriginal && (
+                                            <span className="bbox-text">{bubble.textOriginal}</span>
+                                        )}
                                         <button
                                             type="button"
                                             className="bbox-resize"
@@ -602,7 +760,22 @@ export default function PageStructureReview() {
                         <>
                             <div className="section-actions" style={{ marginTop: 0 }}>
                                 <span className="badge">Panel {selectedPanel.panelNumber}</span>
-                                <button type="button" className="btn btn-outline" onClick={deletePanel}>Delete Panel</button>
+                                <span className={`badge ${selectedPanelDecision === "accepted" ? "badge-ok" : "badge-warn"}`}>
+                                    {selectedPanelDecision}
+                                </span>
+                                <button type="button" className="btn btn-outline" onClick={() => acceptPanel(selectedPanel)}>Accept</button>
+                                <button type="button" className="btn btn-outline danger-lite-inline" onClick={rejectSelectedPanel}>Reject</button>
+                            </div>
+                            <div className="form-group">
+                                <label>Reaction Tags</label>
+                                <input
+                                    value={selectedPanel.reactionTags.join(", ")}
+                                    onChange={(e) => updatePanel(selectedPanelIndex, {
+                                        ...selectedPanel,
+                                        reactionTags: e.target.value.split(",").map((tag) => tag.trim()).filter(Boolean),
+                                    })}
+                                    placeholder="surprise, closeup"
+                                />
                             </div>
                             <div className="bbox-grid">
                                 {(["x", "y", "width", "height"] as const).map((field) => (
@@ -621,7 +794,21 @@ export default function PageStructureReview() {
                                 <>
                                     <div className="section-actions">
                                         <span className="badge badge-ok">Bubble {selectedBubble.bubbleNumber}</span>
-                                        <button type="button" className="btn btn-outline" onClick={deleteBubble}>Delete Bubble</button>
+                                        <span className={`badge ${selectedBubbleDecision === "accepted" ? "badge-ok" : "badge-warn"}`}>
+                                            {selectedBubbleDecision}
+                                        </span>
+                                        <button type="button" className="btn btn-outline" onClick={() => acceptBubble(selectedBubble)}>Accept</button>
+                                        <button type="button" className="btn btn-outline danger-lite-inline" onClick={rejectSelectedBubble}>Reject</button>
+                                    </div>
+                                    <div className="bubble-id-grid">
+                                        <div>
+                                            <label>Bubble ID</label>
+                                            <code>{selectedBubble.id}</code>
+                                        </div>
+                                        <div>
+                                            <label>Short ID</label>
+                                            <code>{selectedBubble.shortId}</code>
+                                        </div>
                                     </div>
                                     <div className="form-group">
                                         <label>Original Text</label>
@@ -639,6 +826,29 @@ export default function PageStructureReview() {
                                             placeholder="character-id"
                                         />
                                     </div>
+                                    <div className="bbox-grid">
+                                        <div className="form-group">
+                                            <label>Speaker Confidence</label>
+                                            <select
+                                                value={selectedBubble.speakerConfidence ?? "unknown"}
+                                                onChange={(e) => updateSelectedBubble({ speakerConfidence: e.target.value as BubbleData["speakerConfidence"] })}
+                                            >
+                                                <option value="unknown">unknown</option>
+                                                <option value="inferred">inferred</option>
+                                                <option value="confirmed">confirmed</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Text Direction</label>
+                                            <select
+                                                value={selectedBubble.textDirection ?? "vertical"}
+                                                onChange={(e) => updateSelectedBubble({ textDirection: e.target.value as BubbleData["textDirection"] })}
+                                            >
+                                                <option value="vertical">vertical</option>
+                                                <option value="horizontal">horizontal</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     <div className="form-group">
                                         <label>Bubble Type</label>
                                         <select
@@ -652,6 +862,35 @@ export default function PageStructureReview() {
                                             <option value="caption">caption</option>
                                             <option value="other">other</option>
                                         </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Language</label>
+                                        <input
+                                            value={selectedBubble.lang ?? ""}
+                                            onChange={(e) => updateSelectedBubble({ lang: e.target.value || undefined })}
+                                            placeholder="ja"
+                                        />
+                                    </div>
+                                    <div className="flag-row">
+                                        {([
+                                            ["shareable", "Shareable"],
+                                            ["feedback_enabled", "Feedback"],
+                                            ["contains_spoiler", "Spoiler"],
+                                        ] as const).map(([field, label]) => {
+                                            const flags = selectedBubble.flags ?? DEFAULT_FLAGS;
+                                            return (
+                                                <label key={field}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={Boolean(flags[field])}
+                                                        onChange={(e) => updateSelectedBubble({
+                                                            flags: { ...DEFAULT_FLAGS, ...selectedBubble.flags, [field]: e.target.checked },
+                                                        })}
+                                                    />
+                                                    {label}
+                                                </label>
+                                            );
+                                        })}
                                     </div>
                                     <div className="bbox-grid">
                                         {(["x", "y", "width", "height"] as const).map((field) => (
