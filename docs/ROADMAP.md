@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-03-29
+Last updated: 2026-05-29
 
 This document tracks the path from the current repository state to a public launch.
 
@@ -50,16 +50,60 @@ The project has moved beyond a viewer-only prototype.
 
 ## Next Milestones
 
+### Reader UX and sharing priorities
+
+The next viewer work should preserve a strong normal reading experience before
+adding more visible structure.
+
+Priority A:
+
+- Separate `normal` reading mode from `study` mode
+- Keep structure overlays hidden in normal mode
+- Support Page / Panel / Bubble URL resolution
+- Add canonical path URLs for share pages so OGP does not depend on fragments
+- Add selected target highlighting
+- Add basic share link generation
+- Add Page OGP first
+- Add read-complete card
+- Add official Quote, official Clip, and official Reaction records
+- Add `spoiler_level` and `share_policy`
+
+Priority B:
+
+- Reaction use-case tags
+- Character quote lists after speaker metadata is reliable
+- localStorage reading progress and favorite quote/panel save
+- Footnote Pack UI
+- Author commentary surfaced after reading
+- Translation comparison and translation review modes
+
+Priority C:
+
+- User-generated public Clip creation
+- External Embed
+- Public Community Proposal UI
+- Contributor Reward payout
+- Pack Marketplace
+- Accessibility reading
+- Large-scale dynamic OGP generation
+
 ### Phase 1: Finish the content foundation
 
 - Tighten `contents/` and `packs/` schemas until they can be treated as stable source-of-truth contracts
 - Decide what remains filesystem-backed and what will move behind DB-backed repositories later
 - Add tests or CLI validation so malformed source content is caught in CI, not only at runtime
+- Split internal content IDs from human-facing display refs
+- Add Edition metadata for web, volume, revised, color, vertical scroll, and international versions
+- Add URL alias resolution rules for old display refs
 
 ### Phase 2: Finish public reading
 
 - Add the missing reader interactions: panel highlighting, zoom, bubble targeting, deep-link behavior
-- Add quote/clip OGP generation and reaction previews
+- Add normal/study mode separation
+- Add read-complete card
+- Add Page OGP, then official Quote/Clip/Reaction OGP
+- Add official Quote, official Clip, and official Reaction surfaces before user-generated sharing
+- Add spoiler_level and share_policy to shareable units
 - Run a real deployment rehearsal with production viewer build + API + DB-backed mode
 
 ### Phase 3: Complete viewer/API integration
@@ -68,6 +112,7 @@ The project has moved beyond a viewer-only prototype.
 - Align implementation with `openapi.yaml`, especially reader payloads and delivery URL behavior
 - Decide whether loader fallback stays as a dev-only feature or is removed after API stability improves
 - Consolidate API response types so viewer-side runtime contracts are shared instead of duplicated
+- Ensure share pages use server-visible path URLs, while fragments remain only for in-reader navigation
 
 ### Phase 4: Build the publish path
 
@@ -75,6 +120,8 @@ The project has moved beyond a viewer-only prototype.
 - Expand editing beyond page-level entry so panel/bubble structures can be edited in CMS
 - Replace cache-reload internals with an explicit invalidation/reload mechanism
 - Add safer validation and error UX around publish failures
+- Add CMS fields for official Quote / Clip / Reaction curation
+- Add CMS controls for spoiler_level and share_policy
 
 ### Phase 5: Build ingestion
 
@@ -82,6 +129,7 @@ The project has moved beyond a viewer-only prototype.
 - Support asset attachment or image-path import in a less manual way
 - Expand beyond the current deterministic PoC to compare multiple source input levels (image-only vs text export)
 - Leave OCR/panel detection sophistication for later; first keep the pipeline operable, measurable, and auditable
+- Keep speaker metadata optional at first; use it for character quote lists only when reliable
 
 ### Phase 7: Harden for production
 
