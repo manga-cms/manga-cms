@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ProposalCreateInput, ProposalKind, ProposalRecord, ProposalStatus } from "./proposal-types.js";
 import type { FeedbackIssueType, FeedbackRecord } from "./feedback-types.js";
+import { withFileLock } from "./file-lock.js";
 
 export interface ProposalRepository {
     create(input: ProposalCreateInput): ProposalRecord;
@@ -41,17 +42,19 @@ export class FileProposalRepository implements ProposalRepository {
     }
 
     create(input: ProposalCreateInput): ProposalRecord {
-        mkdirSync(this.proposalsDir, { recursive: true });
-        const now = new Date().toISOString();
-        const record: ProposalRecord = {
-            ...input,
-            proposal_id: `pr_${randomUUID()}`,
-            status: input.status ?? "new",
-            created_at: now,
-            updated_at: now,
-        };
-        appendFileSync(this.filePath(), JSON.stringify(record) + "\n", "utf-8");
-        return record;
+        return withFileLock(this.filePath(), () => {
+            mkdirSync(this.proposalsDir, { recursive: true });
+            const now = new Date().toISOString();
+            const record: ProposalRecord = {
+                ...input,
+                proposal_id: `pr_${randomUUID()}`,
+                status: input.status ?? "new",
+                created_at: now,
+                updated_at: now,
+            };
+            appendFileSync(this.filePath(), JSON.stringify(record) + "\n", "utf-8");
+            return record;
+        });
     }
 
     list(filters: { status?: ProposalStatus; kind?: ProposalKind; seriesId?: string } = {}): ProposalRecord[] {
@@ -75,21 +78,23 @@ export class FileProposalRepository implements ProposalRepository {
         proposalId: string,
         input: { status: ProposalStatus; reviewNote?: string; reviewedBy?: string },
     ): { success: true; record: ProposalRecord } | { success: false; error: string } {
-        const records = this.readAll();
-        const index = records.findIndex((record) => record.proposal_id === proposalId);
-        if (index < 0) return { success: false, error: "Proposal not found" };
-        const now = new Date().toISOString();
-        const record: ProposalRecord = {
-            ...records[index]!,
-            status: input.status,
-            updated_at: now,
-            ...(input.reviewNote !== undefined && { review_note: input.reviewNote }),
-            ...(input.reviewedBy !== undefined && { reviewed_by: input.reviewedBy }),
-            reviewed_at: now,
-        };
-        records[index] = record;
-        this.writeAll(records);
-        return { success: true, record };
+        return withFileLock(this.filePath(), () => {
+            const records = this.readAll();
+            const index = records.findIndex((record) => record.proposal_id === proposalId);
+            if (index < 0) return { success: false, error: "Proposal not found" };
+            const now = new Date().toISOString();
+            const record: ProposalRecord = {
+                ...records[index]!,
+                status: input.status,
+                updated_at: now,
+                ...(input.reviewNote !== undefined && { review_note: input.reviewNote }),
+                ...(input.reviewedBy !== undefined && { reviewed_by: input.reviewedBy }),
+                reviewed_at: now,
+            };
+            records[index] = record;
+            this.writeAll(records);
+            return { success: true, record };
+        });
     }
 }
 

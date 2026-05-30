@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { PackType } from "./types.js";
 import type { PackDraftCreateInput, PackDraftEntry, PackDraftRecord, PackDraftStatus } from "./pack-draft-types.js";
 import type { ProposalKind, ProposalRecord } from "./proposal-types.js";
+import { withFileLock } from "./file-lock.js";
 
 export interface PackDraftRepository {
     create(input: PackDraftCreateInput): PackDraftRecord;
@@ -45,19 +46,21 @@ export class FilePackDraftRepository implements PackDraftRepository {
     }
 
     create(input: PackDraftCreateInput): PackDraftRecord {
-        mkdirSync(this.packDraftsDir, { recursive: true });
-        const now = new Date().toISOString();
-        const record: PackDraftRecord = {
-            ...input,
-            pack_draft_id: `pd_${cryptoRandomUUID()}`,
-            status: "draft",
-            version: input.version ?? 1,
-            entries: [],
-            created_at: now,
-            updated_at: now,
-        };
-        appendFileSync(this.filePath(), JSON.stringify(record) + "\n", "utf-8");
-        return record;
+        return withFileLock(this.filePath(), () => {
+            mkdirSync(this.packDraftsDir, { recursive: true });
+            const now = new Date().toISOString();
+            const record: PackDraftRecord = {
+                ...input,
+                pack_draft_id: `pd_${cryptoRandomUUID()}`,
+                status: "draft",
+                version: input.version ?? 1,
+                entries: [],
+                created_at: now,
+                updated_at: now,
+            };
+            appendFileSync(this.filePath(), JSON.stringify(record) + "\n", "utf-8");
+            return record;
+        });
     }
 
     list(filters: { status?: PackDraftStatus; type?: PackType; seriesId?: string } = {}): PackDraftRecord[] {
@@ -77,40 +80,44 @@ export class FilePackDraftRepository implements PackDraftRepository {
         packDraftId: string,
         input: { status: PackDraftStatus; reviewedBy?: string | null },
     ): { success: true; record: PackDraftRecord } | { success: false; error: string } {
-        const records = this.readAll();
-        const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
-        if (index < 0) return { success: false, error: "Pack draft not found" };
-        const now = new Date().toISOString();
-        const record: PackDraftRecord = {
-            ...records[index]!,
-            status: input.status,
-            updated_at: now,
-            ...(input.reviewedBy !== undefined && { reviewed_by: input.reviewedBy }),
-            reviewed_at: now,
-        };
-        records[index] = record;
-        this.writeAll(records);
-        return { success: true, record };
+        return withFileLock(this.filePath(), () => {
+            const records = this.readAll();
+            const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
+            if (index < 0) return { success: false, error: "Pack draft not found" };
+            const now = new Date().toISOString();
+            const record: PackDraftRecord = {
+                ...records[index]!,
+                status: input.status,
+                updated_at: now,
+                ...(input.reviewedBy !== undefined && { reviewed_by: input.reviewedBy }),
+                reviewed_at: now,
+            };
+            records[index] = record;
+            this.writeAll(records);
+            return { success: true, record };
+        });
     }
 
     addEntry(
         packDraftId: string,
         entry: PackDraftEntry,
     ): { success: true; record: PackDraftRecord } | { success: false; error: string } {
-        const records = this.readAll();
-        const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
-        if (index < 0) return { success: false, error: "Pack draft not found" };
-        if (entry.source_proposal_id && records[index]!.entries.some((existing) => existing.source_proposal_id === entry.source_proposal_id)) {
-            return { success: false, error: "Proposal already adopted into this pack draft" };
-        }
-        const record: PackDraftRecord = {
-            ...records[index]!,
-            entries: [...records[index]!.entries, entry],
-            updated_at: new Date().toISOString(),
-        };
-        records[index] = record;
-        this.writeAll(records);
-        return { success: true, record };
+        return withFileLock(this.filePath(), () => {
+            const records = this.readAll();
+            const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
+            if (index < 0) return { success: false, error: "Pack draft not found" };
+            if (entry.source_proposal_id && records[index]!.entries.some((existing) => existing.source_proposal_id === entry.source_proposal_id)) {
+                return { success: false, error: "Proposal already adopted into this pack draft" };
+            }
+            const record: PackDraftRecord = {
+                ...records[index]!,
+                entries: [...records[index]!.entries, entry],
+                updated_at: new Date().toISOString(),
+            };
+            records[index] = record;
+            this.writeAll(records);
+            return { success: true, record };
+        });
     }
 }
 

@@ -8,6 +8,7 @@ export * from "./feedback-types.js";
 export * from "./feedback-repository.js";
 export * from "./proposal-types.js";
 export * from "./proposal-repository.js";
+export * from "./file-lock.js";
 export * from "./pack-draft-types.js";
 export * from "./pack-draft-repository.js";
 export * from "./pack-loader.js";
