@@ -1,0 +1,120 @@
+---
+interface Props {
+  workId: string;
+  episodeId: string;
+  seriesTitle: string;
+  episodeTitle: string;
+  pageCount: number;
+  viewerPagesJson: string;
+  feedbackApiBaseJson: string;
+}
+
+const {
+  workId,
+  episodeId,
+  seriesTitle,
+  episodeTitle,
+  pageCount,
+  viewerPagesJson,
+  feedbackApiBaseJson,
+} = Astro.props;
+---
+
+<div class="reader-shell" data-work-id={workId} data-episode-id={episodeId}>
+  <div class="reader-toolbar" aria-label="Reader controls">
+    <div class="reader-meta">
+      <a href={`/works/${workId}`} class="reader-back">← {seriesTitle}</a>
+      <span>{episodeTitle}</span>
+    </div>
+    <div class="reader-mode">
+      <button type="button" class="reader-mode-button is-active" data-mode-button="normal">Read</button>
+      <button type="button" class="reader-mode-button" data-mode-button="explore">Explore / くわしく見る</button>
+    </div>
+    <div class="reader-progress">
+      <span data-current-page>1</span> / {pageCount}
+    </div>
+    <p class="reader-hint text-muted">スワイプ・左右キー・画面左右タップでページ送り</p>
+  </div>
+
+  <div class="reader-stage" data-reader-stage>
+    <button type="button" class="reader-nav-zone reader-nav-next" data-reader-next aria-label="次のページへ">←</button>
+    <div class="reader-viewport" id="reader" tabindex="0" aria-label="Manga reader">
+      <div class="reader-track" data-reader-track></div>
+    </div>
+    <button type="button" class="reader-nav-zone reader-nav-prev" data-reader-prev aria-label="前のページへ">→</button>
+  </div>
+
+  <aside class="study-panel" data-study-panel>
+    <div>
+      <p class="study-panel-kicker">Explore / Feedback</p>
+      <h2 data-explore-title>Page <span data-note-page>1</span></h2>
+      <p class="text-muted" data-explore-summary>フキダシやコマを選ぶと、原文確認や軽い提案ができます。本格レビューとPack反映はCMS側で扱います。</p>
+    </div>
+    <div class="explore-detail" data-explore-detail>
+      <p class="text-muted">Explore Modeでページ内のフキダシ/コマを選択してください。</p>
+    </div>
+    <label>
+      <span>脚注・翻訳メモ</span>
+      <textarea
+        data-note-input
+        rows="5"
+        placeholder="例: このセリフはPackの説明で補足したい、翻訳では別案がありそう、など"
+      ></textarea>
+    </label>
+    <div class="study-target-grid">
+      <label>
+        <span>対象</span>
+        <select data-note-scope>
+          <option value="page">ページ全体</option>
+          <option value="panel">コマ</option>
+          <option value="bubble">フキダシ</option>
+          <option value="region">任意位置</option>
+        </select>
+      </label>
+      <label>
+        <span>対象メモ</span>
+        <input data-note-target placeholder="例: 右上のフキダシ / 2コマ目 / 画面中央" />
+      </label>
+    </div>
+    <p class="text-muted study-panel-note" data-note-anchor>位置指定なし。Explore Modeでページ画像をクリックすると、注の位置候補を保存できます。</p>
+    <p class="text-muted study-panel-note">Readerでは軽い報告/提案だけを受け付けます。正式編集はCMSで行います。</p>
+  </aside>
+  <script type="application/json" id="reader-pages" set:html={viewerPagesJson}></script>
+  <script type="application/json" id="feedback-api-base" set:html={feedbackApiBaseJson}></script>
+  <div class="reader-context-menu" data-reader-context-menu hidden></div>
+  <div class="reader-toast" data-reader-toast hidden></div>
+  <div class="feedback-modal" data-feedback-modal hidden>
+    <div class="feedback-modal-backdrop" data-feedback-close></div>
+    <form class="feedback-dialog" data-feedback-form>
+      <input type="text" name="website" autocomplete="off" tabindex="-1" class="feedback-honeypot" aria-hidden="true" />
+      <div>
+        <p class="study-panel-kicker" data-feedback-kicker>Feedback</p>
+        <h2 data-feedback-title>報告する</h2>
+        <p class="text-muted" data-feedback-target>対象を選択中</p>
+      </div>
+      <label>
+        <span>種類</span>
+        <select name="issue_type" data-feedback-issue>
+          <option value="typo">誤字</option>
+          <option value="mistranslation">誤訳</option>
+          <option value="display">表示崩れ</option>
+          <option value="better_translation">よりよい訳</option>
+          <option value="missing_note">注釈提案</option>
+          <option value="other">その他</option>
+        </select>
+      </label>
+      <label>
+        <span>コメント</span>
+        <textarea name="comment" data-feedback-comment maxlength="1000" rows="4" placeholder="気づいた点を短く書いてください"></textarea>
+      </label>
+      <label data-feedback-suggested-wrap hidden>
+        <span>提案文</span>
+        <textarea name="suggested_text" data-feedback-suggested maxlength="2000" rows="3" placeholder="翻訳案や注釈案があれば入力してください"></textarea>
+      </label>
+      <div class="feedback-actions">
+        <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-close>閉じる</button>
+        <button type="submit" class="btn-viewer btn-primary-viewer">送信</button>
+      </div>
+    </form>
+  </div>
+</div>
