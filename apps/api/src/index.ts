@@ -22,6 +22,8 @@ import {
     createFileIngestionRepository,
     createFileEntitlementRepository,
     createFileFeedbackRepository,
+    isPublicNow,
+    isSeriesAndEpisodePublicNow,
     DefaultAccessPolicy,
     generateDeliveryToken,
     verifyDeliveryToken,
@@ -139,7 +141,27 @@ function publicSeriesMeta(series: any) {
         title: series.title,
         coverUrl: series.coverUrl,
         ...(series.shareImageUrl ? { shareImageUrl: series.shareImageUrl } : {}),
+        ...(series.publishStartAt ? { publishStartAt: series.publishStartAt } : {}),
+        ...(series.publishEndAt ? { publishEndAt: series.publishEndAt } : {}),
+        ...(series.visibility ? { visibility: series.visibility } : {}),
     };
+}
+
+function publicEpisodeSummary(ep: any) {
+    return {
+        id: ep.id,
+        episodeNumber: ep.episodeNumber,
+        title: ep.title,
+        publishedAt: ep.publishedAt,
+        ...(ep.publishStartAt ? { publishStartAt: ep.publishStartAt } : {}),
+        ...(ep.publishEndAt ? { publishEndAt: ep.publishEndAt } : {}),
+        ...(ep.visibility ? { visibility: ep.visibility } : {}),
+    };
+}
+
+function visibleEpisodes(series: any, now = new Date()) {
+    if (!isPublicNow(series, now)) return [];
+    return series.episodes.filter((ep: any) => isPublicNow(ep, now));
 }
 
 // ---------------------------------------------------------------------------
@@ -410,8 +432,14 @@ app.get("/series/:seriesId/episodes/:episodeId/pages/:pageNumber", async (c) => 
     if (pageNumber instanceof Response) return pageNumber;
     const user = getUser(c);
 
+    const series = readRepo.getSeries(seriesId);
+    if (!series) return c.json({ error: { code: "NOT_FOUND", message: "Series not found" } }, 404);
+
     const ep = readRepo.getEpisode(seriesId, episodeId);
     if (!ep) return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
+    if (!isSeriesAndEpisodePublicNow(series, ep)) {
+        return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
+    }
 
     const page = ep.pages.find((p: any) => p.pageNumber === pageNumber);
     if (!page) return c.json({ error: { code: "NOT_FOUND", message: "Page not found" } }, 404);
@@ -485,8 +513,17 @@ app.get("/series/:seriesId/episodes/:episodeId", async (c) => {
 
     const ep = readRepo.getEpisode(seriesId, episodeId);
     if (!ep) return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
+    if (!isSeriesAndEpisodePublicNow(series, ep)) {
+        return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
+    }
 
-    const { prev, next } = readRepo.getAdjacentEpisodes(seriesId, episodeId);
+    const publicEpisodes = visibleEpisodes(series);
+    const sortedPublicEpisodes = [...publicEpisodes].sort((a: any, b: any) => a.episodeNumber - b.episodeNumber);
+    const currentIndex = sortedPublicEpisodes.findIndex((candidate: any) => candidate.id === episodeId);
+    const prev = currentIndex > 0 ? sortedPublicEpisodes[currentIndex - 1] : null;
+    const next = currentIndex >= 0 && currentIndex < sortedPublicEpisodes.length - 1
+        ? sortedPublicEpisodes[currentIndex + 1]
+        : null;
 
     // --- Entitlement check ---
     const isFree = accessPolicy.isEpisodeFree(seriesId, episodeId, ep.episodeNumber);
@@ -497,10 +534,7 @@ app.get("/series/:seriesId/episodes/:episodeId", async (c) => {
         return c.json({
             series: publicSeriesMeta(series),
             episode: {
-                id: ep.id,
-                episodeNumber: ep.episodeNumber,
-                title: ep.title,
-                publishedAt: ep.publishedAt,
+                ...publicEpisodeSummary(ep),
                 pages: [], // stripped
             },
             gated: true,
@@ -540,21 +574,27 @@ app.get("/series/:seriesId/episodes/:episodeId", async (c) => {
 // ---------------------------------------------------------------------------
 
 app.get("/series", (c) => {
-    const allSeries = readRepo.listSeries().map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        description: s.description,
-        status: s.status,
-        coverUrl: s.coverUrl,
-        ...(s.shareImageUrl ? { shareImageUrl: s.shareImageUrl } : {}),
-        episodeCount: s.episodes.length,
-    }));
+    const allSeries = readRepo.listSeries()
+        .filter((s: any) => isPublicNow(s))
+        .map((s: any) => ({
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            status: s.status,
+            coverUrl: s.coverUrl,
+            ...(s.shareImageUrl ? { shareImageUrl: s.shareImageUrl } : {}),
+            ...(s.publishStartAt ? { publishStartAt: s.publishStartAt } : {}),
+            ...(s.publishEndAt ? { publishEndAt: s.publishEndAt } : {}),
+            ...(s.visibility ? { visibility: s.visibility } : {}),
+            episodeCount: visibleEpisodes(s).length,
+        }));
     return c.json({ items: allSeries });
 });
 
 app.get("/series/:seriesId", (c) => {
     const series = readRepo.getSeries(c.req.param("seriesId"));
-    if (!series) return c.json({ error: { code: "NOT_FOUND", message: "Series not found" } }, 404);
+    if (!series || !isPublicNow(series)) return c.json({ error: { code: "NOT_FOUND", message: "Series not found" } }, 404);
+    const publicEpisodes = visibleEpisodes(series);
     return c.json({
         id: series.id,
         title: series.title,
@@ -562,11 +602,17 @@ app.get("/series/:seriesId", (c) => {
         status: series.status,
         coverUrl: series.coverUrl,
         ...(series.shareImageUrl ? { shareImageUrl: series.shareImageUrl } : {}),
-        episodes: series.episodes.map((ep: any) => ({
+        ...(series.publishStartAt ? { publishStartAt: series.publishStartAt } : {}),
+        ...(series.publishEndAt ? { publishEndAt: series.publishEndAt } : {}),
+        ...(series.visibility ? { visibility: series.visibility } : {}),
+        episodes: publicEpisodes.map((ep: any) => ({
             id: ep.id,
             episodeNumber: ep.episodeNumber,
             title: ep.title,
             publishedAt: ep.publishedAt,
+            ...(ep.publishStartAt ? { publishStartAt: ep.publishStartAt } : {}),
+            ...(ep.publishEndAt ? { publishEndAt: ep.publishEndAt } : {}),
+            ...(ep.visibility ? { visibility: ep.visibility } : {}),
             pageCount: ep.pages.length,
         })),
     });
@@ -589,6 +635,9 @@ app.get(
 
         const result = readRepo.findBubble(seriesId, episodeId, pageNumber, panelNumber, bubbleNumber);
         if (!result) return c.json({ error: { code: "NOT_FOUND", message: "Quote not found" } }, 404);
+        if (!isSeriesAndEpisodePublicNow(result.series, result.episode)) {
+            return c.json({ error: { code: "NOT_FOUND", message: "Quote not found" } }, 404);
+        }
 
         return c.json({
             seriesId: result.series.id,
@@ -632,6 +681,9 @@ app.get(
 
         const result = readRepo.findPanels(seriesId, episodeId, pageNumber, panelStart, panelEnd);
         if (!result) return c.json({ error: { code: "NOT_FOUND", message: "Clip not found" } }, 404);
+        if (!isSeriesAndEpisodePublicNow(result.series, result.episode)) {
+            return c.json({ error: { code: "NOT_FOUND", message: "Clip not found" } }, 404);
+        }
 
         return c.json({
             seriesId: result.series.id,
@@ -665,7 +717,8 @@ app.get("/reactions", (c) => {
     const tag = c.req.query("tag") ?? "";
     if (!tag) return c.json({ error: { code: "BAD_REQUEST", message: "tag query parameter required" } }, 400);
 
-    const results = readRepo.findReactionPanels(tag);
+    const results = readRepo.findReactionPanels(tag)
+        .filter((r: any) => isSeriesAndEpisodePublicNow(r.series, r.episode));
 
     return c.json({
         items: results.map((r: any) => ({
@@ -840,6 +893,9 @@ app.post("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", async (c) =
         episodeNumber: ep.episodeNumber,
         title: ep.title,
         publishedAt: ep.publishedAt,
+        publishStartAt: ep.publishStartAt,
+        publishEndAt: ep.publishEndAt,
+        visibility: ep.visibility,
         pages,
     });
     if (!result.success) {
@@ -1184,6 +1240,10 @@ app.get("/entitlements/check", async (c) => {
         return c.json({ error: { code: "BAD_REQUEST", message: "seriesId and episodeId required" } }, 400);
     }
     const ep = readRepo.getEpisode(seriesId, episodeId);
+    const series = readRepo.getSeries(seriesId);
+    if (!series || !ep || !isSeriesAndEpisodePublicNow(series, ep)) {
+        return c.json({ entitled: false, reason: "Content unavailable" });
+    }
     const isFree = ep ? accessPolicy.isEpisodeFree(seriesId, episodeId, ep.episodeNumber) : false;
     const isEntitled = isFree || await entitlements.check(user.id, "EPISODE", `${seriesId}/${episodeId}`);
     return c.json({ entitled: isEntitled, free: isFree, userId: user.id });
@@ -1227,7 +1287,9 @@ app.get("/deliver/:pageId", (c) => {
     let seriesId: string | null = null;
     let episodeId: string | null = null;
     for (const series of readRepo.listSeries()) {
+        if (!isPublicNow(series)) continue;
         for (const ep of series.episodes) {
+            if (!isPublicNow(ep)) continue;
             const page = ep.pages.find((p: any) => p.id === pageId);
             if (page) {
                 originRelPath = (page.images as any)[locale] ?? (page.images as any).ja ?? null;

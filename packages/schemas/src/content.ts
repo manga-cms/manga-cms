@@ -68,15 +68,37 @@ export const PageSchema = z.object({
     panels: z.array(PanelSchema).default([]),
 });
 
+const PublishDateTimeSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+    message: "Must be a parseable date-time",
+});
+
+function validatePublishWindow(
+    value: { publishStartAt?: string; publishEndAt?: string },
+    ctx: z.RefinementCtx,
+): void {
+    if (!value.publishStartAt || !value.publishEndAt) return;
+    if (Date.parse(value.publishEndAt) <= Date.parse(value.publishStartAt)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["publishEndAt"],
+            message: "publishEndAt must be after publishStartAt",
+        });
+    }
+}
+
 export const EpisodeSchema = z.object({
     id: z.string().min(1),
     episodeNumber: z.number().int().positive(),
     title: z.string(),
     publishedAt: z.string(),
+    publishStartAt: PublishDateTimeSchema.optional(),
+    publishEndAt: PublishDateTimeSchema.optional(),
+    visibility: z.enum(["public", "hidden", "archived"]).default("public").optional(),
     pages: z.array(PageSchema).default([]),
-});
+}).superRefine(validatePublishWindow);
 
 export const SeriesStatusSchema = z.enum(["ongoing", "completed", "hiatus"]);
+export const PublicationVisibilitySchema = z.enum(["public", "hidden", "archived"]);
 export const PublicImageUrlSchema = z.string().refine(
     (value) => value.startsWith("/") || /^https?:\/\//.test(value),
     { message: "Must be a root-relative or http(s) URL" },
@@ -90,8 +112,11 @@ export const SeriesManifestSchema = z.object({
     status: SeriesStatusSchema.default("ongoing"),
     cover: z.string().default("cover.jpg"),
     shareImageUrl: PublicImageUrlSchema.optional(),
+    publishStartAt: PublishDateTimeSchema.optional(),
+    publishEndAt: PublishDateTimeSchema.optional(),
+    visibility: PublicationVisibilitySchema.default("public").optional(),
     episodes: z.array(z.string()).default([]),
-});
+}).superRefine(validatePublishWindow);
 
 // ---------------------------------------------------------------------------
 // Pack

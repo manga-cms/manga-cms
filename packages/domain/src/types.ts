@@ -87,10 +87,14 @@ export interface Episode {
     episodeNumber: number;
     title: string;
     publishedAt: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
     pages: Page[];
 }
 
 export type SeriesStatus = "ongoing" | "completed" | "hiatus";
+export type PublicationVisibility = "public" | "hidden" | "archived";
 
 export interface Series {
     id: string;
@@ -99,6 +103,9 @@ export interface Series {
     status: SeriesStatus;
     coverUrl: string;
     shareImageUrl?: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
     episodes: Episode[];
 }
 
