@@ -164,6 +164,7 @@ export class FileContentRepository implements ContentRepository {
                 description: manifest.description,
                 status: manifest.status,
                 coverUrl: manifest.cover,
+                shareImageUrl: manifest.shareImageUrl,
                 episodes,
             };
 

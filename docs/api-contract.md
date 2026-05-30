@@ -43,6 +43,7 @@ interface Series {
   description: string;
   status: SeriesStatus;
   coverUrl: string;
+  shareImageUrl?: string;
   episodes: Episode[];
 }
 ```
@@ -56,9 +57,15 @@ interface SeriesManifest {
   description: string;
   status: SeriesStatus;
   cover: string;
+  shareImageUrl?: string;
   episodes: string[];
 }
 ```
+
+`coverUrl` is the canonical cover asset reference from content storage.
+`shareImageUrl` is an optional stable public URL for SEO/OGP metadata. Reader
+and API work should prefer `shareImageUrl` for social cards when it is present,
+because page delivery URLs may be short-lived.
 
 ### Episode
 

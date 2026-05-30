@@ -28,6 +28,7 @@ if (!workId || !episodeId) {
 let seriesTitle = "";
 let episode: { title: string; episodeNumber: number; publishedAt: string; pages: any[] } | null = null;
 let seriesCoverUrl = "";
+let seriesShareImageUrl = "";
 let prev: { id: string; title: string; episodeNumber: number } | null = null;
 let next: { id: string; title: string; episodeNumber: number } | null = null;
 let dataSource: "api" | "loader" | "none" = "none";
@@ -41,6 +42,8 @@ if (isApiConfigured()) {
   const result = await fetchEpisode(workId, episodeId, requestCookies);
   if (result.data) {
     seriesTitle = result.data.series.title;
+    seriesCoverUrl = result.data.series.coverUrl ?? "";
+    seriesShareImageUrl = result.data.series.shareImageUrl ?? "";
     episode = result.data.episode;
     prev = result.data.prev;
     next = result.data.next;
@@ -60,6 +63,7 @@ if (!episode) {
   if (work && ep) {
     seriesTitle = work.title;
     seriesCoverUrl = work.coverUrl;
+    seriesShareImageUrl = work.shareImageUrl ?? "";
     // For loader fallback, only show ep1 (free). Others are gated.
     if (ep.episodeNumber <= 1) {
       episode = ep;
@@ -114,14 +118,21 @@ const viewerPages = episode.pages.map((page: any) => ({
     })),
   })),
 }));
-seriesCoverUrl ||= getSeries(workId)?.coverUrl ?? "";
+const fallbackSeries = getSeries(workId);
+seriesCoverUrl ||= fallbackSeries?.coverUrl ?? "";
+seriesShareImageUrl ||= fallbackSeries?.shareImageUrl ?? "";
 const viewerPagesJson = JSON.stringify(viewerPages).replace(/</g, "\\u003c");
 const feedbackApiBase = (import.meta.env.API_BASE ?? "").replace(/\/$/, "") || "/api/v1";
 const feedbackApiBaseJson = JSON.stringify(feedbackApiBase).replace(/</g, "\\u003c");
 const isReaderAvailable = !isGated && episode.pages.length > 0;
 const episodeDescription = `${seriesTitle} Episode ${episode.episodeNumber}: ${episode.title}`;
 const hasPublicCoverUrl = seriesCoverUrl.startsWith("/") || /^https?:\/\//.test(seriesCoverUrl);
-const episodeOgImage = viewerPages[0]?.src || (hasPublicCoverUrl ? seriesCoverUrl : "/placeholder-cover.svg");
+const hasPublicShareImageUrl = seriesShareImageUrl.startsWith("/") || /^https?:\/\//.test(seriesShareImageUrl);
+const episodeOgImage = hasPublicShareImageUrl
+  ? seriesShareImageUrl
+  : hasPublicCoverUrl
+    ? seriesCoverUrl
+    : viewerPages[0]?.src || "/placeholder-cover.svg";
 ---
 
 <BaseLayout

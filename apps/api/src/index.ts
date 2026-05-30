@@ -132,6 +132,15 @@ function makeDeliveryUrl(c: any, pageId: string, token: string, locale: string):
     return `${origin}${path}?${params.toString()}`;
 }
 
+function publicSeriesMeta(series: any) {
+    return {
+        id: series.id,
+        title: series.title,
+        coverUrl: series.coverUrl,
+        ...(series.shareImageUrl ? { shareImageUrl: series.shareImageUrl } : {}),
+    };
+}
+
 // ---------------------------------------------------------------------------
 // CORS — env-based allowed origins for launch safety
 // ---------------------------------------------------------------------------
@@ -431,7 +440,7 @@ app.get("/series/:seriesId/episodes/:episodeId", async (c) => {
     if (!isEntitled) {
         // Gated: return metadata only, no page content
         return c.json({
-            series: { id: series.id, title: series.title },
+            series: publicSeriesMeta(series),
             episode: {
                 id: ep.id,
                 episodeNumber: ep.episodeNumber,
@@ -463,7 +472,7 @@ app.get("/series/:seriesId/episodes/:episodeId", async (c) => {
     };
 
     return c.json({
-        series: { id: series.id, title: series.title },
+        series: publicSeriesMeta(series),
         episode: safeEpisode,
         gated: false,
         prev: prev ? { id: prev.id, title: prev.title, episodeNumber: prev.episodeNumber } : null,
@@ -482,6 +491,7 @@ app.get("/series", (c) => {
         description: s.description,
         status: s.status,
         coverUrl: s.coverUrl,
+        ...(s.shareImageUrl ? { shareImageUrl: s.shareImageUrl } : {}),
         episodeCount: s.episodes.length,
     }));
     return c.json({ items: allSeries });
@@ -496,6 +506,7 @@ app.get("/series/:seriesId", (c) => {
         description: series.description,
         status: series.status,
         coverUrl: series.coverUrl,
+        ...(series.shareImageUrl ? { shareImageUrl: series.shareImageUrl } : {}),
         episodes: series.episodes.map((ep: any) => ({
             id: ep.id,
             episodeNumber: ep.episodeNumber,

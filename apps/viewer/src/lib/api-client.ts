@@ -43,7 +43,7 @@ async function apiFetch<T>(path: string, cookies?: string | null): Promise<{ dat
 // ---------------------------------------------------------------------------
 
 export interface EpisodeMetaResponse {
-    series: { id: string; title: string };
+    series: { id: string; title: string; coverUrl?: string; shareImageUrl?: string };
     episode: {
         id: string;
         episodeNumber: number;

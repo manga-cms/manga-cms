@@ -23,6 +23,7 @@ export interface CreateSeriesInput {
     description?: string;
     status?: "ongoing" | "completed" | "hiatus";
     cover?: string;
+    shareImageUrl?: string;
 }
 
 export interface UpdateSeriesInput {
@@ -30,6 +31,7 @@ export interface UpdateSeriesInput {
     description?: string;
     status?: "ongoing" | "completed" | "hiatus";
     cover?: string;
+    shareImageUrl?: string;
 }
 
 export interface SaveEpisodeInput {
@@ -95,6 +97,7 @@ export class FileContentWriter implements ContentWriteRepository {
             description: input.description ?? "",
             status: input.status ?? "ongoing",
             cover: input.cover ?? "cover.jpg",
+            ...(input.shareImageUrl !== undefined && { shareImageUrl: input.shareImageUrl }),
             episodes: [],
         };
 
@@ -117,6 +120,7 @@ export class FileContentWriter implements ContentWriteRepository {
                 description: manifest.description,
                 status: manifest.status,
                 coverUrl: manifest.cover,
+                shareImageUrl: manifest.shareImageUrl,
                 episodes: [],
             },
         };
@@ -143,6 +147,7 @@ export class FileContentWriter implements ContentWriteRepository {
             ...(input.description !== undefined && { description: input.description }),
             ...(input.status !== undefined && { status: input.status }),
             ...(input.cover !== undefined && { cover: input.cover }),
+            ...(input.shareImageUrl !== undefined && { shareImageUrl: input.shareImageUrl }),
         };
 
         const result = SeriesManifestSchema.safeParse(updated);
@@ -161,6 +166,7 @@ export class FileContentWriter implements ContentWriteRepository {
                 description: updated.description ?? "",
                 status: updated.status ?? "ongoing",
                 coverUrl: updated.cover ?? "cover.jpg",
+                shareImageUrl: updated.shareImageUrl,
                 episodes: [],
             },
         };
