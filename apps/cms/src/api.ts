@@ -372,6 +372,16 @@ export interface PreparedDirectoryImportInput {
     episodeTitle: string;
     defaultWidth?: number;
     defaultHeight?: number;
+    pages?: PreparedDirectoryImportPageInput[];
+}
+
+export interface PreparedDirectoryImportPageInput {
+    sourcePath?: string;
+    fileName?: string;
+    pageNumber?: number;
+    width?: number;
+    height?: number;
+    displayRef?: string;
 }
 
 export async function importPreparedDirectory(input: PreparedDirectoryImportInput) {
