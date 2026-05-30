@@ -51,8 +51,9 @@ For ready-to-paste Codex prompts for the next parallel workstreams, see
 - Add Pack Manager contracts for translation, footnote, commentary, learning, and accessibility packs.
 - Add Rights/Role Manager MVP contracts for owner/editor/translator/reviewer/contributor permissions.
 - Wire CMS publication scheduling controls to the Series/Episode scheduling
-  contract (`publishStartAt`, `publishEndAt`, `visibility`) and add any needed
-  bulk status-change workflow.
+  contract (`publishStartAt`, `publishEndAt`, `visibility`). A minimal Episode
+  bulk status-change workflow now exists on the Work detail screen; expand it
+  later if release operations need saved presets or review approvals.
 - Add bulk import contracts for prepared episode directories or archives so page
   images and draft metadata can be imported without hand-entering every page.
 - Add share policy and spoiler policy schemas.
