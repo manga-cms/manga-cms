@@ -1432,6 +1432,15 @@ function preparedImportError(c: any, message: string, status = 400): Response {
     return c.json({ error: { code: status === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message } }, status);
 }
 
+interface PreparedImportPage {
+    pageNumber: number;
+    source: string;
+    canonicalFileName: string;
+    width: number;
+    height: number;
+    displayRef?: string;
+}
+
 // POST /admin/ingestion/import/prepared-directory — Create draft job from local prepared assets.
 app.post("/admin/ingestion/import/prepared-directory", async (c) => {
     const denied = requireAdmin(c); if (denied) return denied;
@@ -1454,9 +1463,12 @@ app.post("/admin/ingestion/import/prepared-directory", async (c) => {
     if (!seriesId || !seriesTitle || !episodeId || !episodeTitle || !Number.isInteger(episodeNumber) || episodeNumber < 1) {
         return preparedImportError(c, "seriesId, seriesTitle, episodeId, episodeNumber, and episodeTitle are required");
     }
+    const seriesStatus = body.seriesStatus ?? "ongoing";
+    if (!["ongoing", "completed", "hiatus"].includes(seriesStatus)) {
+        return preparedImportError(c, "seriesStatus must be ongoing, completed, or hiatus");
+    }
 
     try {
-        const job = await ingestion.createJob(body.label ?? `${seriesTitle} - ${episodeTitle}`);
         const sourceFiles = Array.isArray(body.pages) && body.pages.length > 0
             ? body.pages.map((page: any) => String(page.sourcePath ?? page.fileName ?? ""))
             : listPreparedImageFiles(sourceDir);
@@ -1465,7 +1477,8 @@ app.post("/admin/ingestion/import/prepared-directory", async (c) => {
             return preparedImportError(c, "No supported image files found in prepared source directory");
         }
 
-        const draftPages = sourceFiles.map((fileName: string, index: number) => {
+        const seenCanonicalFileNames = new Set<string>();
+        const preparedPages: PreparedImportPage[] = sourceFiles.map((fileName: string, index: number) => {
             if (!fileName || !isSafeRelativePath(fileName)) {
                 throw new Error(`Unsafe page source path at index ${index}`);
             }
@@ -1484,20 +1497,41 @@ app.post("/admin/ingestion/import/prepared-directory", async (c) => {
             }
             const normalizedExt = ext === ".jpeg" ? ".jpg" : ext;
             const canonicalFileName = `p${String(pageNumber).padStart(3, "0")}${normalizedExt}`;
-            const sourceImagePath = `${job.id}/pages/${canonicalFileName}`;
+            if (seenCanonicalFileNames.has(canonicalFileName)) {
+                throw new Error(`Duplicate canonical page target: ${canonicalFileName}`);
+            }
+            const width = Number(bodyPage.width ?? body.defaultWidth ?? 500);
+            const height = Number(bodyPage.height ?? body.defaultHeight ?? 760);
+            if (!Number.isFinite(width) || width < 1 || !Number.isFinite(height) || height < 1) {
+                throw new Error(`Invalid dimensions for ${fileName}`);
+            }
+            seenCanonicalFileNames.add(canonicalFileName);
+            return {
+                source,
+                pageNumber,
+                canonicalFileName,
+                width,
+                height,
+                displayRef: typeof bodyPage.displayRef === "string" && bodyPage.displayRef ? bodyPage.displayRef : undefined,
+            };
+        });
+
+        const job = await ingestion.createJob(body.label ?? `${seriesTitle} - ${episodeTitle}`);
+        const draftPages = preparedPages.map((page) => {
+            const sourceImagePath = `${job.id}/pages/${page.canonicalFileName}`;
             const draftAssetPath = resolve(DRAFT_ASSETS_DIR, sourceImagePath);
             if (!isPathInside(DRAFT_ASSETS_DIR, draftAssetPath)) {
-                throw new Error(`Unsafe draft asset path for ${fileName}`);
+                throw new Error(`Unsafe draft asset path for ${page.canonicalFileName}`);
             }
             mkdirSync(dirname(draftAssetPath), { recursive: true });
-            copyFileSync(source, draftAssetPath);
+            copyFileSync(page.source, draftAssetPath);
             return {
-                pageNumber,
-                imagePath: `pages/${canonicalFileName}`,
+                pageNumber: page.pageNumber,
+                imagePath: `pages/${page.canonicalFileName}`,
                 sourceImagePath,
-                width: Number(bodyPage.width ?? body.defaultWidth ?? 500),
-                height: Number(bodyPage.height ?? body.defaultHeight ?? 760),
-                displayRef: typeof bodyPage.displayRef === "string" && bodyPage.displayRef ? bodyPage.displayRef : undefined,
+                width: page.width,
+                height: page.height,
+                displayRef: page.displayRef,
             };
         });
 
@@ -1505,7 +1539,7 @@ app.post("/admin/ingestion/import/prepared-directory", async (c) => {
             seriesId,
             seriesTitle,
             seriesDescription: typeof body.seriesDescription === "string" ? body.seriesDescription : undefined,
-            seriesStatus: body.seriesStatus,
+            seriesStatus,
             episodeId,
             episodeNumber,
             episodeTitle,
