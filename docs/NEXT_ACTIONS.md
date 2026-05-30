@@ -39,12 +39,29 @@ For ready-to-paste Codex prompts for the next parallel workstreams, see
 ## Codex Tasks
 
 - Keep `/deliver/:pageId` path containment covered as delivery evolves toward CDN or watermark output.
+- Refactor the fat Viewer episode page before adding more Reader interactions:
+  split SSR data loading, metadata, reader layout, Explore panel, feedback modal,
+  and client-side reader controls into smaller modules.
+- Add Reader mobile polish: stronger image preload/decode handling, blank-page
+  prevention, RTL swipe tuning, double-tap zoom, and Explore bottom sheet on
+  small screens.
+- Upgrade the read-complete surface with next Episode, reaction, share, and
+  contribution actions.
+- Add Page OGP first, then Clip/Quote dynamic share images once official
+  Clip/Quote records are available.
 - Convert provided manuscript/page assets into `contents/` structure.
 - Create or validate `series.json` and `episode.json`.
 - Add panel and bubble metadata where needed for quote/clip features.
 - Align Reader behavior with `docs/reader-ux-spec.md`: Normal Mode hides overlays; Study Mode exposes footnotes, translation comparison, lightweight proposals, and focus-link target inspection.
 - Expand Reader feedback from the current MVP into CMS triage: list feedback, inspect target context, close/triage, and convert approved items into proposals.
 - Bring the viewer closer to the medamayaki reader model: right-to-left page flow, keyboard/tap navigation, minimal chrome during reading, and a read-completion surface.
+- Refactor `PageStructureReview.tsx` into focused CMS components before adding
+  deeper editor behavior.
+- Add CMS canvas zoom/pan, fit presets, and coordinate conversion checks for
+  high-resolution Page Structure Review.
+- Add CMS editing safety: undo/redo, dirty-state browser warning, and local
+  autosave/recovery for structure review.
+- Add a Translation Workspace MVP with surrounding Bubble/Panel context.
 - Expand the CMS Review UI for page structure: image overlay, draggable panel boxes, draggable bubble boxes, template-assisted panel creation, reading-order labels, text/footnote proposals, accept/reject, and save to canonical draft.
 - Connect ingestion artifacts to that Review UI so panel/bubble candidates are auto-filled but remain human-confirmed before entering canonical content.
 - Add Proposal Queue contracts for translation, typo, footnote, commentary, tag, and structure proposals.
@@ -63,18 +80,18 @@ For ready-to-paste Codex prompts for the next parallel workstreams, see
 
 ## Suggested Next Sprint
 
-1. Confirm sample-content rights.
-2. Add GitHub repository description and topics.
-3. Add the first real episode assets.
-4. Validate viewer/API rendering locally.
-5. Validate Reader against `docs/reader-ux-spec.md`, especially Normal Mode vs Study Mode, focus links, and mobile/tablet/desktop viewport behavior.
-6. Use CMS panel templates to structure the first real/storyboard episode, then manually add Bubble boxes and text for key pages.
-7. Connect ingestion artifacts to the CMS page-structure review editor so panel/bubble candidates can prefill templates.
-8. Add CMS Feedback Triage for records saved by `POST /api/v1/feedback`.
-9. Add Proposal Queue data contracts and minimal CMS list/detail UI.
-10. Add Pack Manager MVP for Translation Pack and Footnote Pack.
-11. Add Rights/Role Manager MVP for language-specific translation permissions.
-12. Add official Quote / Clip records for the first episode.
+1. Confirm sample-content rights and choose the first real Series.
+2. Refactor the Viewer episode page into smaller modules.
+3. Add Reader preload/blank-page prevention and mobile swipe/zoom polish.
+4. Add a dedicated read-complete surface.
+5. Refactor Page Structure Review into focused CMS components.
+6. Add CMS canvas zoom/pan and editing safety.
+7. Add CMS Rights/Role Manager UI on top of the existing Rights API.
+8. Add the first real episode assets through prepared import.
+9. Use CMS panel templates and manual Bubble editing to structure the first episode.
+10. Validate Reader/API rendering locally across mobile/tablet/desktop.
+11. Add Page OGP and then official Quote / Clip records.
+12. Run a public-launch smoke rehearsal.
 
 ## Post-Launch Engineering Backlog
 
