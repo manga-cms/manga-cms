@@ -30,6 +30,9 @@ cp .env.example .env
 | `API_BASE` | Internal API URL for viewer SSR |
 | `DELIVERY_PUBLIC_ORIGIN` | Optional public API origin for signed image URLs when different from `API_BASE` |
 | `FEEDBACK_DIR` | Private runtime JSONL storage for reader feedback |
+| `PROPOSALS_DIR` | Private runtime JSONL storage for Proposal Queue records |
+| `PACK_DRAFTS_DIR` | Private runtime JSONL storage for Pack draft records |
+| `PACKS_DIR` | Canonical Pack manifest storage, defaults to repository `packs/` |
 | `TRUST_PROXY` | `1` if behind reverse proxy (Cloudflare, nginx) |
 | `ALLOWED_ORIGINS` | Comma-separated allowed CORS origins (e.g. `https://manga.example.com,http://localhost:4321`) |
 
