@@ -103,6 +103,9 @@ export default function ProposalDetail() {
 
     if (loading) return <p style={{ color: "var(--muted)" }}>Loading...</p>;
     if (!record) return <div className="error-msg">{error || "Proposal not found"}</div>;
+    const adoptedDrafts = packDrafts.filter((draft) =>
+        draft.entries.some((entry) => entry.source_proposal_id === record.proposal_id),
+    );
     const compatibleDrafts = packDrafts.filter((draft) => canAdoptIntoDraft(record, draft));
     const compatibleTypes = PROPOSAL_COMPATIBILITY[record.kind].join(", ");
 
@@ -126,6 +129,17 @@ export default function ProposalDetail() {
             {status === "accepted" && (
                 <div className="success-msg">
                     Accepted records are not applied to canonical content or published packs automatically. Adopt this proposal into a Pack Draft as a separate step.
+                </div>
+            )}
+            {adoptedDrafts.length > 0 && (
+                <div className="success-msg">
+                    Already adopted into {adoptedDrafts.length} Pack Draft{adoptedDrafts.length === 1 ? "" : "s"}:{" "}
+                    {adoptedDrafts.map((draft, index) => (
+                        <span key={draft.pack_draft_id}>
+                            {index > 0 && ", "}
+                            <Link to={`/pack-drafts/${draft.pack_draft_id}`}>{draft.title}</Link>
+                        </span>
+                    ))}
                 </div>
             )}
 
@@ -172,6 +186,7 @@ export default function ProposalDetail() {
                     <h2>Adopt Into Pack Draft</h2>
                     <p className="card-meta">
                         Compatible Pack types: {compatibleTypes}. Only draft or in_review Pack Drafts with matching Series/Episode scope are shown.
+                        Drafts that already include this proposal are listed above instead of being offered again.
                     </p>
                     {compatibleDrafts.length === 0 ? (
                         <div className="empty-state">
