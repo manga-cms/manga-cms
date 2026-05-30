@@ -17,8 +17,7 @@ Implemented in this MVP:
 
 Not implemented in this MVP:
 
-- Review Queue
-- CMS feedback triage
+- Proposal Queue
 - Pack merge or publication
 - Contributor credit/rewards
 - Public GitHub Issue posting
@@ -100,3 +99,21 @@ Feedback storage is private runtime state and is ignored by Git.
 - `user_agent` and client IP captured server-side
 
 For multi-instance production, replace the in-memory limiter with a shared store.
+
+## CMS Triage
+
+CMS can list private feedback, inspect target context fields, and update
+triage status:
+
+- `GET /api/v1/admin/feedback`
+- `GET /api/v1/admin/feedback/{feedbackId}`
+- `PUT /api/v1/admin/feedback/{feedbackId}/status`
+
+Statuses:
+
+- `new`
+- `triaged`
+- `closed`
+
+Triage does not mutate canonical content, Packs, or proposals. Converting
+approved feedback into proposal records remains a future workflow.

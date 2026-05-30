@@ -264,6 +264,93 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /admin/feedback:
+    get:
+      tags: [Feedback]
+      summary: List feedback records for CMS triage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/FeedbackStatus"
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Feedback records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FeedbackRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/feedback/{feedbackId}:
+    get:
+      tags: [Feedback]
+      summary: Read one feedback record for CMS triage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/feedbackId"
+      responses:
+        "200":
+          description: Feedback record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/feedback/{feedbackId}/status:
+    put:
+      tags: [Feedback]
+      summary: Update feedback triage status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/feedbackId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated feedback record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /deliver/{pageId}:
     get:
       tags: [Delivery]
@@ -1334,6 +1421,12 @@ components:
       required: true
       schema:
         type: string
+    feedbackId:
+      name: feedbackId
+      in: path
+      required: true
+      schema:
+        type: string
 
   responses:
     Ok:
@@ -1860,6 +1953,80 @@ components:
         website:
           type: string
           maxLength: 200
+
+    FeedbackStatus:
+      type: string
+      enum: [new, triaged, closed]
+
+    FeedbackRecord:
+      type: object
+      required: [feedback_id, status, created_at, series_id, episode_id, mode, issue_type, source_url]
+      properties:
+        feedback_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/FeedbackStatus"
+        created_at:
+          type: string
+          format: date-time
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        page_id:
+          type: string
+          nullable: true
+        panel_id:
+          type: string
+          nullable: true
+        bubble_id:
+          type: string
+          nullable: true
+        mode:
+          type: string
+          enum: [read, explore, completion]
+        issue_type:
+          type: string
+          enum: [typo, mistranslation, better_translation, missing_note, display, broken_link, spoiler, other]
+        comment:
+          type: string
+        lang:
+          type: string
+        current_text:
+          type: string
+        current_translation:
+          type: string
+        suggested_text:
+          type: string
+        user_id:
+          type: string
+          nullable: true
+        source_url:
+          type: string
+          format: uri
+        user_agent:
+          type: string
+        client_time:
+          type: string
+        triage_note:
+          type: string
+        triaged_by:
+          type: string
+        triaged_at:
+          type: string
+          format: date-time
+        client_ip:
+          type: string
+          nullable: true
+
+    FeedbackStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/FeedbackStatus"
+        triage_note:
+          type: string
 
     FeedbackResponse:
       type: object

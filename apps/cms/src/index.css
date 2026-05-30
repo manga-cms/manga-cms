@@ -272,6 +272,22 @@ textarea {
     margin-bottom: 1rem;
 }
 
+.detail-list {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.detail-list dt {
+    color: var(--muted);
+}
+
+.detail-list dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .section-actions {
     display: flex;
     gap: 0.75rem;
