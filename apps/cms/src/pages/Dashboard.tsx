@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listSeries, type SeriesItem } from "../api";
+import { getPublicationState } from "../publication";
 
 export default function Dashboard() {
     const [works, setWorks] = useState<SeriesItem[]>([]);
@@ -37,6 +38,10 @@ export default function Dashboard() {
                             <div className="card-meta">
                                 <span className={`badge ${w.status === "ongoing" ? "" : "badge-muted"}`}>
                                     {w.status}
+                                </span>
+                                {" "}
+                                <span className={`badge publication-${getPublicationState(w)}`}>
+                                    {getPublicationState(w)}
                                 </span>
                                 {" "}{w.episodeCount} episode(s)
                             </div>

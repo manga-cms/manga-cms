@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createSeries } from "../api";
+import { createSeries, type PublicationVisibility } from "../api";
+import { publicationInputPayload, type PublicationFormState } from "../publication";
 
 function slugify(text: string): string {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -11,6 +12,11 @@ export default function CreateWork() {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [status, setStatus] = useState("ongoing");
+    const [publication, setPublication] = useState<PublicationFormState>({
+        visibility: "public",
+        publishStartAt: "",
+        publishEndAt: "",
+    });
     const [customId, setCustomId] = useState("");
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
@@ -25,7 +31,7 @@ export default function CreateWork() {
         setSaving(true);
         setError("");
         try {
-            await createSeries({ id: seriesId, title, description, status });
+            await createSeries({ id: seriesId, title, description, status, ...publicationInputPayload(publication) });
             nav(`/works/${seriesId}`);
         } catch (err) {
             setError((err as Error).message);
@@ -60,6 +66,35 @@ export default function CreateWork() {
                         <option value="completed">Completed</option>
                         <option value="hiatus">Hiatus</option>
                     </select>
+                </div>
+                <div className="publication-grid">
+                    <div className="form-group">
+                        <label>Visibility</label>
+                        <select
+                            value={publication.visibility}
+                            onChange={(e) => setPublication((current) => ({ ...current, visibility: e.target.value as PublicationVisibility }))}
+                        >
+                            <option value="public">Public</option>
+                            <option value="hidden">Hidden</option>
+                            <option value="archived">Archived</option>
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label>Publish Start</label>
+                        <input
+                            type="datetime-local"
+                            value={publication.publishStartAt}
+                            onChange={(e) => setPublication((current) => ({ ...current, publishStartAt: e.target.value }))}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Publish End</label>
+                        <input
+                            type="datetime-local"
+                            value={publication.publishEndAt}
+                            onChange={(e) => setPublication((current) => ({ ...current, publishEndAt: e.target.value }))}
+                        />
+                    </div>
                 </div>
 
                 {error && <div className="error-msg">{error}</div>}

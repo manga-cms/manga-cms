@@ -164,6 +164,27 @@ function visibleEpisodes(series: any, now = new Date()) {
     return series.episodes.filter((ep: any) => isPublicNow(ep, now));
 }
 
+function adminSeriesSummary(series: any) {
+    return {
+        ...publicSeriesMeta(series),
+        description: series.description,
+        status: series.status,
+        episodeCount: series.episodes.length,
+    };
+}
+
+function adminSeriesDetail(series: any) {
+    return {
+        ...publicSeriesMeta(series),
+        description: series.description,
+        status: series.status,
+        episodes: series.episodes.map((ep: any) => ({
+            ...publicEpisodeSummary(ep),
+            pageCount: ep.pages.length,
+        })),
+    };
+}
+
 // ---------------------------------------------------------------------------
 // CORS — env-based allowed origins for launch safety
 // ---------------------------------------------------------------------------
@@ -750,6 +771,18 @@ function requireAdmin(c: any): Response | null {
 }
 
 // POST /admin/series — Create a new series
+app.get("/admin/series", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    return c.json({ items: readRepo.listSeries().map(adminSeriesSummary) });
+});
+
+app.get("/admin/series/:id", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const series = readRepo.getSeries(c.req.param("id"));
+    if (!series) return c.json({ error: { code: "NOT_FOUND", message: "Series not found" } }, 404);
+    return c.json(adminSeriesDetail(series));
+});
+
 app.post("/admin/series", async (c) => {
     const denied = requireAdmin(c); if (denied) return denied;
     const body = await c.req.json();

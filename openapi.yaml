@@ -334,6 +334,29 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   /admin/series:
+    get:
+      tags: [AdminContent]
+      summary: List Series for CMS editing
+      description: Returns all Series, including hidden, archived, scheduled, and expired Series.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin Series summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SeriesSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
     post:
       tags: [AdminContent]
       summary: Create Series
@@ -360,6 +383,27 @@ paths:
           $ref: "#/components/responses/Forbidden"
 
   /admin/series/{seriesId}:
+    get:
+      tags: [AdminContent]
+      summary: Read Series for CMS editing
+      description: Returns one Series with all Episode summaries, bypassing Public Reader visibility gating.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      responses:
+        "200":
+          description: Admin Series detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       tags: [AdminContent]
       summary: Update Series metadata

@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { saveEpisode, getSeries, getAdminEpisode, uploadAdminPageImage, type PageData } from "../api";
+import { saveEpisode, getSeries, getAdminEpisode, uploadAdminPageImage, type PageData, type PublicationVisibility } from "../api";
+import {
+    getPublicationState,
+    publicationInputPayload,
+    toLocalDateTimeInput,
+    type PublicationFormState,
+} from "../publication";
 
 interface PageInput {
     id?: string;
@@ -34,6 +40,12 @@ export default function EpisodeEditor() {
 
     const [epTitle, setEpTitle] = useState("");
     const [epNum, setEpNum] = useState(1);
+    const [publishedAt, setPublishedAt] = useState("");
+    const [episodeSchedule, setEpisodeSchedule] = useState<PublicationFormState>({
+        visibility: "public",
+        publishStartAt: "",
+        publishEndAt: "",
+    });
     const [pages, setPages] = useState<PageInput[]>([]);
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
@@ -49,8 +61,22 @@ export default function EpisodeEditor() {
             if (episodeSummary) {
                 setEpTitle(episodeSummary.title);
                 setEpNum(episodeSummary.episodeNumber);
+                setPublishedAt(episodeSummary.publishedAt);
+                setEpisodeSchedule({
+                    visibility: episodeSummary.visibility ?? "public",
+                    publishStartAt: toLocalDateTimeInput(episodeSummary.publishStartAt),
+                    publishEndAt: toLocalDateTimeInput(episodeSummary.publishEndAt),
+                });
                 getAdminEpisode(seriesId, epId!)
                     .then((adminEpisode) => {
+                        if (adminEpisode) {
+                            setPublishedAt(adminEpisode.publishedAt);
+                            setEpisodeSchedule({
+                                visibility: adminEpisode.visibility ?? "public",
+                                publishStartAt: toLocalDateTimeInput(adminEpisode.publishStartAt),
+                                publishEndAt: toLocalDateTimeInput(adminEpisode.publishEndAt),
+                            });
+                        }
                         const pages = adminEpisode?.pages ?? [];
                         if (pages.length) {
                             setPages(pages.map((p) => ({
@@ -76,6 +102,7 @@ export default function EpisodeEditor() {
                     });
             } else {
                 // New episode — add one default page
+                setPublishedAt(new Date().toISOString().slice(0, 10));
                 setPages([{ pageNumber: 1, imagePath: "pages/p01.jpg", width: 500, height: 760, panels: [] }]);
                 setLoaded(true);
             }
@@ -144,6 +171,8 @@ export default function EpisodeEditor() {
                 id: epId,
                 episodeNumber: epNum,
                 title: epTitle || epId,
+                publishedAt: publishedAt || new Date().toISOString().slice(0, 10),
+                ...publicationInputPayload(episodeSchedule),
                 pages: fullPages,
             });
             nav(`/works/${seriesId}`);
@@ -155,6 +184,11 @@ export default function EpisodeEditor() {
     };
 
     if (!loaded) return <p style={{ color: "var(--muted)" }}>Loading episode…</p>;
+    const episodePublicationState = getPublicationState({
+        visibility: episodeSchedule.visibility,
+        publishStartAt: publicationInputPayload(episodeSchedule).publishStartAt,
+        publishEndAt: publicationInputPayload(episodeSchedule).publishEndAt,
+    });
 
     return (
         <div>
@@ -172,6 +206,49 @@ export default function EpisodeEditor() {
                     <div className="form-group">
                         <label>Episode Number</label>
                         <input type="number" min={1} value={epNum} onChange={(e) => setEpNum(Number(e.target.value))} />
+                    </div>
+                    <div className="form-group">
+                        <label>Published At</label>
+                        <input type="date" value={publishedAt} onChange={(e) => setPublishedAt(e.target.value)} />
+                    </div>
+                </div>
+
+                <div className="card publication-card" style={{ maxWidth: "42rem", marginBottom: "1.5rem" }}>
+                    <div className="section-heading">
+                        <div>
+                            <h2>Publication</h2>
+                            <p className="card-meta">Episode availability still depends on the parent Series being public.</p>
+                        </div>
+                        <span className={`badge publication-${episodePublicationState}`}>{episodePublicationState}</span>
+                    </div>
+                    <div className="publication-grid">
+                        <div className="form-group">
+                            <label>Visibility</label>
+                            <select
+                                value={episodeSchedule.visibility}
+                                onChange={(e) => setEpisodeSchedule((current) => ({ ...current, visibility: e.target.value as PublicationVisibility }))}
+                            >
+                                <option value="public">Public</option>
+                                <option value="hidden">Hidden</option>
+                                <option value="archived">Archived</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Publish Start</label>
+                            <input
+                                type="datetime-local"
+                                value={episodeSchedule.publishStartAt}
+                                onChange={(e) => setEpisodeSchedule((current) => ({ ...current, publishStartAt: e.target.value }))}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Publish End</label>
+                            <input
+                                type="datetime-local"
+                                value={episodeSchedule.publishEndAt}
+                                onChange={(e) => setEpisodeSchedule((current) => ({ ...current, publishEndAt: e.target.value }))}
+                            />
+                        </div>
                     </div>
                 </div>
 

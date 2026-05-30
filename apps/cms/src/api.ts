@@ -7,7 +7,23 @@ export interface SeriesItem {
     status: string;
     coverUrl: string;
     shareImageUrl?: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
     episodeCount: number;
+}
+
+export type PublicationVisibility = "public" | "hidden" | "archived";
+
+export interface EpisodeSummary {
+    id: string;
+    episodeNumber: number;
+    title: string;
+    publishedAt: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
+    pageCount: number;
 }
 
 export interface SeriesDetail {
@@ -17,7 +33,10 @@ export interface SeriesDetail {
     status: string;
     coverUrl: string;
     shareImageUrl?: string;
-    episodes: { id: string; episodeNumber: number; title: string; publishedAt: string; pageCount: number }[];
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
+    episodes: EpisodeSummary[];
 }
 
 export interface BoundingBox {
@@ -72,22 +91,46 @@ export interface EpisodeData {
     episodeNumber: number;
     title: string;
     publishedAt: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
     pages: PageData[];
 }
 
 export async function listSeries(): Promise<SeriesItem[]> {
+    const res = await fetch(`${API}/admin/series`, { credentials: "include" });
+    if (!res.ok) return listPublicSeries();
+    const data = await res.json();
+    return data.items ?? [];
+}
+
+async function listPublicSeries(): Promise<SeriesItem[]> {
     const res = await fetch(`${API}/series`);
     const data = await res.json();
     return data.items ?? [];
 }
 
 export async function getSeries(id: string): Promise<SeriesDetail | null> {
+    const res = await fetch(`${API}/admin/series/${id}`, { credentials: "include" });
+    if (!res.ok) return getPublicSeries(id);
+    return res.json();
+}
+
+async function getPublicSeries(id: string): Promise<SeriesDetail | null> {
     const res = await fetch(`${API}/series/${id}`);
     if (!res.ok) return null;
     return res.json();
 }
 
-export async function createSeries(input: { id: string; title: string; description?: string; status?: string }) {
+export async function createSeries(input: {
+    id: string;
+    title: string;
+    description?: string;
+    status?: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
+}) {
     const res = await fetch(`${API}/admin/series`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,7 +142,14 @@ export async function createSeries(input: { id: string; title: string; descripti
     return data;
 }
 
-export async function updateSeries(id: string, input: { title?: string; description?: string; status?: string }) {
+export async function updateSeries(id: string, input: {
+    title?: string;
+    description?: string;
+    status?: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
+}) {
     const res = await fetch(`${API}/admin/series/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -116,6 +166,9 @@ export async function saveEpisode(seriesId: string, input: {
     episodeNumber: number;
     title: string;
     publishedAt?: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: PublicationVisibility;
     pages: unknown[];
 }) {
     const res = await fetch(`${API}/admin/series/${seriesId}/episodes`, {

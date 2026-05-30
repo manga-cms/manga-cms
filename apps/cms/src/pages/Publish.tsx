@@ -50,6 +50,9 @@ export default function Publish() {
                     description: work.description,
                     status: work.status,
                     cover: work.coverUrl,
+                    publishStartAt: work.publishStartAt,
+                    publishEndAt: work.publishEndAt,
+                    visibility: work.visibility,
                     episodes: work.episodes.map((ep) => ep.id),
                 }, null, 2)}
             </div>
@@ -63,6 +66,9 @@ export default function Publish() {
                             episodeNumber: ep.episodeNumber,
                             title: ep.title,
                             publishedAt: ep.publishedAt,
+                            publishStartAt: ep.publishStartAt,
+                            publishEndAt: ep.publishEndAt,
+                            visibility: ep.visibility,
                             pageCount: ep.pageCount,
                         }, null, 2)}
                     </div>

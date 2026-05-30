@@ -306,7 +306,9 @@ Base path: `/api/v1`
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/admin/series` | List all Series for CMS editing, including hidden/scheduled/expired content |
 | `POST` | `/admin/series` | Create Series |
+| `GET` | `/admin/series/{id}` | Read Series for CMS editing, including all Episode summaries |
 | `PUT` | `/admin/series/{id}` | Update Series metadata |
 | `POST` | `/admin/series/{id}/episodes` | Create or save Episode |
 | `PUT` | `/admin/series/{id}/episodes/{epId}` | Update Episode |
