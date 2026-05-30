@@ -35,6 +35,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const feedbackSuggestedWrap = document.querySelector("[data-feedback-suggested-wrap]");
     const feedbackComment = document.querySelector("[data-feedback-comment]");
     const feedbackSuggested = document.querySelector("[data-feedback-suggested]");
+    const readerLoading = document.querySelector("[data-reader-loading]");
+    const readerLoadingText = document.querySelector("[data-reader-loading-text]");
     let activePage = "1";
     let selectedTarget = null;
     let feedbackTargetState = null;
@@ -47,6 +49,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let lastWidth = viewport.clientWidth;
     let suppressNextImageClick = false;
     let suppressNextTap = false;
+    let navigationToken = 0;
+    const imageCache = new Map();
 
     const noteKey = (page) => `${storagePrefix}:p${page}`;
     const readNote = (page) => {
@@ -108,6 +112,98 @@ document.addEventListener("DOMContentLoaded", () => {
       window.setTimeout(() => {
         toast.hidden = true;
       }, 1800);
+    };
+    const setReaderLoading = (loading, message = "ページを読み込み中") => {
+      shell.setAttribute("data-image-state", loading ? "loading" : "ready");
+      if (readerLoading) readerLoading.hidden = !loading;
+      if (readerLoadingText) readerLoadingText.textContent = message;
+    };
+    const imageCacheKey = (page) => page?.src || "";
+    const findPageFrame = (page) => track.querySelector(`[data-page="${page.pageNumber}"]`);
+    const markPageImageState = (page, state) => {
+      const frame = findPageFrame(page);
+      if (frame) frame.setAttribute("data-image-state", state);
+    };
+    const syncPageImageElement = (page, state = "loading") => {
+      const img = findPageFrame(page)?.querySelector("img[data-src]");
+      if (!img) return;
+      if (!img.getAttribute("src")) img.setAttribute("src", img.dataset.src);
+      markPageImageState(page, state);
+    };
+    const decodePreloadedImage = async (img) => {
+      if (!img.decode) return;
+      try {
+        await Promise.race([
+          img.decode(),
+          new Promise((resolve) => window.setTimeout(resolve, 800)),
+        ]);
+      } catch {
+        // Some browsers reject decode() for images that still painted correctly.
+      }
+    };
+    const preloadPageImage = (page) => {
+      const key = imageCacheKey(page);
+      if (!key) return Promise.resolve({ ok: false, src: key });
+      const cached = imageCache.get(key);
+      if (cached) return cached.promise;
+
+      const img = new Image();
+      img.decoding = "async";
+      const record = {
+        status: "loading",
+        promise: new Promise((resolve) => {
+          img.onload = async () => {
+            await decodePreloadedImage(img);
+            record.status = "ready";
+            markPageImageState(page, "ready");
+            resolve({ ok: true, src: key });
+          };
+          img.onerror = () => {
+            record.status = "error";
+            markPageImageState(page, "error");
+            resolve({ ok: false, src: key });
+          };
+        }),
+      };
+      imageCache.set(key, record);
+      markPageImageState(page, "loading");
+      img.src = key;
+      if (img.complete && img.naturalWidth > 0) {
+        record.promise = decodePreloadedImage(img).then(() => {
+          record.status = "ready";
+          markPageImageState(page, "ready");
+          return { ok: true, src: key };
+        });
+        imageCache.set(key, record);
+      }
+      return record.promise;
+    };
+    const preloadPages = (targetPages) => Promise.all(
+      targetPages.filter(Boolean).map((page) => preloadPageImage(page)),
+    );
+    const preloadAroundPage = (pageNumber) => {
+      const index = pages.findIndex((page) => page.pageNumber === pageNumber);
+      if (index < 0) return;
+      preloadPages([pages[index - 1], pages[index], pages[index + 1]]);
+    };
+    const preloadAroundView = (viewIndex) => {
+      const targetPages = [];
+      for (let i = viewIndex - 1; i <= viewIndex + 1; i++) {
+        targetPages.push(...(views[i]?.pages || []));
+      }
+      preloadPages(targetPages);
+    };
+    const ensureViewImagesReady = async (view) => {
+      const viewPages = view?.pages || [];
+      if (viewPages.length === 0) return true;
+      viewPages.forEach((page) => syncPageImageElement(page, "loading"));
+      const results = await preloadPages(viewPages);
+      const ok = results.every((result) => result.ok);
+      viewPages.forEach((page) => {
+        const record = imageCache.get(imageCacheKey(page));
+        syncPageImageElement(page, record?.status === "ready" ? "ready" : "error");
+      });
+      return ok;
     };
     const closeContextMenu = () => {
       if (contextMenu) contextMenu.hidden = true;
@@ -428,6 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const frame = document.createElement("article");
       frame.className = "page-frame";
       frame.dataset.page = String(page.pageNumber);
+      frame.dataset.imageState = "idle";
       frame.innerHTML = `
         <div class="page-image-wrap">
           <img
@@ -436,8 +533,10 @@ document.addEventListener("DOMContentLoaded", () => {
             width="${page.width}"
             height="${page.height}"
             decoding="async"
+            loading="eager"
             draggable="false"
           />
+          <span class="page-image-status" aria-live="polite">画像を読み込み中</span>
           <div class="reader-target-layer"></div>
         </div>
         <div class="page-info text-muted">
@@ -583,13 +682,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const loadBufferedImages = () => {
       for (let i = currentViewIndex - 2; i <= currentViewIndex + 2; i++) {
-        const viewEl = track.children[i];
-        if (!viewEl) continue;
-        viewEl.querySelectorAll("img[data-src]").forEach((img) => {
-          if (!img.getAttribute("src")) {
-            img.setAttribute("src", img.dataset.src);
-          }
-        });
+        const view = views[i];
+        if (!view) continue;
+        for (const page of view.pages || []) {
+          const record = imageCache.get(imageCacheKey(page));
+          syncPageImageElement(page, record?.status === "ready" ? "ready" : "loading");
+          if (!record) preloadPageImage(page);
+        }
       }
     };
 
@@ -603,6 +702,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const nextUrl = new URL(window.location.href);
       nextUrl.hash = `p${activePage}`;
       history.replaceState(null, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+      preloadAroundPage(page.pageNumber);
+      preloadAroundView(currentViewIndex);
     };
 
     const render = (offset = 0, animate = true) => {
@@ -614,26 +715,47 @@ document.addEventListener("DOMContentLoaded", () => {
       loadBufferedImages();
     };
 
-    const goToView = (index) => {
-      currentViewIndex = Math.max(0, Math.min(index, views.length - 1));
-      render(0, true);
+    const goToView = async (index, options = {}) => {
+      const { animate = true, requireReady = true } = options;
+      const targetIndex = Math.max(0, Math.min(index, views.length - 1));
+      const targetView = views[targetIndex];
+      const token = ++navigationToken;
+      preloadAroundView(targetIndex);
+
+      if (requireReady && targetView?.pages?.length) {
+        const movingToNewView = targetIndex !== currentViewIndex;
+        if (movingToNewView) {
+          render(0, true);
+          setReaderLoading(true, "次のページを読み込み中");
+        }
+        const ok = await ensureViewImagesReady(targetView);
+        if (token !== navigationToken) return;
+        if (!ok) {
+          showToast("画像を読み込めませんでした");
+        }
+      }
+
+      setReaderLoading(false);
+      currentViewIndex = targetIndex;
+      render(0, animate);
       updateActivePage();
     };
 
     const next = () => goToView(currentViewIndex + 1);
     const prev = () => goToView(currentViewIndex - 1);
 
-    const goToPage = (pageNumber) => {
+    const goToPage = (pageNumber, options = {}) => {
       const index = views.findIndex((view) => view.pages?.some((page) => page.pageNumber === pageNumber));
-      if (index >= 0) goToView(index);
+      if (index >= 0) return goToView(index, options);
+      return Promise.resolve();
     };
-    const applyInitialFocus = () => {
+    const applyInitialFocus = async () => {
       const url = new URL(window.location.href);
       const focus = url.searchParams.get("focus");
       const pageParam = url.searchParams.get("page");
       const target = findTargetById(focus || pageParam);
       if (!target) return false;
-      goToPage(target.page.pageNumber);
+      await goToPage(target.page.pageNumber, { animate: false, requireReady: true });
       setReaderMode("explore");
       requestAnimationFrame(() => {
         selectTarget(target);
@@ -726,13 +848,17 @@ document.addEventListener("DOMContentLoaded", () => {
       render(0, false);
     });
 
-    buildDOM();
-    lastWidth = viewport.clientWidth;
-    const initialPage = Number(location.hash.replace("#p", "")) || 1;
-    goToPage(getPage(initialPage) ? initialPage : 1);
-    loadNote(activePage);
-    if (!applyInitialFocus() && location.hash.startsWith("#p")) {
-      requestAnimationFrame(revealReader);
-    }
+    const initializeReader = async () => {
+      buildDOM();
+      lastWidth = viewport.clientWidth;
+      const initialPage = Number(location.hash.replace("#p", "")) || 1;
+      await goToPage(getPage(initialPage) ? initialPage : 1, { animate: false, requireReady: true });
+      loadNote(activePage);
+      if (!(await applyInitialFocus()) && location.hash.startsWith("#p")) {
+        requestAnimationFrame(revealReader);
+      }
+    };
+
+    initializeReader();
   }
 });

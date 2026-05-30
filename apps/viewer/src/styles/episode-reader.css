@@ -147,6 +147,44 @@
   user-select: none;
 }
 
+.reader-loading {
+  align-items: center;
+  background: rgba(5, 6, 9, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  display: inline-flex;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  gap: 0.6rem;
+  left: 50%;
+  padding: 0.65rem 0.9rem;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+}
+
+.reader-loading[hidden] {
+  display: none;
+}
+
+.reader-loading-spinner {
+  animation: reader-spin 0.8s linear infinite;
+  border: 2px solid rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+  border-top-color: rgba(255, 255, 255, 0.95);
+  height: 1rem;
+  width: 1rem;
+}
+
+@keyframes reader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .reader-track {
   display: flex;
   flex-direction: row-reverse;
@@ -273,6 +311,30 @@
   box-shadow: none;
   filter: none;
   object-fit: contain;
+}
+
+.page-image-status {
+  background: rgba(5, 6, 9, 0.72);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.75rem;
+  font-weight: 800;
+  left: 50%;
+  padding: 0.45rem 0.7rem;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.page-frame[data-image-state="ready"] .page-image-status,
+.page-frame[data-image-state="idle"] .page-image-status {
+  display: none;
+}
+
+.page-frame[data-image-state="error"] .page-image-status {
+  background: rgba(127, 29, 29, 0.86);
 }
 
 .panel-badges {
