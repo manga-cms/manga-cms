@@ -1957,6 +1957,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Panel"
+        availablePacks:
+          type: array
+          description: Published canonical Packs with entries scoped to this Page.
+          items:
+            $ref: "#/components/schemas/PublishedPack"
 
     Episode:
       type: object
@@ -2180,7 +2185,7 @@ components:
         availablePacks:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/PublishedPack"
 
     QuoteResponse:
       type: object
@@ -2637,6 +2642,92 @@ components:
         path:
           type: string
 
+    PackManifestEntryTarget:
+      type: object
+      required: [seriesId]
+      properties:
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        panelId:
+          type: string
+        bubbleId:
+          type: string
+
+    PackManifestEntry:
+      type: object
+      required: [id, target]
+      properties:
+        id:
+          type: string
+        target:
+          $ref: "#/components/schemas/PackManifestEntryTarget"
+        language:
+          type: string
+        originalText:
+          type: string
+        text:
+          type: string
+        note:
+          type: string
+        sourceProposalId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    PublishedPackEntry:
+      type: object
+      required: [id, target]
+      properties:
+        id:
+          type: string
+        target:
+          $ref: "#/components/schemas/PackManifestEntryTarget"
+        language:
+          type: string
+        originalText:
+          type: string
+        text:
+          type: string
+        note:
+          type: string
+
+    PublishedPack:
+      type: object
+      required: [id, type, version, isPublished, entries]
+      description: Public Reader Pack payload. It omits runtime draft/proposal IDs and private metadata.
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/PackType"
+        packClass:
+          $ref: "#/components/schemas/PackClass"
+        language:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        authorLabel:
+          type: string
+        isPublished:
+          type: boolean
+          enum: [true]
+        targetSeriesId:
+          type: string
+        targetEpisodeId:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishedPackEntry"
+
     PackManifest:
       type: object
       required: [id, type, version, isPublished, entries]
@@ -2667,7 +2758,7 @@ components:
         entries:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/PackManifestEntry"
 
     CreateSeriesInput:
       type: object

@@ -43,6 +43,7 @@ async function apiFetch<T>(path: string, cookies?: string | null): Promise<{ dat
 // ---------------------------------------------------------------------------
 
 export interface EpisodeMetaResponse {
+    availablePacks?: PublishedPack[];
     series: { id: string; title: string; coverUrl?: string; shareImageUrl?: string };
     episode: {
         id: string;
@@ -55,6 +56,7 @@ export interface EpisodeMetaResponse {
             images: Record<string, string | undefined>;
             width: number;
             height: number;
+            availablePacks?: PublishedPack[];
             panels: {
                 id: string;
                 panelNumber: number;
@@ -74,6 +76,35 @@ export interface EpisodeMetaResponse {
     };
     prev: { id: string; title: string; episodeNumber: number } | null;
     next: { id: string; title: string; episodeNumber: number } | null;
+}
+
+export interface PublishedPackEntry {
+    id: string;
+    target: {
+        seriesId: string;
+        episodeId?: string;
+        pageId?: string;
+        panelId?: string;
+        bubbleId?: string;
+    };
+    language?: string;
+    originalText?: string;
+    text?: string;
+    note?: string;
+}
+
+export interface PublishedPack {
+    id: string;
+    type: "TRANSLATION" | "FOOTNOTE" | "COMMENTARY" | "LEARNING" | "ACCESSIBILITY";
+    packClass?: "proposal" | "draft" | "official" | "deprecated";
+    language?: string;
+    version: number;
+    title?: string;
+    authorLabel?: string;
+    isPublished: boolean;
+    targetSeriesId?: string;
+    targetEpisodeId?: string;
+    entries: PublishedPackEntry[];
 }
 
 export interface QuoteResponse {

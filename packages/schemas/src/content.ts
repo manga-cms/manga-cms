@@ -166,6 +166,19 @@ export const PackManifestSchema = z.object({
     entries: z.array(PackEntrySchema).default([]),
 });
 
+export const PublishedPackEntrySchema = PackEntrySchema.omit({
+    sourceProposalId: true,
+    metadata: true,
+});
+
+export const PublishedPackSchema = PackManifestSchema.omit({
+    sourcePackDraftId: true,
+    entries: true,
+}).extend({
+    isPublished: z.literal(true),
+    entries: z.array(PublishedPackEntrySchema).default([]),
+});
+
 // ---------------------------------------------------------------------------
 // Inferred types (use these when you want validated data)
 // ---------------------------------------------------------------------------
@@ -176,3 +189,4 @@ export type PageData = z.infer<typeof PageSchema>;
 export type PanelData = z.infer<typeof PanelSchema>;
 export type BubbleData = z.infer<typeof BubbleSchema>;
 export type PackManifest = z.infer<typeof PackManifestSchema>;
+export type PublishedPack = z.infer<typeof PublishedPackSchema>;
