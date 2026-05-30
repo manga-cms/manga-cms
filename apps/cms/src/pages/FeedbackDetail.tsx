@@ -68,6 +68,7 @@ export default function FeedbackDetail() {
 
     if (loading) return <p style={{ color: "var(--muted)" }}>Loading…</p>;
     if (!record) return <div className="error-msg">{error || "Feedback not found"}</div>;
+    const canCreateProposal = record.status === "new";
 
     return (
         <div>
@@ -81,6 +82,11 @@ export default function FeedbackDetail() {
 
             {error && <div className="error-msg">{error}</div>}
             {saved && <div className="success-msg">Feedback updated.</div>}
+            {!canCreateProposal && (
+                <div className="success-msg">
+                    This feedback has already left the new queue. Proposal creation is only available for new feedback.
+                </div>
+            )}
 
             <div className="grid-2">
                 <div className="card">
@@ -137,9 +143,11 @@ export default function FeedbackDetail() {
             <div className="section-actions">
                 <Link to="/feedback" className="btn btn-outline">← Feedback</Link>
                 <Link to={`/works/${record.series_id}/episodes/${record.episode_id}`} className="btn btn-outline">Episode</Link>
-                <button type="button" className="btn btn-primary" disabled={creatingProposal} onClick={createProposal}>
-                    {creatingProposal ? "Creating..." : "Create Proposal"}
-                </button>
+                {canCreateProposal && (
+                    <button type="button" className="btn btn-primary" disabled={creatingProposal} onClick={createProposal}>
+                        {creatingProposal ? "Creating..." : "Create Proposal"}
+                    </button>
+                )}
                 {record.source_url && <a href={record.source_url} target="_blank" rel="noreferrer" className="btn btn-outline">Source URL</a>}
             </div>
         </div>

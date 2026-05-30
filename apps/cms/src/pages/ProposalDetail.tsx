@@ -64,6 +64,11 @@ export default function ProposalDetail() {
 
             {error && <div className="error-msg">{error}</div>}
             {saved && <div className="success-msg">Proposal updated.</div>}
+            {status === "accepted" && (
+                <div className="success-msg">
+                    Accepted records are not applied to canonical content or published packs automatically. Adopt this proposal into a Pack Draft as a separate step.
+                </div>
+            )}
 
             <div className="grid-2">
                 <div className="card">
