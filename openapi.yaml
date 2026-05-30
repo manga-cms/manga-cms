@@ -16,6 +16,7 @@ tags:
   - name: Health
   - name: Reader
   - name: Feedback
+  - name: Proposals
   - name: Delivery
   - name: AdminContent
   - name: Ingestion
@@ -342,6 +343,147 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeedbackRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/feedback/{feedbackId}/proposal:
+    post:
+      tags: [Proposals]
+      summary: Convert private feedback into a CMS proposal
+      description: Creates a Proposal Queue record from a Reader feedback record and marks the feedback triaged.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/feedbackId"
+      responses:
+        "201":
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/proposals:
+    get:
+      tags: [Proposals]
+      summary: List CMS proposal records
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ProposalStatus"
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ProposalKind"
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Proposal records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProposalRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Proposals]
+      summary: Create a CMS proposal record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposalCreateInput"
+      responses:
+        "201":
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/proposals/{proposalId}:
+    get:
+      tags: [Proposals]
+      summary: Read one proposal record
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/proposalId"
+      responses:
+        "200":
+          description: Proposal record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/proposals/{proposalId}/status:
+    put:
+      tags: [Proposals]
+      summary: Update proposal review status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/proposalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposalStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated proposal record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalRecord"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -1427,6 +1569,12 @@ components:
       required: true
       schema:
         type: string
+    proposalId:
+      name: proposalId
+      in: path
+      required: true
+      schema:
+        type: string
 
   responses:
     Ok:
@@ -2036,6 +2184,102 @@ components:
           type: boolean
         feedback_id:
           type: string
+
+    ProposalKind:
+      type: string
+      enum: [translation, typo, footnote, commentary, tag, structure]
+
+    ProposalStatus:
+      type: string
+      enum: [new, triaged, accepted, rejected, closed]
+
+    ProposalTarget:
+      type: object
+      required: [series_id, episode_id]
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        page_id:
+          type: string
+          nullable: true
+        panel_id:
+          type: string
+          nullable: true
+        bubble_id:
+          type: string
+          nullable: true
+
+    ProposalCreateInput:
+      allOf:
+        - $ref: "#/components/schemas/ProposalTarget"
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              $ref: "#/components/schemas/ProposalKind"
+            status:
+              $ref: "#/components/schemas/ProposalStatus"
+            source_feedback_id:
+              type: string
+              nullable: true
+            lang:
+              type: string
+              maxLength: 16
+            current_text:
+              type: string
+              maxLength: 4000
+            current_translation:
+              type: string
+              maxLength: 4000
+            suggested_text:
+              type: string
+              maxLength: 4000
+            comment:
+              type: string
+              maxLength: 2000
+            proposer_id:
+              type: string
+              nullable: true
+              maxLength: 120
+            source_url:
+              type: string
+              format: uri
+
+    ProposalRecord:
+      allOf:
+        - $ref: "#/components/schemas/ProposalCreateInput"
+        - type: object
+          required: [proposal_id, status, created_at, updated_at]
+          properties:
+            proposal_id:
+              type: string
+            status:
+              $ref: "#/components/schemas/ProposalStatus"
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            review_note:
+              type: string
+            reviewed_by:
+              type: string
+            reviewed_at:
+              type: string
+              format: date-time
+
+    ProposalStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/ProposalStatus"
+        review_note:
+          type: string
+          maxLength: 2000
 
     CreateSeriesInput:
       type: object

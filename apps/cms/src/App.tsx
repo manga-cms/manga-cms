@@ -12,6 +12,8 @@ import Entitlements from "./pages/Entitlements";
 import PageStructureReview from "./pages/PageStructureReview";
 import FeedbackList from "./pages/FeedbackList";
 import FeedbackDetail from "./pages/FeedbackDetail";
+import ProposalList from "./pages/ProposalList";
+import ProposalDetail from "./pages/ProposalDetail";
 import { devLogin, getMe } from "./api";
 
 export default function App() {
@@ -41,6 +43,7 @@ export default function App() {
                     <Link to="/works/new">+ New Work</Link>
                     <Link to="/ingestion">📥 Ingestion</Link>
                     <Link to="/feedback">Feedback</Link>
+                    <Link to="/proposals">Proposals</Link>
                     <Link to="/entitlements">🔐 Entitlements</Link>
                 </nav>
                 <div className="app-session">
@@ -67,6 +70,8 @@ export default function App() {
                     <Route path="/ingestion/:jobId" element={<JobDetail />} />
                     <Route path="/feedback" element={<FeedbackList />} />
                     <Route path="/feedback/:feedbackId" element={<FeedbackDetail />} />
+                    <Route path="/proposals" element={<ProposalList />} />
+                    <Route path="/proposals/:proposalId" element={<ProposalDetail />} />
                     <Route path="/entitlements" element={<Entitlements />} />
                 </Routes>
             </main>

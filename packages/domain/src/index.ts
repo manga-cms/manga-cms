@@ -6,4 +6,6 @@ export * from "./ingestion-repository.js";
 export * from "./entitlement-repository.js";
 export * from "./feedback-types.js";
 export * from "./feedback-repository.js";
+export * from "./proposal-types.js";
+export * from "./proposal-repository.js";
 export * from "./delivery.js";
