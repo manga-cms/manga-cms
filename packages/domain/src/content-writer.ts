@@ -24,6 +24,9 @@ export interface CreateSeriesInput {
     status?: "ongoing" | "completed" | "hiatus";
     cover?: string;
     shareImageUrl?: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: "public" | "hidden" | "archived";
 }
 
 export interface UpdateSeriesInput {
@@ -32,6 +35,9 @@ export interface UpdateSeriesInput {
     status?: "ongoing" | "completed" | "hiatus";
     cover?: string;
     shareImageUrl?: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: "public" | "hidden" | "archived";
 }
 
 export interface SaveEpisodeInput {
@@ -39,6 +45,9 @@ export interface SaveEpisodeInput {
     episodeNumber: number;
     title: string;
     publishedAt?: string;
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: "public" | "hidden" | "archived";
     pages: Episode["pages"];
 }
 
@@ -98,6 +107,9 @@ export class FileContentWriter implements ContentWriteRepository {
             status: input.status ?? "ongoing",
             cover: input.cover ?? "cover.jpg",
             ...(input.shareImageUrl !== undefined && { shareImageUrl: input.shareImageUrl }),
+            ...(input.publishStartAt !== undefined && { publishStartAt: input.publishStartAt }),
+            ...(input.publishEndAt !== undefined && { publishEndAt: input.publishEndAt }),
+            ...(input.visibility !== undefined && { visibility: input.visibility }),
             episodes: [],
         };
 
@@ -121,6 +133,9 @@ export class FileContentWriter implements ContentWriteRepository {
                 status: manifest.status,
                 coverUrl: manifest.cover,
                 shareImageUrl: manifest.shareImageUrl,
+                publishStartAt: manifest.publishStartAt,
+                publishEndAt: manifest.publishEndAt,
+                visibility: manifest.visibility,
                 episodes: [],
             },
         };
@@ -148,6 +163,9 @@ export class FileContentWriter implements ContentWriteRepository {
             ...(input.status !== undefined && { status: input.status }),
             ...(input.cover !== undefined && { cover: input.cover }),
             ...(input.shareImageUrl !== undefined && { shareImageUrl: input.shareImageUrl }),
+            ...(input.publishStartAt !== undefined && { publishStartAt: input.publishStartAt }),
+            ...(input.publishEndAt !== undefined && { publishEndAt: input.publishEndAt }),
+            ...(input.visibility !== undefined && { visibility: input.visibility }),
         };
 
         const result = SeriesManifestSchema.safeParse(updated);
@@ -167,6 +185,9 @@ export class FileContentWriter implements ContentWriteRepository {
                 status: updated.status ?? "ongoing",
                 coverUrl: updated.cover ?? "cover.jpg",
                 shareImageUrl: updated.shareImageUrl,
+                publishStartAt: updated.publishStartAt,
+                publishEndAt: updated.publishEndAt,
+                visibility: updated.visibility,
                 episodes: [],
             },
         };
@@ -197,6 +218,9 @@ export class FileContentWriter implements ContentWriteRepository {
             episodeNumber: input.episodeNumber,
             title: input.title,
             publishedAt: input.publishedAt ?? new Date().toISOString().split("T")[0],
+            ...(input.publishStartAt !== undefined && { publishStartAt: input.publishStartAt }),
+            ...(input.publishEndAt !== undefined && { publishEndAt: input.publishEndAt }),
+            ...(input.visibility !== undefined && { visibility: input.visibility }),
             pages: input.pages ?? [],
         };
 

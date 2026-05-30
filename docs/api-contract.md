@@ -36,6 +36,7 @@ Canonical TypeScript shape:
 
 ```ts
 type SeriesStatus = "ongoing" | "completed" | "hiatus";
+type PublicationVisibility = "public" | "hidden" | "archived";
 
 interface Series {
   id: string;
@@ -44,6 +45,9 @@ interface Series {
   status: SeriesStatus;
   coverUrl: string;
   shareImageUrl?: string;
+  publishStartAt?: string;
+  publishEndAt?: string;
+  visibility?: PublicationVisibility;
   episodes: Episode[];
 }
 ```
@@ -58,6 +62,9 @@ interface SeriesManifest {
   status: SeriesStatus;
   cover: string;
   shareImageUrl?: string;
+  publishStartAt?: string;
+  publishEndAt?: string;
+  visibility?: PublicationVisibility;
   episodes: string[];
 }
 ```
@@ -66,6 +73,9 @@ interface SeriesManifest {
 `shareImageUrl` is an optional stable public URL for SEO/OGP metadata. Reader
 and API work should prefer `shareImageUrl` for social cards when it is present,
 because page delivery URLs may be short-lived.
+
+Scheduling fields are optional for backward compatibility. Existing Series with
+no scheduling fields are treated as currently public.
 
 ### Episode
 
@@ -77,14 +87,53 @@ interface Episode {
   episodeNumber: number;
   title: string;
   publishedAt: string;
+  publishStartAt?: string;
+  publishEndAt?: string;
+  visibility?: PublicationVisibility;
   pages: Page[];
 }
 ```
 
 Storage file: `contents/{seriesId}/{episodeId}/episode.json`
 
-`publishedAt` is required in the current schema. Draft and review state exists
-in ingestion jobs, not as a canonical Episode status field.
+`publishedAt` is required in the current schema and remains a display/publication
+label. It does not schedule reader availability by itself.
+
+Scheduling fields are optional for backward compatibility. Existing Episodes
+with no scheduling fields are treated as currently public.
+
+### Publication Scheduling
+
+Series and Episode support the same optional scheduling fields:
+
+```ts
+interface PublishSchedule {
+  publishStartAt?: string; // ISO 8601 date-time, inclusive
+  publishEndAt?: string;   // ISO 8601 date-time, exclusive
+  visibility?: "public" | "hidden" | "archived";
+}
+```
+
+Rules:
+
+- Missing fields mean `visibility: "public"` with no start/end window.
+- `publishStartAt` is inclusive. If it is in the future, the content is
+  scheduled and unavailable to Public Reader endpoints.
+- `publishEndAt` is exclusive. If it is at or before the current request time,
+  the content is expired and unavailable to Public Reader endpoints.
+- `publishEndAt` must be after `publishStartAt` when both are present.
+- `visibility: "hidden"` is draft/internal-equivalent. Public Reader endpoints
+  return 404 and must not leak images, panels, quotes, clips, reaction entries,
+  or delivery URLs.
+- `visibility: "archived"` is admin-only. Public Reader endpoints return 404
+  and public lists omit the content.
+- Public visibility is inherited by hierarchy: an Episode is public only when
+  both its parent Series and the Episode itself are currently public.
+- Entitlement gating is evaluated only after publication visibility passes.
+  Draft, hidden, scheduled, expired, and archived content is not represented as
+  `gated: true`; it is treated as not found.
+- Admin endpoints may read and write all scheduling fields regardless of current
+  publication state.
 
 ### Page
 
@@ -223,6 +272,17 @@ Base path: `/api/v1`
 Public reader endpoints must be safe for unauthenticated requests unless the
 route explicitly accepts optional auth. Entitlement-gated content must return a
 gated response or omit protected image URLs rather than leaking origin paths.
+
+Public Reader visibility:
+
+- `/series` returns only currently public Series. `episodeCount` counts only
+  currently public Episodes.
+- `/series/{seriesId}` returns 404 for non-public Series and includes only
+  currently public Episodes.
+- `/series/{seriesId}/episodes/{episodeId}` and `/pages/{pageNumber}` return
+  404 for draft/hidden, scheduled, expired, or archived Series/Episodes.
+- `/quotes`, `/clips`, `/reactions`, and `/deliver/{pageId}` also exclude
+  draft/hidden, scheduled, expired, and archived content.
 
 Current CMS/Reader endpoint coverage:
 

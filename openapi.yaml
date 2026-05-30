@@ -42,6 +42,9 @@ paths:
     get:
       tags: [Reader]
       summary: List public Series summaries
+      description: >
+        Returns Series whose publication visibility is currently public. Hidden,
+        archived, scheduled, and expired Series are omitted.
       security: []
       responses:
         "200":
@@ -61,6 +64,9 @@ paths:
     get:
       tags: [Reader]
       summary: Read Series detail and Episode summaries
+      description: >
+        Returns a public Series and only currently public Episode summaries.
+        Hidden, archived, scheduled, and expired Series return 404.
       security: []
       parameters:
         - $ref: "#/components/parameters/seriesId"
@@ -80,7 +86,8 @@ paths:
       summary: Read Episode metadata and navigation
       description: >
         Returns delivery URLs for entitled/free content. Locked episodes return
-        `gated: true` and no page payloads.
+        `gated: true` and no page payloads. Draft/hidden, scheduled, expired,
+        or archived Series/Episodes are not gated; they return 404.
       security:
         - {}
         - bearerAuth: []
@@ -104,7 +111,8 @@ paths:
       description: >
         Returns page metadata, tokenized delivery image URLs, panel/bubble
         references, and available packs. Locked pages return `gated: true` and
-        omit image URLs and panel details.
+        omit image URLs and panel details. Draft/hidden, scheduled, expired,
+        or archived Series/Episodes return 404.
       security:
         - {}
         - bearerAuth: []
@@ -1351,6 +1359,15 @@ components:
         contains_spoiler:
           type: boolean
 
+    PublicationVisibility:
+      type: string
+      enum: [public, hidden, archived]
+      description: >
+        Public Reader visibility state. `public` content can be shown when its
+        publication window is active. `hidden` is admin-only/draft-equivalent.
+        `archived` is admin-only and omitted from public discovery and direct
+        reader endpoints.
+
     Bubble:
       type: object
       required: [id, bubbleNumber, shortId, bubbleType, textOriginal, bbox]
@@ -1440,6 +1457,17 @@ components:
           type: string
         publishedAt:
           type: string
+          description: Display/publication label. Does not by itself schedule availability.
+        publishStartAt:
+          type: string
+          format: date-time
+          description: Optional inclusive publication start. Future values are scheduled and hidden from Public Reader endpoints.
+        publishEndAt:
+          type: string
+          format: date-time
+          description: Optional exclusive publication end. Past values are expired and hidden from Public Reader endpoints.
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
         pages:
           type: array
           items:
@@ -1463,6 +1491,16 @@ components:
         shareImageUrl:
           type: string
           description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+          description: Optional inclusive publication start. Future values are scheduled and hidden from Public Reader endpoints.
+        publishEndAt:
+          type: string
+          format: date-time
+          description: Optional exclusive publication end. Past values are expired and hidden from Public Reader endpoints.
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
         episodes:
           type: array
           items:
@@ -1485,8 +1523,17 @@ components:
         shareImageUrl:
           type: string
           description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+        publishEndAt:
+          type: string
+          format: date-time
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
         episodeCount:
           type: integer
+          description: Count of currently public Episodes.
 
     SeriesDetail:
       type: object
@@ -1505,6 +1552,14 @@ components:
         shareImageUrl:
           type: string
           description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+        publishEndAt:
+          type: string
+          format: date-time
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
         episodes:
           type: array
           items:
@@ -1519,6 +1574,14 @@ components:
                 type: string
               publishedAt:
                 type: string
+              publishStartAt:
+                type: string
+                format: date-time
+              publishEndAt:
+                type: string
+                format: date-time
+              visibility:
+                $ref: "#/components/schemas/PublicationVisibility"
               pageCount:
                 type: integer
 
@@ -1550,6 +1613,14 @@ components:
             shareImageUrl:
               type: string
               description: Stable public image URL for SEO/OGP metadata.
+            publishStartAt:
+              type: string
+              format: date-time
+            publishEndAt:
+              type: string
+              format: date-time
+            visibility:
+              $ref: "#/components/schemas/PublicationVisibility"
         episode:
           $ref: "#/components/schemas/Episode"
         gated:
@@ -1740,6 +1811,14 @@ components:
         shareImageUrl:
           type: string
           description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+        publishEndAt:
+          type: string
+          format: date-time
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
 
     UpdateSeriesInput:
       type: object
@@ -1756,6 +1835,14 @@ components:
         shareImageUrl:
           type: string
           description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+        publishEndAt:
+          type: string
+          format: date-time
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
 
     PublishResponse:
       type: object

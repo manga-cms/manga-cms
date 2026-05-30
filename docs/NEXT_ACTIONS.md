@@ -50,8 +50,9 @@ For ready-to-paste Codex prompts for the next parallel workstreams, see
 - Add Proposal Queue contracts for translation, typo, footnote, commentary, tag, and structure proposals.
 - Add Pack Manager contracts for translation, footnote, commentary, learning, and accessibility packs.
 - Add Rights/Role Manager MVP contracts for owner/editor/translator/reviewer/contributor permissions.
-- Add CMS publication scheduling contracts for Series/Episode/Page visibility,
-  including publish start, publish end, archive timing, and bulk status changes.
+- Wire CMS publication scheduling controls to the Series/Episode scheduling
+  contract (`publishStartAt`, `publishEndAt`, `visibility`) and add any needed
+  bulk status-change workflow.
 - Add bulk import contracts for prepared episode directories or archives so page
   images and draft metadata can be imported without hand-entering every page.
 - Add share policy and spoiler policy schemas.

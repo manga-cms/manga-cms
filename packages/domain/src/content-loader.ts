@@ -15,6 +15,45 @@ import { SeriesManifestSchema, EpisodeSchema } from "@manga/schemas";
 import type { Series, Episode, Page, Panel, Bubble } from "./types.js";
 import { isSafePathSegment } from "./path-safety.js";
 
+export type PublicationState = "public" | "hidden" | "archived" | "scheduled" | "expired";
+
+export interface PublicationSchedule {
+    publishStartAt?: string;
+    publishEndAt?: string;
+    visibility?: "public" | "hidden" | "archived";
+}
+
+function parseScheduleDate(value: string | undefined): number | null {
+    if (!value) return null;
+    const timestamp = Date.parse(value);
+    return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+export function getPublicationState(
+    item: PublicationSchedule,
+    now: Date = new Date(),
+): PublicationState {
+    if (item.visibility === "hidden") return "hidden";
+    if (item.visibility === "archived") return "archived";
+
+    const nowMs = now.getTime();
+    const startMs = parseScheduleDate(item.publishStartAt);
+    if (startMs !== null && nowMs < startMs) return "scheduled";
+
+    const endMs = parseScheduleDate(item.publishEndAt);
+    if (endMs !== null && nowMs >= endMs) return "expired";
+
+    return "public";
+}
+
+export function isPublicNow(item: PublicationSchedule, now: Date = new Date()): boolean {
+    return getPublicationState(item, now) === "public";
+}
+
+export function isSeriesAndEpisodePublicNow(series: Series, episode: Episode, now: Date = new Date()): boolean {
+    return isPublicNow(series, now) && isPublicNow(episode, now);
+}
+
 // ---------------------------------------------------------------------------
 // Validation error
 // ---------------------------------------------------------------------------
@@ -154,6 +193,9 @@ export class FileContentRepository implements ContentRepository {
                     episodeNumber: epData.episodeNumber,
                     title: epData.title,
                     publishedAt: epData.publishedAt,
+                    publishStartAt: epData.publishStartAt,
+                    publishEndAt: epData.publishEndAt,
+                    visibility: epData.visibility,
                     pages: epData.pages as Page[],
                 });
             }
@@ -165,6 +207,9 @@ export class FileContentRepository implements ContentRepository {
                 status: manifest.status,
                 coverUrl: manifest.cover,
                 shareImageUrl: manifest.shareImageUrl,
+                publishStartAt: manifest.publishStartAt,
+                publishEndAt: manifest.publishEndAt,
+                visibility: manifest.visibility,
                 episodes,
             };
 
