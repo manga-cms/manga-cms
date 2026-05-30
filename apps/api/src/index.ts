@@ -15,7 +15,14 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync, existsSync, writeFi
 import { createHash } from "node:crypto";
 import { getEmailProvider, isEmailConfigured } from "./email.js";
 import { RateLimiter } from "./rate-limit.js";
-import { FeedbackPayloadSchema, ProposalCreateInputSchema, ProposalStatusUpdateInputSchema } from "@manga/schemas";
+import {
+    FeedbackPayloadSchema,
+    PackDraftAdoptProposalInputSchema,
+    PackDraftCreateInputSchema,
+    PackDraftStatusUpdateInputSchema,
+    ProposalCreateInputSchema,
+    ProposalStatusUpdateInputSchema,
+} from "@manga/schemas";
 import { buildPreparedDirectoryDraft } from "@manga/ingestion";
 import {
     FileContentRepository,
@@ -23,6 +30,7 @@ import {
     createFileIngestionRepository,
     createFileEntitlementRepository,
     createFileFeedbackRepository,
+    createFilePackDraftRepository,
     createFileProposalRepository,
     isPublicNow,
     isSeriesAndEpisodePublicNow,
@@ -36,6 +44,10 @@ import {
     type EntitlementRepository,
     type FeedbackPayload,
     type FeedbackStatus,
+    packTypesForProposalKind,
+    proposalToPackDraftEntry,
+    type PackDraftStatus,
+    type PackType,
     proposalInputFromFeedback,
     type ProposalKind,
     type ProposalStatus,
@@ -111,6 +123,8 @@ const feedbackRepo = createFileFeedbackRepository(FEEDBACK_DIR);
 const feedbackLimiter = new RateLimiter({ maxRequests: IS_PRODUCTION ? 10 : 60, windowSeconds: 60 });
 const PROPOSALS_DIR = process.env.PROPOSALS_DIR ?? join(__dirname, "../../../proposals");
 const proposalRepo = createFileProposalRepository(PROPOSALS_DIR);
+const PACK_DRAFTS_DIR = process.env.PACK_DRAFTS_DIR ?? join(__dirname, "../../../pack-drafts");
+const packDraftRepo = createFilePackDraftRepository(PACK_DRAFTS_DIR);
 
 const accessPolicy = new DefaultAccessPolicy();
 
@@ -624,6 +638,119 @@ app.post("/admin/feedback/:feedbackId/proposal", async (c) => {
         ...(user?.id && { triagedBy: user.id }),
     });
     return c.json(proposal, 201);
+});
+
+// ===========================================================================
+// ADMIN — Pack draft manager
+// Runtime draft state only. Does not write canonical `packs/` or `contents/`.
+// ===========================================================================
+
+app.get("/admin/pack-drafts", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const status = c.req.query("status") as PackDraftStatus | undefined;
+    const type = c.req.query("type") as PackType | undefined;
+    const seriesId = c.req.query("seriesId");
+
+    if (status && !["draft", "in_review", "approved", "published", "archived"].includes(status)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid pack draft status" } }, 400);
+    }
+    if (type && !["TRANSLATION", "FOOTNOTE", "COMMENTARY", "LEARNING", "ACCESSIBILITY"].includes(type)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid pack type" } }, 400);
+    }
+
+    return c.json({ items: packDraftRepo.list({ status, type, seriesId }) });
+});
+
+app.post("/admin/pack-drafts", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = PackDraftCreateInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const user = getUser(c);
+    const record = packDraftRepo.create({
+        ...parsed.data,
+        created_by: parsed.data.created_by ?? user?.id ?? null,
+    });
+    return c.json(record, 201);
+});
+
+app.get("/admin/pack-drafts/:packDraftId", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const record = packDraftRepo.get(c.req.param("packDraftId"));
+    if (!record) return c.json({ error: { code: "NOT_FOUND", message: "Pack draft not found" } }, 404);
+    return c.json(record);
+});
+
+app.put("/admin/pack-drafts/:packDraftId/status", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = PackDraftStatusUpdateInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const user = getUser(c);
+    const result = packDraftRepo.updateStatus(c.req.param("packDraftId"), {
+        status: parsed.data.status,
+        reviewedBy: user?.id ?? null,
+    });
+    if (!result.success) {
+        return c.json({ error: { code: "NOT_FOUND", message: result.error } }, 404);
+    }
+    return c.json(result.record);
+});
+
+app.post("/admin/pack-drafts/:packDraftId/adopt-proposal", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = PackDraftAdoptProposalInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const draft = packDraftRepo.get(c.req.param("packDraftId"));
+    if (!draft) return c.json({ error: { code: "NOT_FOUND", message: "Pack draft not found" } }, 404);
+    if (!["draft", "in_review"].includes(draft.status)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Only draft or in_review pack drafts can accept proposal entries" } }, 400);
+    }
+
+    const proposal = proposalRepo.get(parsed.data.proposal_id);
+    if (!proposal) return c.json({ error: { code: "NOT_FOUND", message: "Proposal not found" } }, 404);
+    if (proposal.status !== "accepted") {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Only accepted proposals can be adopted into pack drafts" } }, 400);
+    }
+    if (!packTypesForProposalKind(proposal.kind).includes(draft.type)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Proposal kind is not compatible with this pack draft type" } }, 400);
+    }
+
+    const user = getUser(c);
+    const result = packDraftRepo.addEntry(c.req.param("packDraftId"), proposalToPackDraftEntry(proposal, user?.id ?? null));
+    if (!result.success) {
+        const statusCode = result.error.includes("not found") ? 404 : 400;
+        return c.json({ error: { code: statusCode === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: result.error } }, statusCode);
+    }
+    return c.json(result.record);
 });
 
 // ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ tags:
   - name: Reader
   - name: Feedback
   - name: Proposals
+  - name: PackManager
   - name: Delivery
   - name: AdminContent
   - name: Ingestion
@@ -484,6 +485,160 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProposalRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/pack-drafts:
+    get:
+      tags: [PackManager]
+      summary: List runtime Pack draft records
+      description: Lists CMS-managed Pack drafts. These records are runtime review state and do not write canonical `packs/`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PackDraftStatus"
+        - name: type
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PackType"
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pack draft records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PackDraftRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [PackManager]
+      summary: Create a runtime Pack draft
+      description: Creates a draft review record only. It does not publish a Pack or modify canonical content.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftCreateInput"
+      responses:
+        "201":
+          description: Pack draft created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/pack-drafts/{packDraftId}:
+    get:
+      tags: [PackManager]
+      summary: Read one runtime Pack draft
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      responses:
+        "200":
+          description: Pack draft record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/pack-drafts/{packDraftId}/status:
+    put:
+      tags: [PackManager]
+      summary: Update Pack draft review status
+      description: Updates runtime review state only. `published` is an intent/status value here and does not write canonical `packs/`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated Pack draft record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/pack-drafts/{packDraftId}/adopt-proposal:
+    post:
+      tags: [PackManager]
+      summary: Adopt an accepted Proposal into a Pack draft
+      description: >
+        Adds a Pack draft entry from an accepted Proposal Queue record. This does
+        not modify canonical Episode JSON or published Pack manifests.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftAdoptProposalInput"
+      responses:
+        "200":
+          description: Pack draft with adopted entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftRecord"
         "400":
           $ref: "#/components/responses/ValidationError"
         "401":
@@ -1575,6 +1730,12 @@ components:
       required: true
       schema:
         type: string
+    packDraftId:
+      name: packDraftId
+      in: path
+      required: true
+      schema:
+        type: string
 
   responses:
     Ok:
@@ -2280,6 +2441,168 @@ components:
         review_note:
           type: string
           maxLength: 2000
+
+    PackType:
+      type: string
+      enum: [TRANSLATION, FOOTNOTE, COMMENTARY, LEARNING, ACCESSIBILITY]
+
+    PackClass:
+      type: string
+      enum: [proposal, draft, official, deprecated]
+
+    PackDraftStatus:
+      type: string
+      enum: [draft, in_review, approved, published, archived]
+
+    PackEntryTarget:
+      type: object
+      required: [series_id]
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+          nullable: true
+        page_id:
+          type: string
+          nullable: true
+        panel_id:
+          type: string
+          nullable: true
+        bubble_id:
+          type: string
+          nullable: true
+
+    PackDraftEntry:
+      type: object
+      required: [entry_id, target, adopted_at]
+      properties:
+        entry_id:
+          type: string
+        source_proposal_id:
+          type: string
+          nullable: true
+        target:
+          $ref: "#/components/schemas/PackEntryTarget"
+        lang:
+          type: string
+        original_text:
+          type: string
+        current_translation:
+          type: string
+        text:
+          type: string
+        note:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        adopted_at:
+          type: string
+          format: date-time
+        adopted_by:
+          type: string
+          nullable: true
+
+    PackDraftCreateInput:
+      type: object
+      required: [type, title]
+      properties:
+        type:
+          $ref: "#/components/schemas/PackType"
+        title:
+          type: string
+          maxLength: 200
+        language:
+          type: string
+          maxLength: 16
+        target_series_id:
+          type: string
+        target_episode_id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        created_by:
+          type: string
+          nullable: true
+          maxLength: 120
+
+    PackDraftRecord:
+      allOf:
+        - $ref: "#/components/schemas/PackDraftCreateInput"
+        - type: object
+          required: [pack_draft_id, status, version, entries, created_at, updated_at]
+          properties:
+            pack_draft_id:
+              type: string
+            status:
+              $ref: "#/components/schemas/PackDraftStatus"
+            version:
+              type: integer
+              minimum: 1
+            entries:
+              type: array
+              items:
+                $ref: "#/components/schemas/PackDraftEntry"
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            reviewed_by:
+              type: string
+              nullable: true
+            reviewed_at:
+              type: string
+              format: date-time
+
+    PackDraftStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/PackDraftStatus"
+
+    PackDraftAdoptProposalInput:
+      type: object
+      required: [proposal_id]
+      properties:
+        proposal_id:
+          type: string
+
+    PackManifest:
+      type: object
+      required: [id, type, version, isPublished, entries]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/PackType"
+        packClass:
+          $ref: "#/components/schemas/PackClass"
+        language:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        authorLabel:
+          type: string
+        isPublished:
+          type: boolean
+        targetSeriesId:
+          type: string
+        targetEpisodeId:
+          type: string
+        sourcePackDraftId:
+          type: string
+        entries:
+          type: array
+          items:
+            type: object
 
     CreateSeriesInput:
       type: object
