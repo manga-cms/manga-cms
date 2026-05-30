@@ -339,6 +339,10 @@ Base path: `/api/v1`
 | `PUT` | `/admin/pack-drafts/{packDraftId}/status` | Update Pack draft review status |
 | `POST` | `/admin/pack-drafts/{packDraftId}/adopt-proposal` | Adopt an accepted Proposal into a Pack draft |
 | `POST` | `/admin/pack-drafts/{packDraftId}/export` | Export an approved/published Pack draft to `packs/{packId}/pack.json` |
+| `GET` | `/admin/rights/grants` | List runtime Rights grants |
+| `POST` | `/admin/rights/grants` | Create a runtime Rights grant |
+| `POST` | `/admin/rights/grants/{grantId}/revoke` | Revoke a runtime Rights grant |
+| `POST` | `/admin/rights/check` | Check whether a user has a Rights permission |
 
 Admin endpoints require authenticated admin access. Browser CMS calls should
 send credentials so the `manga_auth` cookie is included.
@@ -453,9 +457,13 @@ entitlements:
   commercially use content or Packs.
 
 The initial contract is defined by `packages/domain/src/rights-types.ts`,
-`packages/schemas/src/rights.ts`, and the `Rights*` component schemas in
-`openapi.yaml`. No admin Rights API routes are implemented yet; add routes only
-when persistence and CMS workflows are scheduled.
+`packages/domain/src/rights-repository.ts`, `packages/schemas/src/rights.ts`,
+and the `Rights*` component schemas in `openapi.yaml`.
+
+Rights grants are file-backed by default under `RIGHTS_DIR` or `rights/`, and
+that directory is ignored by Git. The current admin API supports list, create,
+revoke, and explicit permission checks. These APIs do not grant reading
+entitlement, do not publish Packs, and do not mutate canonical content.
 
 Rights roles:
 
@@ -491,6 +499,12 @@ Grant scope can include `series_id`, `episode_id`, `language`, `pack_id`,
 `usage`, and `territory`. Language-specific grants do not imply all-language
 grants. Pack-specific grants do not imply original-content rights. Commercial
 use requires an explicit `commercial_use` permission and matching usage scope.
+
+A grant scope field acts as a restriction when present. For example, a grant
+with `language: "en"` matches English checks only; a grant with no `language`
+field is an all-language grant and should be used deliberately.
+If a grant has a `usage` restriction, permission checks must provide a matching
+`usage` array.
 
 ### Image Upload And Storage State
 

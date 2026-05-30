@@ -8,11 +8,19 @@ Production permission answers: can this user propose, edit, review, publish, or 
 ## Contract Sources
 
 - `packages/domain/src/rights-types.ts`
+- `packages/domain/src/rights-repository.ts`
 - `packages/schemas/src/rights.ts`
 - `openapi.yaml` `Rights*` component schemas
 
-No Rights admin API routes are implemented yet. The current phase fixes the
-shared vocabulary and validation shape before CMS UI or persistence work starts.
+The MVP Rights admin API is intentionally small:
+
+- `GET /api/v1/admin/rights/grants`
+- `POST /api/v1/admin/rights/grants`
+- `POST /api/v1/admin/rights/grants/{grantId}/revoke`
+- `POST /api/v1/admin/rights/check`
+
+These routes manage runtime governance grants only. They do not grant reader
+entitlement, publish Packs, or mutate canonical content.
 
 ## Roles
 
