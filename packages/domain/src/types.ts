@@ -98,6 +98,7 @@ export interface Series {
     description: string;
     status: SeriesStatus;
     coverUrl: string;
+    shareImageUrl?: string;
     episodes: Episode[];
 }
 

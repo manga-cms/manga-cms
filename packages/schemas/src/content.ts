@@ -77,6 +77,10 @@ export const EpisodeSchema = z.object({
 });
 
 export const SeriesStatusSchema = z.enum(["ongoing", "completed", "hiatus"]);
+export const PublicImageUrlSchema = z.string().refine(
+    (value) => value.startsWith("/") || /^https?:\/\//.test(value),
+    { message: "Must be a root-relative or http(s) URL" },
+);
 
 /** Schema for `contents/{seriesId}/series.json` */
 export const SeriesManifestSchema = z.object({
@@ -85,6 +89,7 @@ export const SeriesManifestSchema = z.object({
     description: z.string().default(""),
     status: SeriesStatusSchema.default("ongoing"),
     cover: z.string().default("cover.jpg"),
+    shareImageUrl: PublicImageUrlSchema.optional(),
     episodes: z.array(z.string()).default([]),
 });
 

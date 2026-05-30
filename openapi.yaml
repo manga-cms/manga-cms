@@ -1301,6 +1301,9 @@ components:
           enum: [ongoing, completed, hiatus]
         coverUrl:
           type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
         episodes:
           type: array
           items:
@@ -1320,6 +1323,9 @@ components:
           type: string
         coverUrl:
           type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
         episodeCount:
           type: integer
 
@@ -1337,6 +1343,9 @@ components:
           type: string
         coverUrl:
           type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
         episodes:
           type: array
           items:
@@ -1377,6 +1386,11 @@ components:
               type: string
             title:
               type: string
+            coverUrl:
+              type: string
+            shareImageUrl:
+              type: string
+              description: Stable public image URL for SEO/OGP metadata.
         episode:
           $ref: "#/components/schemas/Episode"
         gated:
@@ -1564,6 +1578,9 @@ components:
           enum: [ongoing, completed, hiatus]
         cover:
           type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
 
     UpdateSeriesInput:
       type: object
@@ -1577,6 +1594,9 @@ components:
           enum: [ongoing, completed, hiatus]
         cover:
           type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
 
     PublishResponse:
       type: object

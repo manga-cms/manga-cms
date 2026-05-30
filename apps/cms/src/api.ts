@@ -6,6 +6,7 @@ export interface SeriesItem {
     description: string;
     status: string;
     coverUrl: string;
+    shareImageUrl?: string;
     episodeCount: number;
 }
 
@@ -15,6 +16,7 @@ export interface SeriesDetail {
     description: string;
     status: string;
     coverUrl: string;
+    shareImageUrl?: string;
     episodes: { id: string; episodeNumber: number; title: string; publishedAt: string; pageCount: number }[];
 }
 
