@@ -40,6 +40,10 @@ const {
     <button type="button" class="reader-nav-zone reader-nav-next" data-reader-next aria-label="次のページへ">←</button>
     <div class="reader-viewport" id="reader" tabindex="0" aria-label="Manga reader">
       <div class="reader-track" data-reader-track></div>
+      <div class="reader-loading" data-reader-loading hidden>
+        <span class="reader-loading-spinner" aria-hidden="true"></span>
+        <span data-reader-loading-text>ページを読み込み中</span>
+      </div>
     </div>
     <button type="button" class="reader-nav-zone reader-nav-prev" data-reader-prev aria-label="前のページへ">→</button>
   </div>
