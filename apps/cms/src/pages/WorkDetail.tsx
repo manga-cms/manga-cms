@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { getSeries, saveEpisode, updateSeries, type PublicationVisibility, type SeriesDetail } from "../api";
+import { getAdminEpisode, getSeries, saveEpisode, updateSeries, type PublicationVisibility, type SeriesDetail } from "../api";
 import {
     formatPublicationDate,
     getPublicationState,
@@ -16,7 +16,14 @@ export default function WorkDetail() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [scheduleSaved, setScheduleSaved] = useState(false);
+    const [bulkSaved, setBulkSaved] = useState(false);
+    const [selectedEpisodeIds, setSelectedEpisodeIds] = useState<string[]>([]);
     const [seriesSchedule, setSeriesSchedule] = useState<PublicationFormState>({
+        visibility: "public",
+        publishStartAt: "",
+        publishEndAt: "",
+    });
+    const [episodeBulkSchedule, setEpisodeBulkSchedule] = useState<PublicationFormState>({
         visibility: "public",
         publishStartAt: "",
         publishEndAt: "",
@@ -58,6 +65,47 @@ export default function WorkDetail() {
             const updated = await getSeries(id);
             applyWork(updated);
             setScheduleSaved(true);
+            setBulkSaved(false);
+        } catch (err) {
+            setError((err as Error).message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const toggleEpisodeSelection = (episodeId: string) => {
+        setSelectedEpisodeIds((current) =>
+            current.includes(episodeId)
+                ? current.filter((id) => id !== episodeId)
+                : [...current, episodeId],
+        );
+    };
+
+    const handleBulkEpisodeScheduleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!id || selectedEpisodeIds.length === 0) return;
+        setSaving(true);
+        setError("");
+        setScheduleSaved(false);
+        setBulkSaved(false);
+        try {
+            const payload = publicationInputPayload(episodeBulkSchedule);
+            for (const episodeId of selectedEpisodeIds) {
+                const episode = await getAdminEpisode(id, episodeId);
+                if (!episode) throw new Error(`Episode not found: ${episodeId}`);
+                await saveEpisode(id, {
+                    id: episode.id,
+                    episodeNumber: episode.episodeNumber,
+                    title: episode.title,
+                    publishedAt: episode.publishedAt,
+                    ...payload,
+                    pages: episode.pages,
+                });
+            }
+            const updated = await getSeries(id);
+            applyWork(updated);
+            setSelectedEpisodeIds([]);
+            setBulkSaved(true);
         } catch (err) {
             setError((err as Error).message);
         } finally {
@@ -184,6 +232,68 @@ export default function WorkDetail() {
             )}
 
             <h2>Episodes</h2>
+            {work.episodes.length > 0 && (
+                <form onSubmit={handleBulkEpisodeScheduleSave} className="card publication-card">
+                    <div className="section-heading">
+                        <div>
+                            <h3>Bulk Episode Publication</h3>
+                            <p className="card-meta">Apply visibility and scheduling fields to selected Episodes. Page, Panel, and Bubble data is preserved.</p>
+                        </div>
+                        <span className="badge">{selectedEpisodeIds.length} selected</span>
+                    </div>
+                    <div className="publication-grid">
+                        <div className="form-group">
+                            <label>Visibility</label>
+                            <select
+                                value={episodeBulkSchedule.visibility}
+                                onChange={(e) => setEpisodeBulkSchedule((current) => ({ ...current, visibility: e.target.value as PublicationVisibility }))}
+                            >
+                                <option value="public">Public</option>
+                                <option value="hidden">Hidden</option>
+                                <option value="archived">Archived</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Publish Start</label>
+                            <input
+                                type="datetime-local"
+                                value={episodeBulkSchedule.publishStartAt}
+                                onChange={(e) => setEpisodeBulkSchedule((current) => ({ ...current, publishStartAt: e.target.value }))}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Publish End</label>
+                            <input
+                                type="datetime-local"
+                                value={episodeBulkSchedule.publishEndAt}
+                                onChange={(e) => setEpisodeBulkSchedule((current) => ({ ...current, publishEndAt: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+                    {bulkSaved && <div className="success-msg">Episode publication settings saved.</div>}
+                    <div className="section-actions" style={{ marginTop: "1rem" }}>
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => setSelectedEpisodeIds(work.episodes.map((ep) => ep.id))}
+                            disabled={saving}
+                        >
+                            Select all
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => setSelectedEpisodeIds([])}
+                            disabled={saving || selectedEpisodeIds.length === 0}
+                        >
+                            Clear
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={saving || selectedEpisodeIds.length === 0}>
+                            {saving ? "保存中…" : "選択したEpisodeに適用"}
+                        </button>
+                    </div>
+                </form>
+            )}
             {work.episodes.length === 0 ? (
                 <div className="card empty-state">エピソードがまだありません</div>
             ) : (
@@ -191,6 +301,14 @@ export default function WorkDetail() {
                     {work.episodes.map((ep) => (
                         <div key={ep.id} className="card">
                             <div className="card-title">
+                                <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", marginRight: "0.5rem" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedEpisodeIds.includes(ep.id)}
+                                        onChange={() => toggleEpisodeSelection(ep.id)}
+                                        aria-label={`Select ${ep.title}`}
+                                    />
+                                </label>
                                 <span className="badge" style={{ marginRight: "0.5rem" }}>EP{ep.episodeNumber}</span>
                                 <span className={`badge publication-${getPublicationState(ep)}`} style={{ marginRight: "0.5rem" }}>
                                     {getPublicationState(ep)}
