@@ -2,6 +2,9 @@
 
 This is the practical task split for starting the first public manga site.
 
+For ready-to-paste Codex prompts for the next parallel workstreams, see
+`docs/next-thread-instructions.md`.
+
 ## Current State
 
 - The repository has been pushed to `https://github.com/manga-cms/manga-cms`.
