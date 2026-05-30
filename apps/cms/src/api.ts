@@ -142,6 +142,32 @@ export function getAdminPageImageUrl(seriesId: string, episodeId: string, pageNu
     return `${API}/admin/series/${seriesId}/episodes/${episodeId}/pages/${pageNumber}/image?${params.toString()}`;
 }
 
+export async function uploadAdminPageImage(
+    seriesId: string,
+    episodeId: string,
+    pageNumber: number,
+    file: File,
+    locale = "ja",
+) {
+    const params = new URLSearchParams({ locale });
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API}/admin/series/${seriesId}/episodes/${episodeId}/pages/${pageNumber}/image?${params.toString()}`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Image upload failed");
+    return data as {
+        uploaded: true;
+        imagePath: string;
+        contentType: string;
+        size: number;
+        sha256: string;
+    };
+}
+
 export async function publishSeries(seriesId: string) {
     const res = await fetch(`${API}/admin/series/${seriesId}/publish`, {
         method: "POST",

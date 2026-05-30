@@ -633,7 +633,7 @@ textarea {
 
 .page-editor-grid {
     display: grid;
-    grid-template-columns: minmax(12rem, 1fr) minmax(8rem, 0.7fr) minmax(5rem, 0.45fr) minmax(5rem, 0.45fr);
+    grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) minmax(8rem, 0.7fr) minmax(5rem, 0.45fr) minmax(5rem, 0.45fr);
     gap: 0.5rem;
 }
 

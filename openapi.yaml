@@ -493,6 +493,67 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+    post:
+      tags: [AdminContent]
+      summary: Upload Page image and update Episode image path
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+          image/gif:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Uploaded image metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageImageUploadResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          description: Uploaded image exceeds size limit
+        "415":
+          description: Unsupported media type
 
   /admin/series/{seriesId}/publish:
     post:
@@ -1709,6 +1770,31 @@ components:
         viewerUrl:
           type: string
         apiUrl:
+          type: string
+
+    PageImageUploadResponse:
+      type: object
+      required: [uploaded, seriesId, episodeId, pageNumber, locale, imagePath, contentType, size, sha256]
+      properties:
+        uploaded:
+          type: boolean
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageNumber:
+          type: integer
+        locale:
+          type: string
+        imagePath:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+        sha256:
+          type: string
+        originalName:
           type: string
 
     DraftPayload:
