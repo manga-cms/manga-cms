@@ -1,9 +1,51 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createJob, importPreparedDirectory, type DraftPayload } from "../api";
+import { createJob, importPreparedDirectory, type DraftPayload, type PreparedDirectoryImportPageInput } from "../api";
 
 function slugify(text: string): string {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function parsePageManifest(text: string): PreparedDirectoryImportPageInput[] | undefined {
+    const trimmed = text.trim();
+    if (!trimmed) return undefined;
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) {
+        throw new Error("Page Manifest は JSON array で入力してください");
+    }
+    return parsed.map((entry, index) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            throw new Error(`Page Manifest ${index + 1} 行目が object ではありません`);
+        }
+        const sourcePath = typeof entry.sourcePath === "string" ? entry.sourcePath.trim() : undefined;
+        const fileName = typeof entry.fileName === "string" ? entry.fileName.trim() : undefined;
+        const pageNumber = entry.pageNumber === undefined ? undefined : Number(entry.pageNumber);
+        const width = entry.width === undefined ? undefined : Number(entry.width);
+        const height = entry.height === undefined ? undefined : Number(entry.height);
+        const displayRef = typeof entry.displayRef === "string" ? entry.displayRef.trim() : undefined;
+
+        if (!sourcePath && !fileName) {
+            throw new Error(`Page Manifest ${index + 1} 行目に sourcePath または fileName が必要です`);
+        }
+        if (pageNumber !== undefined && (!Number.isInteger(pageNumber) || pageNumber < 1)) {
+            throw new Error(`Page Manifest ${index + 1} 行目の pageNumber が不正です`);
+        }
+        if (width !== undefined && (!Number.isFinite(width) || width < 1)) {
+            throw new Error(`Page Manifest ${index + 1} 行目の width が不正です`);
+        }
+        if (height !== undefined && (!Number.isFinite(height) || height < 1)) {
+            throw new Error(`Page Manifest ${index + 1} 行目の height が不正です`);
+        }
+
+        return {
+            ...(sourcePath ? { sourcePath } : {}),
+            ...(fileName ? { fileName } : {}),
+            ...(pageNumber !== undefined ? { pageNumber } : {}),
+            ...(width !== undefined ? { width } : {}),
+            ...(height !== undefined ? { height } : {}),
+            ...(displayRef ? { displayRef } : {}),
+        };
+    });
 }
 
 export default function CreateJob() {
@@ -18,6 +60,7 @@ export default function CreateJob() {
     const [sourceDir, setSourceDir] = useState("");
     const [defaultWidth, setDefaultWidth] = useState(500);
     const [defaultHeight, setDefaultHeight] = useState(760);
+    const [pageManifest, setPageManifest] = useState("");
     const [mode, setMode] = useState<"manual" | "prepared">("prepared");
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
@@ -32,6 +75,13 @@ export default function CreateJob() {
         }
         if (mode === "prepared" && !sourceDir.trim()) {
             setError("Source Directory を入力してください");
+            return;
+        }
+        let pages: PreparedDirectoryImportPageInput[] | undefined;
+        try {
+            pages = mode === "prepared" ? parsePageManifest(pageManifest) : undefined;
+        } catch (err) {
+            setError((err as Error).message);
             return;
         }
 
@@ -64,6 +114,7 @@ export default function CreateJob() {
                     episodeTitle: epTitle,
                     defaultWidth,
                     defaultHeight,
+                    pages,
                 })
                 : await createJob(label || `${seriesTitle} - ${epTitle}`, draft);
             nav(`/ingestion/${job.id}`);
@@ -133,6 +184,18 @@ export default function CreateJob() {
                             <input value={sourceDir} onChange={(e) => setSourceDir(e.target.value)} placeholder="rain-world/ep01/pages" />
                             <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
                                 API server reads this path relative to IMPORTS_DIR. Supported files: jpg, png, webp, gif.
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label>Page Manifest JSON</label>
+                            <textarea
+                                value={pageManifest}
+                                onChange={(e) => setPageManifest(e.target.value)}
+                                placeholder={'[\n  { "sourcePath": "page-01.png", "pageNumber": 1, "displayRef": "P1" }\n]'}
+                                rows={6}
+                            />
+                            <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                                Optional. Leave empty to sort all supported images by filename. Use this for storyboard labels or explicit page order.
                             </div>
                         </div>
                         <div className="page-editor-grid">

@@ -104,6 +104,10 @@ If `pages` is omitted, image files in `sourceDir` are sorted by filename and
 mapped to `pages/p001.png`, `pages/p002.png`, and so on. For explicit storyboard
 labels, pass `pages[].displayRef`.
 
+The CMS `New Ingestion Job` screen can send the same `pages` mapping through the
+optional `Page Manifest JSON` field. Keep this manifest local unless the source
+assets are cleared for the public repository.
+
 ## CMS Script Assist
 
 `Page Structure Review` has a lightweight Script Assist field for the selected panel.
