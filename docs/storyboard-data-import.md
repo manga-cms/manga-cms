@@ -72,6 +72,38 @@ The safest flow is:
 6. Save canonical `episode.json`.
 7. Publish/reload so Reader focus links and feedback can target the structures.
 
+## Prepared Directory Import
+
+The API supports a local-only prepared asset intake endpoint:
+
+```http
+POST /api/v1/admin/ingestion/import/prepared-directory
+```
+
+The endpoint reads `sourceDir` relative to the API server `IMPORTS_DIR`, copies
+supported page images into draft asset storage, and creates an ingestion draft
+job. It does not write canonical `contents/` data until the job is reviewed and
+confirmed.
+
+Minimal request:
+
+```json
+{
+  "sourceDir": "rain-world/ep01/pages",
+  "seriesId": "rain-world",
+  "seriesTitle": "Rain World",
+  "episodeId": "ep01",
+  "episodeNumber": 1,
+  "episodeTitle": "Rain Ruins",
+  "defaultWidth": 768,
+  "defaultHeight": 1024
+}
+```
+
+If `pages` is omitted, image files in `sourceDir` are sorted by filename and
+mapped to `pages/p001.png`, `pages/p002.png`, and so on. For explicit storyboard
+labels, pass `pages[].displayRef`.
+
 ## CMS Script Assist
 
 `Page Structure Review` has a lightweight Script Assist field for the selected panel.

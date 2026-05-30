@@ -27,6 +27,7 @@ export type IngestionJobStatus =
 export interface DraftPage {
     pageNumber: number;
     imagePath: string;
+    sourceImagePath?: string;
     width: number;
     height: number;
     displayRef?: string;
