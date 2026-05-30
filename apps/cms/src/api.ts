@@ -516,6 +516,109 @@ export async function createProposalFromFeedback(feedbackId: string) {
     return data as ProposalRecord;
 }
 
+// ---------------------------------------------------------------------------
+// Pack drafts
+// ---------------------------------------------------------------------------
+
+export type PackType = "TRANSLATION" | "FOOTNOTE" | "COMMENTARY" | "LEARNING" | "ACCESSIBILITY";
+export type PackDraftStatus = "draft" | "in_review" | "approved" | "published" | "archived";
+
+export interface PackDraftEntry {
+    entry_id: string;
+    source_proposal_id?: string | null;
+    target: {
+        series_id: string;
+        episode_id?: string | null;
+        page_id?: string | null;
+        panel_id?: string | null;
+        bubble_id?: string | null;
+    };
+    lang?: string;
+    original_text?: string;
+    current_translation?: string;
+    text?: string;
+    note?: string;
+    adopted_at: string;
+    adopted_by?: string | null;
+}
+
+export interface PackDraftRecord {
+    pack_draft_id: string;
+    type: PackType;
+    title: string;
+    language?: string;
+    target_series_id?: string;
+    target_episode_id?: string;
+    version: number;
+    status: PackDraftStatus;
+    entries: PackDraftEntry[];
+    created_by?: string | null;
+    created_at: string;
+    updated_at: string;
+    reviewed_by?: string | null;
+    reviewed_at?: string;
+}
+
+export async function listPackDrafts(filters: { status?: PackDraftStatus; type?: PackType } = {}): Promise<PackDraftRecord[]> {
+    const params = new URLSearchParams();
+    if (filters.status) params.set("status", filters.status);
+    if (filters.type) params.set("type", filters.type);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`${API}/admin/pack-drafts${suffix}`, { credentials: "include" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to load pack drafts");
+    return data.items ?? [];
+}
+
+export async function createPackDraft(input: {
+    type: PackType;
+    title: string;
+    language?: string;
+    target_series_id?: string;
+    target_episode_id?: string;
+    version?: number;
+}) {
+    const res = await fetch(`${API}/admin/pack-drafts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to create pack draft");
+    return data as PackDraftRecord;
+}
+
+export async function getPackDraft(packDraftId: string): Promise<PackDraftRecord | null> {
+    const res = await fetch(`${API}/admin/pack-drafts/${packDraftId}`, { credentials: "include" });
+    if (!res.ok) return null;
+    return res.json();
+}
+
+export async function updatePackDraftStatus(packDraftId: string, status: PackDraftStatus) {
+    const res = await fetch(`${API}/admin/pack-drafts/${packDraftId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to update pack draft");
+    return data as PackDraftRecord;
+}
+
+export async function adoptProposalIntoPackDraft(packDraftId: string, proposalId: string) {
+    const res = await fetch(`${API}/admin/pack-drafts/${packDraftId}/adopt-proposal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ proposal_id: proposalId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to adopt proposal");
+    return data as PackDraftRecord;
+}
+
 export async function updateDraft(jobId: string, draft: DraftPayload) {
     const res = await fetch(`${API}/admin/ingestion/jobs/${jobId}/draft`, {
         method: "PUT",

@@ -272,6 +272,18 @@ textarea {
     margin-bottom: 1rem;
 }
 
+.compact-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.compact-list-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.875rem;
+    background: var(--bg);
+}
+
 .detail-list {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
