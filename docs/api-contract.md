@@ -429,7 +429,10 @@ Accepted Proposal Queue records can be adopted into Pack drafts:
 Only `accepted` proposals can be adopted. Adoption adds a Pack draft entry with
 the proposal target and suggested text, but it does not mutate the source
 Proposal record, canonical Episode JSON, or published Pack manifests. The same
-proposal cannot be adopted into the same Pack draft twice.
+proposal cannot be adopted into the same Pack draft twice. Cross-draft adoption
+is allowed for now because some Proposal kinds can legitimately feed multiple
+Pack types; CMS surfaces existing adoptions so reviewers can avoid accidental
+duplicates.
 
 ### Image Upload And Storage State
 
