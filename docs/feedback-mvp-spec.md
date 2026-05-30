@@ -108,6 +108,7 @@ triage status:
 - `GET /api/v1/admin/feedback`
 - `GET /api/v1/admin/feedback/{feedbackId}`
 - `PUT /api/v1/admin/feedback/{feedbackId}/status`
+- `POST /api/v1/admin/feedback/{feedbackId}/proposal`
 
 Statuses:
 
@@ -115,5 +116,6 @@ Statuses:
 - `triaged`
 - `closed`
 
-Triage does not mutate canonical content, Packs, or proposals. Converting
-approved feedback into proposal records remains a future workflow.
+Triage does not mutate canonical content or Packs. CMS may convert feedback
+into a Proposal Queue record. Conversion marks the feedback as triaged and
+creates a private proposal record; Pack adoption remains a separate workflow.

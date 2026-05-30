@@ -93,6 +93,10 @@ Proposal
 - CMS owns review, approval, merging, pack publication, and rights checks.
 - CMS should track reviewer and publisher identity.
 - CMS should preserve proposal history for audit.
+- Proposal Queue records are runtime review state. `accepted` means accepted
+  for follow-up work, not automatically published or merged into a Pack.
+- Current Proposal Queue kinds are `translation`, `typo`, `footnote`,
+  `commentary`, `tag`, and `structure`.
 
 ## Reference Notes
 

@@ -1,48 +1,45 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
-    createProposalFromFeedback,
-    getFeedback,
-    updateFeedbackStatus,
-    type FeedbackRecord,
-    type FeedbackStatus,
+    getProposal,
+    updateProposalStatus,
+    type ProposalRecord,
+    type ProposalStatus,
 } from "../api";
 
-export default function FeedbackDetail() {
-    const { feedbackId } = useParams<{ feedbackId: string }>();
-    const navigate = useNavigate();
-    const [record, setRecord] = useState<FeedbackRecord | null>(null);
-    const [status, setStatus] = useState<FeedbackStatus>("new");
+export default function ProposalDetail() {
+    const { proposalId } = useParams<{ proposalId: string }>();
+    const [record, setRecord] = useState<ProposalRecord | null>(null);
+    const [status, setStatus] = useState<ProposalStatus>("new");
     const [note, setNote] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [creatingProposal, setCreatingProposal] = useState(false);
     const [error, setError] = useState("");
     const [saved, setSaved] = useState(false);
 
     useEffect(() => {
-        if (!feedbackId) return;
-        getFeedback(feedbackId)
+        if (!proposalId) return;
+        getProposal(proposalId)
             .then((next) => {
                 setRecord(next);
                 if (next) {
                     setStatus(next.status);
-                    setNote(next.triage_note ?? "");
+                    setNote(next.review_note ?? "");
                 } else {
-                    setError("Feedback not found");
+                    setError("Proposal not found");
                 }
             })
             .catch((e) => setError(e.message))
             .finally(() => setLoading(false));
-    }, [feedbackId]);
+    }, [proposalId]);
 
     const save = async () => {
-        if (!feedbackId) return;
+        if (!proposalId) return;
         setSaving(true);
         setError("");
         setSaved(false);
         try {
-            const next = await updateFeedbackStatus(feedbackId, status, note);
+            const next = await updateProposalStatus(proposalId, status, note);
             setRecord(next);
             setSaved(true);
         } catch (e) {
@@ -52,94 +49,80 @@ export default function FeedbackDetail() {
         }
     };
 
-    const createProposal = async () => {
-        if (!feedbackId) return;
-        setCreatingProposal(true);
-        setError("");
-        try {
-            const proposal = await createProposalFromFeedback(feedbackId);
-            navigate(`/proposals/${proposal.proposal_id}`);
-        } catch (e) {
-            setError((e as Error).message);
-        } finally {
-            setCreatingProposal(false);
-        }
-    };
-
-    if (loading) return <p style={{ color: "var(--muted)" }}>Loading…</p>;
-    if (!record) return <div className="error-msg">{error || "Feedback not found"}</div>;
+    if (loading) return <p style={{ color: "var(--muted)" }}>Loading...</p>;
+    if (!record) return <div className="error-msg">{error || "Proposal not found"}</div>;
 
     return (
         <div>
             <div className="section-heading">
                 <div>
-                    <h1>Feedback Detail</h1>
-                    <p className="card-meta">{record.feedback_id}</p>
+                    <h1>Proposal Detail</h1>
+                    <p className="card-meta">{record.proposal_id}</p>
                 </div>
                 <span className="badge">{record.status}</span>
             </div>
 
             {error && <div className="error-msg">{error}</div>}
-            {saved && <div className="success-msg">Feedback updated.</div>}
+            {saved && <div className="success-msg">Proposal updated.</div>}
 
             <div className="grid-2">
                 <div className="card">
                     <h2>Target</h2>
                     <dl className="detail-list">
+                        <dt>Kind</dt><dd>{record.kind}</dd>
                         <dt>Series</dt><dd>{record.series_id}</dd>
                         <dt>Episode</dt><dd>{record.episode_id}</dd>
                         <dt>Page</dt><dd>{record.page_id ?? "-"}</dd>
                         <dt>Panel</dt><dd>{record.panel_id ?? "-"}</dd>
                         <dt>Bubble</dt><dd>{record.bubble_id ?? "-"}</dd>
-                        <dt>Mode</dt><dd>{record.mode}</dd>
-                        <dt>Issue</dt><dd>{record.issue_type}</dd>
+                        <dt>Language</dt><dd>{record.lang ?? "-"}</dd>
                         <dt>Created</dt><dd>{new Date(record.created_at).toLocaleString("ja-JP")}</dd>
+                        <dt>Feedback</dt><dd>{record.source_feedback_id ?? "-"}</dd>
                     </dl>
                 </div>
 
                 <div className="card">
-                    <h2>Triage</h2>
+                    <h2>Review</h2>
                     <div className="form-group">
                         <label>Status</label>
-                        <select value={status} onChange={(e) => setStatus(e.target.value as FeedbackStatus)}>
+                        <select value={status} onChange={(e) => setStatus(e.target.value as ProposalStatus)}>
                             <option value="new">New</option>
                             <option value="triaged">Triaged</option>
+                            <option value="accepted">Accepted</option>
+                            <option value="rejected">Rejected</option>
                             <option value="closed">Closed</option>
                         </select>
                     </div>
                     <div className="form-group">
-                        <label>Note</label>
-                        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="対応方針や確認メモ" />
+                        <label>Review note</label>
+                        <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="採用可否、Pack反映方針、追加確認メモ" />
                     </div>
                     <button type="button" className="btn btn-primary" disabled={saving} onClick={save}>
-                        {saving ? "保存中…" : "Status を保存"}
+                        {saving ? "Saving..." : "Save status"}
                     </button>
                 </div>
             </div>
 
             <div className="card">
-                <h2>Reader Comment</h2>
+                <h2>Proposal Content</h2>
                 <div className="json-preview">
                     {JSON.stringify({
-                        comment: record.comment,
                         current_text: record.current_text,
                         current_translation: record.current_translation,
                         suggested_text: record.suggested_text,
-                        lang: record.lang,
+                        comment: record.comment,
+                        proposer_id: record.proposer_id,
                         source_url: record.source_url,
-                        user_id: record.user_id,
-                        client_time: record.client_time,
-                        user_agent: record.user_agent,
+                        reviewed_by: record.reviewed_by,
+                        reviewed_at: record.reviewed_at,
                     }, null, 2)}
                 </div>
             </div>
 
             <div className="section-actions">
-                <Link to="/feedback" className="btn btn-outline">← Feedback</Link>
+                <Link to="/proposals" className="btn btn-outline">Back to proposals</Link>
                 <Link to={`/works/${record.series_id}/episodes/${record.episode_id}`} className="btn btn-outline">Episode</Link>
-                <button type="button" className="btn btn-primary" disabled={creatingProposal} onClick={createProposal}>
-                    {creatingProposal ? "Creating..." : "Create Proposal"}
-                </button>
+                {record.source_feedback_id && <Link to={`/feedback/${record.source_feedback_id}`} className="btn btn-outline">Feedback</Link>}
                 {record.source_url && <a href={record.source_url} target="_blank" rel="noreferrer" className="btn btn-outline">Source URL</a>}
             </div>
         </div>

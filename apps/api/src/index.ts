@@ -15,7 +15,7 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync, existsSync, writeFi
 import { createHash } from "node:crypto";
 import { getEmailProvider, isEmailConfigured } from "./email.js";
 import { RateLimiter } from "./rate-limit.js";
-import { FeedbackPayloadSchema } from "@manga/schemas";
+import { FeedbackPayloadSchema, ProposalCreateInputSchema, ProposalStatusUpdateInputSchema } from "@manga/schemas";
 import { buildPreparedDirectoryDraft } from "@manga/ingestion";
 import {
     FileContentRepository,
@@ -23,6 +23,7 @@ import {
     createFileIngestionRepository,
     createFileEntitlementRepository,
     createFileFeedbackRepository,
+    createFileProposalRepository,
     isPublicNow,
     isSeriesAndEpisodePublicNow,
     DefaultAccessPolicy,
@@ -35,6 +36,9 @@ import {
     type EntitlementRepository,
     type FeedbackPayload,
     type FeedbackStatus,
+    proposalInputFromFeedback,
+    type ProposalKind,
+    type ProposalStatus,
     type DraftPayload,
     type IngestionRepository,
 } from "@manga/domain";
@@ -105,6 +109,8 @@ const writer = createFileWriter(CONTENTS_DIR, () => {
 const FEEDBACK_DIR = process.env.FEEDBACK_DIR ?? join(__dirname, "../../../feedback");
 const feedbackRepo = createFileFeedbackRepository(FEEDBACK_DIR);
 const feedbackLimiter = new RateLimiter({ maxRequests: IS_PRODUCTION ? 10 : 60, windowSeconds: 60 });
+const PROPOSALS_DIR = process.env.PROPOSALS_DIR ?? join(__dirname, "../../../proposals");
+const proposalRepo = createFileProposalRepository(PROPOSALS_DIR);
 
 const accessPolicy = new DefaultAccessPolicy();
 
@@ -339,6 +345,12 @@ function validateFeedbackPayload(body: any): { ok: true; payload: FeedbackPayloa
     return { ok: true, payload: result.data };
 }
 
+function formatZodError(error: { issues: Array<{ path: Array<string | number>; message: string }> }): string {
+    return error.issues
+        .map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`)
+        .join("; ");
+}
+
 // ---------------------------------------------------------------------------
 // Session cookie helper
 // ---------------------------------------------------------------------------
@@ -518,6 +530,100 @@ app.put("/admin/feedback/:feedbackId/status", async (c) => {
         return c.json({ error: { code: "NOT_FOUND", message: result.error } }, 404);
     }
     return c.json(result.record);
+});
+
+// ===========================================================================
+// ADMIN — Proposal queue
+// ===========================================================================
+
+app.get("/admin/proposals", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const status = c.req.query("status") as ProposalStatus | undefined;
+    const kind = c.req.query("kind") as ProposalKind | undefined;
+    const seriesId = c.req.query("seriesId");
+
+    if (status && !["new", "triaged", "accepted", "rejected", "closed"].includes(status)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid proposal status" } }, 400);
+    }
+    if (kind && !["translation", "typo", "footnote", "commentary", "tag", "structure"].includes(kind)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid proposal kind" } }, 400);
+    }
+
+    return c.json({ items: proposalRepo.list({ status, kind, seriesId }) });
+});
+
+app.post("/admin/proposals", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = ProposalCreateInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const user = getUser(c);
+    const record = proposalRepo.create({
+        ...parsed.data,
+        proposer_id: parsed.data.proposer_id ?? user?.id ?? null,
+    });
+    return c.json(record, 201);
+});
+
+app.get("/admin/proposals/:proposalId", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const record = proposalRepo.get(c.req.param("proposalId"));
+    if (!record) return c.json({ error: { code: "NOT_FOUND", message: "Proposal not found" } }, 404);
+    return c.json(record);
+});
+
+app.put("/admin/proposals/:proposalId/status", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = ProposalStatusUpdateInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const user = getUser(c);
+    const result = proposalRepo.updateStatus(c.req.param("proposalId"), {
+        status: parsed.data.status,
+        ...(parsed.data.review_note !== undefined && { reviewNote: parsed.data.review_note }),
+        ...(user?.id && { reviewedBy: user.id }),
+    });
+    if (!result.success) {
+        return c.json({ error: { code: "NOT_FOUND", message: result.error } }, 404);
+    }
+    return c.json(result.record);
+});
+
+app.post("/admin/feedback/:feedbackId/proposal", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const feedbackId = c.req.param("feedbackId");
+    const feedback = feedbackRepo.get(feedbackId);
+    if (!feedback) return c.json({ error: { code: "NOT_FOUND", message: "Feedback not found" } }, 404);
+
+    const user = getUser(c);
+    const proposal = proposalRepo.create({
+        ...proposalInputFromFeedback(feedback),
+        proposer_id: feedback.user_id ?? user?.id ?? null,
+    });
+    feedbackRepo.updateStatus(feedbackId, {
+        status: "triaged",
+        triageNote: `Converted to proposal ${proposal.proposal_id}`,
+        ...(user?.id && { triagedBy: user.id }),
+    });
+    return c.json(proposal, 201);
 });
 
 // ---------------------------------------------------------------------------

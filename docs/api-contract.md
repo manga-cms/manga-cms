@@ -291,14 +291,15 @@ Current CMS/Reader endpoint coverage:
   `/admin/series/{id}/episodes/{epId}`,
   `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image`,
   `/admin/series/{id}/publish`, ingestion routes, feedback triage routes, auth
-  routes, and entitlement admin routes. These are implemented by `apps/api`.
+  routes, Proposal Queue routes, and entitlement admin routes. These are
+  implemented by `apps/api`.
 - Reader SSR uses `/series/{seriesId}/episodes/{episodeId}`, `/quotes/...`,
   `/clips/...`, `/reactions`, `/feedback`, and tokenized `/deliver/{pageId}`.
   These are implemented by `apps/api`.
-- `/packs/{packId}`, proposal review routes, and public proposal listing are
-  not implemented in `apps/api` and are not part of the current core contract.
-  Reintroduce them in `openapi.yaml` only when the implementation exists or a
-  task explicitly schedules that surface.
+- `/packs/{packId}` and public proposal listing are not implemented in
+  `apps/api` and are not part of the current core contract. Reintroduce them
+  in `openapi.yaml` only when the implementation exists or a task explicitly
+  schedules that surface.
 
 ## CMS Admin Endpoints
 
@@ -319,13 +320,42 @@ Base path: `/api/v1`
 | `GET` | `/admin/feedback` | List private Reader feedback for CMS triage |
 | `GET` | `/admin/feedback/{feedbackId}` | Read one feedback record |
 | `PUT` | `/admin/feedback/{feedbackId}/status` | Update feedback status and triage note |
+| `POST` | `/admin/feedback/{feedbackId}/proposal` | Convert feedback into a Proposal Queue record |
+| `GET` | `/admin/proposals` | List Proposal Queue records |
+| `POST` | `/admin/proposals` | Create a Proposal Queue record |
+| `GET` | `/admin/proposals/{proposalId}` | Read one proposal record |
+| `PUT` | `/admin/proposals/{proposalId}/status` | Update proposal review status and note |
 
 Admin endpoints require authenticated admin access. Browser CMS calls should
 send credentials so the `manga_auth` cookie is included.
 
-Feedback triage does not mutate canonical content, Packs, or proposals. Status
-is limited to `new`, `triaged`, or `closed`; future proposal conversion should
-be added as a separate contract.
+Feedback triage does not mutate canonical content or Packs. Status is limited
+to `new`, `triaged`, or `closed`. Feedback can be converted into a private
+Proposal Queue record through `/admin/feedback/{feedbackId}/proposal`.
+
+Proposal Queue records are runtime review state, not canonical content and not
+published Packs. They are file-backed by default under `PROPOSALS_DIR` or
+`proposals/`, and that directory is ignored by Git.
+
+Proposal kinds:
+
+- `translation`
+- `typo`
+- `footnote`
+- `commentary`
+- `tag`
+- `structure`
+
+Proposal statuses:
+
+- `new`
+- `triaged`
+- `accepted`
+- `rejected`
+- `closed`
+
+Accepting a proposal records reviewer intent only. Adoption into canonical
+Episode JSON or a Pack remains a later explicit workflow.
 
 ### Image Upload And Storage State
 

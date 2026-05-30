@@ -446,6 +446,76 @@ export async function updateFeedbackStatus(feedbackId: string, status: FeedbackS
     return data as FeedbackRecord;
 }
 
+// ---------------------------------------------------------------------------
+// Proposal queue
+// ---------------------------------------------------------------------------
+
+export type ProposalKind = "translation" | "typo" | "footnote" | "commentary" | "tag" | "structure";
+export type ProposalStatus = "new" | "triaged" | "accepted" | "rejected" | "closed";
+
+export interface ProposalRecord {
+    proposal_id: string;
+    kind: ProposalKind;
+    status: ProposalStatus;
+    created_at: string;
+    updated_at: string;
+    source_feedback_id?: string | null;
+    series_id: string;
+    episode_id: string;
+    page_id?: string | null;
+    panel_id?: string | null;
+    bubble_id?: string | null;
+    lang?: string;
+    current_text?: string;
+    current_translation?: string;
+    suggested_text?: string;
+    comment?: string;
+    proposer_id?: string | null;
+    source_url?: string;
+    review_note?: string;
+    reviewed_by?: string;
+    reviewed_at?: string;
+}
+
+export async function listProposals(filters: { status?: ProposalStatus; kind?: ProposalKind } = {}): Promise<ProposalRecord[]> {
+    const params = new URLSearchParams();
+    if (filters.status) params.set("status", filters.status);
+    if (filters.kind) params.set("kind", filters.kind);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`${API}/admin/proposals${suffix}`, { credentials: "include" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to load proposals");
+    return data.items ?? [];
+}
+
+export async function getProposal(proposalId: string): Promise<ProposalRecord | null> {
+    const res = await fetch(`${API}/admin/proposals/${proposalId}`, { credentials: "include" });
+    if (!res.ok) return null;
+    return res.json();
+}
+
+export async function updateProposalStatus(proposalId: string, status: ProposalStatus, reviewNote?: string) {
+    const res = await fetch(`${API}/admin/proposals/${proposalId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status, review_note: reviewNote }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to update proposal");
+    return data as ProposalRecord;
+}
+
+export async function createProposalFromFeedback(feedbackId: string) {
+    const res = await fetch(`${API}/admin/feedback/${feedbackId}/proposal`, {
+        method: "POST",
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to create proposal");
+    return data as ProposalRecord;
+}
+
 export async function updateDraft(jobId: string, draft: DraftPayload) {
     const res = await fetch(`${API}/admin/ingestion/jobs/${jobId}/draft`, {
         method: "PUT",
