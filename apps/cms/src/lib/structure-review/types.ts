@@ -15,3 +15,10 @@ export type ReviewDecision = "pending" | "accepted" | "rejected";
 export type ReviewDecisions = Record<string, ReviewDecision>;
 
 export type ReviewSummary = Record<ReviewDecision, number>;
+
+export type StructureViewport = {
+    zoom: number;
+    panX: number;
+    panY: number;
+    panMode: boolean;
+};

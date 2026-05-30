@@ -532,6 +532,47 @@ textarea {
 .structure-stage {
     padding: 1rem;
     overflow: auto;
+    min-height: min(72vh, 48rem);
+    max-height: calc(100vh - 8rem);
+}
+
+.structure-canvas-controls {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.85rem;
+    flex-wrap: wrap;
+}
+
+.zoom-controls {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.zoom-controls .btn {
+    min-height: 2.1rem;
+    padding: 0.45rem 0.65rem;
+}
+
+.zoom-controls .btn.is-active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent), transparent 82%);
+    color: var(--text);
+}
+
+.zoom-value {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 3.3rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
 }
 
 .structure-canvas {
@@ -540,6 +581,20 @@ textarea {
     margin: 0 auto;
     user-select: none;
     touch-action: none;
+    transition: width 0.16s ease;
+    will-change: width;
+}
+
+.structure-canvas.is-pan-mode {
+    cursor: grab;
+}
+
+.structure-canvas.is-pan-mode:active {
+    cursor: grabbing;
+}
+
+.structure-canvas.is-pan-mode .bbox {
+    cursor: grab;
 }
 
 .structure-canvas img {

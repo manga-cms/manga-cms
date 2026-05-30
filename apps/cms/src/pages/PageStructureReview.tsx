@@ -20,12 +20,20 @@ import { makeBubbleId, makeBubbleShortId, makePanelId, nextBubbleIdNumber, nextP
 import { buildTemplatePanels } from "../lib/structure-review/panelTemplates";
 import { bubbleReviewKey, markPanels, panelReviewKey, seedAcceptedDecisions, summarizeReview } from "../lib/structure-review/reviewDecisions";
 import { parseScriptAssistLines } from "../lib/structure-review/scriptAssist";
-import type { PanelTemplate, ReviewDecisions } from "../lib/structure-review/types";
+import type { PanelTemplate, ReviewDecisions, StructureViewport } from "../lib/structure-review/types";
 import { useStructureReviewDrag } from "../lib/structure-review/useStructureReviewDrag";
+
+const MIN_STRUCTURE_ZOOM = 0.35;
+const MAX_STRUCTURE_ZOOM = 3;
+
+function clampStructureZoom(zoom: number) {
+    return Math.max(MIN_STRUCTURE_ZOOM, Math.min(MAX_STRUCTURE_ZOOM, zoom));
+}
 
 export default function PageStructureReview() {
     const { id: seriesId, epId } = useParams<{ id: string; epId: string }>();
     const nav = useNavigate();
+    const stageRef = useRef<HTMLElement>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
 
     const [episode, setEpisode] = useState<EpisodeData | null>(null);
@@ -37,6 +45,12 @@ export default function PageStructureReview() {
     const [saved, setSaved] = useState(false);
     const [scriptAssistText, setScriptAssistText] = useState("");
     const [reviewDecisions, setReviewDecisions] = useState<ReviewDecisions>({});
+    const [structureViewport, setStructureViewport] = useState<StructureViewport>({
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+        panMode: false,
+    });
 
     useEffect(() => {
         if (!seriesId || !epId) return;
@@ -68,6 +82,16 @@ export default function PageStructureReview() {
         return summarizeReview(page, reviewDecisions);
     }, [page, reviewDecisions]);
 
+    useEffect(() => {
+        stageRef.current?.scrollTo({ left: 0, top: 0 });
+        setStructureViewport((current) => ({
+            ...current,
+            panX: 0,
+            panY: 0,
+            panMode: false,
+        }));
+    }, [pageIndex]);
+
     const updatePage = useCallback((nextPage: PageData) => {
         setEpisode((current) => {
             if (!current) return current;
@@ -85,6 +109,66 @@ export default function PageStructureReview() {
         setSelectedPanelIndex,
         setSelectedBubbleIndex,
     });
+
+    const updateStructureViewport = useCallback((patch: Partial<StructureViewport>) => {
+        setStructureViewport((current) => ({
+            ...current,
+            ...patch,
+            zoom: patch.zoom === undefined ? current.zoom : clampStructureZoom(patch.zoom),
+        }));
+    }, []);
+
+    const zoomStructureCanvas = useCallback((delta: number) => {
+        setStructureViewport((current) => ({
+            ...current,
+            zoom: clampStructureZoom(current.zoom + delta),
+        }));
+    }, []);
+
+    const resetStructureScroll = useCallback(() => {
+        stageRef.current?.scrollTo({ left: 0, top: 0 });
+    }, []);
+
+    const resetStructureView = useCallback(() => {
+        resetStructureScroll();
+        setStructureViewport({
+            zoom: 1,
+            panX: 0,
+            panY: 0,
+            panMode: false,
+        });
+    }, [resetStructureScroll]);
+
+    const fitStructureWidth = useCallback(() => {
+        resetStructureScroll();
+        setStructureViewport((current) => ({
+            ...current,
+            zoom: 1,
+            panX: 0,
+            panY: 0,
+            panMode: false,
+        }));
+    }, [resetStructureScroll]);
+
+    const fitStructureScreen = useCallback(() => {
+        if (!stageRef.current || !page) {
+            fitStructureWidth();
+            return;
+        }
+        const stageRect = stageRef.current.getBoundingClientRect();
+        const availableWidth = Math.max(320, stageRef.current.clientWidth - 32);
+        const baseWidth = Math.min(availableWidth, 736);
+        const baseHeight = baseWidth * (page.height / page.width);
+        const availableHeight = Math.max(280, window.innerHeight - stageRect.top - 96);
+        resetStructureScroll();
+        setStructureViewport((current) => ({
+            ...current,
+            zoom: clampStructureZoom(Math.min(1, availableHeight / baseHeight)),
+            panX: 0,
+            panY: 0,
+            panMode: false,
+        }));
+    }, [fitStructureWidth, page, resetStructureScroll]);
 
     const updatePanel = (panelIndex: number, nextPanel: PanelData) => {
         if (!page) return;
@@ -376,10 +460,18 @@ export default function PageStructureReview() {
                 <CanvasOverlayEditor
                     page={page}
                     imageUrl={imageUrl}
+                    stageRef={stageRef}
                     canvasRef={canvasRef}
+                    viewport={structureViewport}
                     selectedPanelIndex={selectedPanelIndex}
                     selectedBubbleIndex={selectedBubbleIndex}
                     reviewDecisions={reviewDecisions}
+                    onViewportChange={updateStructureViewport}
+                    onZoomIn={() => zoomStructureCanvas(0.15)}
+                    onZoomOut={() => zoomStructureCanvas(-0.15)}
+                    onResetView={resetStructureView}
+                    onFitWidth={fitStructureWidth}
+                    onFitScreen={fitStructureScreen}
                     onStartDrag={startDrag}
                 />
 
