@@ -1,0 +1,159 @@
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { randomUUID as cryptoRandomUUID } from "node:crypto";
+import { join } from "node:path";
+import type { PackType } from "./types.js";
+import type { PackDraftCreateInput, PackDraftEntry, PackDraftRecord, PackDraftStatus } from "./pack-draft-types.js";
+import type { ProposalKind, ProposalRecord } from "./proposal-types.js";
+
+export interface PackDraftRepository {
+    create(input: PackDraftCreateInput): PackDraftRecord;
+    list(filters?: { status?: PackDraftStatus; type?: PackType; seriesId?: string }): PackDraftRecord[];
+    get(packDraftId: string): PackDraftRecord | undefined;
+    updateStatus(
+        packDraftId: string,
+        input: { status: PackDraftStatus; reviewedBy?: string | null },
+    ): { success: true; record: PackDraftRecord } | { success: false; error: string };
+    addEntry(
+        packDraftId: string,
+        entry: PackDraftEntry,
+    ): { success: true; record: PackDraftRecord } | { success: false; error: string };
+}
+
+export class FilePackDraftRepository implements PackDraftRepository {
+    constructor(private packDraftsDir: string) { }
+
+    private filePath(): string {
+        return join(this.packDraftsDir, "pack-drafts.jsonl");
+    }
+
+    private readAll(): PackDraftRecord[] {
+        const filePath = this.filePath();
+        if (!existsSync(filePath)) return [];
+        return readFileSync(filePath, "utf-8")
+            .split(/\r?\n/)
+            .filter((line) => line.trim().length > 0)
+            .map((line) => JSON.parse(line) as PackDraftRecord)
+            .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+
+    private writeAll(records: PackDraftRecord[]): void {
+        mkdirSync(this.packDraftsDir, { recursive: true });
+        const filePath = this.filePath();
+        const tmpPath = `${filePath}.${process.pid}.${cryptoRandomUUID()}.tmp`;
+        writeFileSync(tmpPath, records.map((record) => JSON.stringify(record)).join("\n") + "\n", "utf-8");
+        renameSync(tmpPath, filePath);
+    }
+
+    create(input: PackDraftCreateInput): PackDraftRecord {
+        mkdirSync(this.packDraftsDir, { recursive: true });
+        const now = new Date().toISOString();
+        const record: PackDraftRecord = {
+            ...input,
+            pack_draft_id: `pd_${cryptoRandomUUID()}`,
+            status: "draft",
+            version: input.version ?? 1,
+            entries: [],
+            created_at: now,
+            updated_at: now,
+        };
+        appendFileSync(this.filePath(), JSON.stringify(record) + "\n", "utf-8");
+        return record;
+    }
+
+    list(filters: { status?: PackDraftStatus; type?: PackType; seriesId?: string } = {}): PackDraftRecord[] {
+        return this.readAll().filter((record) => {
+            if (filters.status && record.status !== filters.status) return false;
+            if (filters.type && record.type !== filters.type) return false;
+            if (filters.seriesId && record.target_series_id !== filters.seriesId) return false;
+            return true;
+        });
+    }
+
+    get(packDraftId: string): PackDraftRecord | undefined {
+        return this.readAll().find((record) => record.pack_draft_id === packDraftId);
+    }
+
+    updateStatus(
+        packDraftId: string,
+        input: { status: PackDraftStatus; reviewedBy?: string | null },
+    ): { success: true; record: PackDraftRecord } | { success: false; error: string } {
+        const records = this.readAll();
+        const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
+        if (index < 0) return { success: false, error: "Pack draft not found" };
+        const now = new Date().toISOString();
+        const record: PackDraftRecord = {
+            ...records[index]!,
+            status: input.status,
+            updated_at: now,
+            ...(input.reviewedBy !== undefined && { reviewed_by: input.reviewedBy }),
+            reviewed_at: now,
+        };
+        records[index] = record;
+        this.writeAll(records);
+        return { success: true, record };
+    }
+
+    addEntry(
+        packDraftId: string,
+        entry: PackDraftEntry,
+    ): { success: true; record: PackDraftRecord } | { success: false; error: string } {
+        const records = this.readAll();
+        const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
+        if (index < 0) return { success: false, error: "Pack draft not found" };
+        if (entry.source_proposal_id && records[index]!.entries.some((existing) => existing.source_proposal_id === entry.source_proposal_id)) {
+            return { success: false, error: "Proposal already adopted into this pack draft" };
+        }
+        const record: PackDraftRecord = {
+            ...records[index]!,
+            entries: [...records[index]!.entries, entry],
+            updated_at: new Date().toISOString(),
+        };
+        records[index] = record;
+        this.writeAll(records);
+        return { success: true, record };
+    }
+}
+
+export function createFilePackDraftRepository(packDraftsDir: string): PackDraftRepository {
+    return new FilePackDraftRepository(packDraftsDir);
+}
+
+export function packTypesForProposalKind(kind: ProposalKind): PackType[] {
+    switch (kind) {
+        case "translation":
+        case "typo":
+            return ["TRANSLATION"];
+        case "footnote":
+            return ["FOOTNOTE"];
+        case "commentary":
+            return ["COMMENTARY", "LEARNING"];
+        case "tag":
+            return ["COMMENTARY", "LEARNING"];
+        case "structure":
+            return ["ACCESSIBILITY"];
+    }
+}
+
+export function proposalToPackDraftEntry(
+    proposal: ProposalRecord,
+    adoptedBy?: string | null,
+): PackDraftEntry {
+    return {
+        entry_id: `pe_${cryptoRandomUUID()}`,
+        source_proposal_id: proposal.proposal_id,
+        target: {
+            series_id: proposal.series_id,
+            episode_id: proposal.episode_id,
+            page_id: proposal.page_id,
+            panel_id: proposal.panel_id,
+            bubble_id: proposal.bubble_id,
+        },
+        lang: proposal.lang,
+        original_text: proposal.current_text,
+        current_translation: proposal.current_translation,
+        text: proposal.suggested_text,
+        note: proposal.comment,
+        adopted_at: new Date().toISOString(),
+        adopted_by: adoptedBy ?? null,
+    };
+}

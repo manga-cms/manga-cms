@@ -130,16 +130,40 @@ export const PackTypeSchema = z.enum([
     "ACCESSIBILITY",
 ]);
 
+export const PackClassSchema = z.enum(["proposal", "draft", "official", "deprecated"]);
+
+export const PackEntryTargetSchema = z.object({
+    seriesId: z.string().min(1),
+    episodeId: z.string().min(1).optional(),
+    pageId: z.string().min(1).optional(),
+    panelId: z.string().min(1).optional(),
+    bubbleId: z.string().min(1).optional(),
+});
+
+export const PackEntrySchema = z.object({
+    id: z.string().min(1),
+    target: PackEntryTargetSchema,
+    language: z.string().optional(),
+    originalText: z.string().optional(),
+    text: z.string().optional(),
+    note: z.string().optional(),
+    sourceProposalId: z.string().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const PackManifestSchema = z.object({
     id: z.string().min(1),
     type: PackTypeSchema,
+    packClass: PackClassSchema.default("draft").optional(),
     language: z.string().optional(),
     version: z.number().int().positive().default(1),
     title: z.string().optional(),
     authorLabel: z.string().optional(),
     isPublished: z.boolean().default(false),
     targetSeriesId: z.string().optional(),
-    entries: z.array(z.unknown()).default([]),
+    targetEpisodeId: z.string().optional(),
+    sourcePackDraftId: z.string().optional(),
+    entries: z.array(PackEntrySchema).default([]),
 });
 
 // ---------------------------------------------------------------------------

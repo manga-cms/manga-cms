@@ -65,10 +65,10 @@ Formal translators may have rights in their translation output depending on juri
 ```text
 Proposal
   -> Review
-  -> Adopt into draft Pack
+  -> Adopt into runtime Pack draft
   -> Pack review
   -> Rights check
-  -> Publish
+  -> Export/publish canonical Pack manifest
   -> Reader availability
 ```
 
@@ -97,6 +97,15 @@ Proposal
   for follow-up work, not automatically published or merged into a Pack.
 - Current Proposal Queue kinds are `translation`, `typo`, `footnote`,
   `commentary`, `tag`, and `structure`.
+- Pack draft records are also runtime review state. They are a staging area for
+  accepted proposals and maintainer edits before a canonical Pack manifest is
+  created under `packs/`.
+- Runtime Pack draft status `published` does not by itself publish Reader
+  content. Reader availability starts only after an explicit canonical
+  Pack manifest/export step.
+- Proposal-to-Pack compatibility is intentionally narrow: translation/typo to
+  Translation Packs, footnotes to Footnote Packs, commentary/tag to Commentary
+  or Learning Packs, and structure proposals to Accessibility Packs.
 
 ## Reference Notes
 

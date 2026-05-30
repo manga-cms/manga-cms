@@ -28,6 +28,7 @@ coverage/
 # Runtime private storage
 feedback/
 proposals/
+pack-drafts/
 
 # Local/private storyboard verification content
 contents/storyboard-ui-check/

@@ -162,14 +162,43 @@ export type PackType =
     | "LEARNING"
     | "ACCESSIBILITY";
 
+export type PackClass = "proposal" | "draft" | "official" | "deprecated";
+
+export interface PackEntryTarget {
+    seriesId: string;
+    episodeId?: string;
+    pageId?: string;
+    panelId?: string;
+    bubbleId?: string;
+}
+
+export interface PackEntry {
+    id: string;
+    target: PackEntryTarget;
+    language?: string;
+    originalText?: string;
+    text?: string;
+    note?: string;
+    sourceProposalId?: string;
+    metadata?: Record<string, unknown>;
+}
+
 export interface PackSummary {
     id: string;
     type: PackType;
+    packClass?: PackClass;
     language?: string;
     version: number;
     title?: string;
     authorLabel?: string;
     isPublished: boolean;
+}
+
+export interface PackManifest extends PackSummary {
+    targetSeriesId?: string;
+    targetEpisodeId?: string;
+    sourcePackDraftId?: string;
+    entries: PackEntry[];
 }
 
 // ---------------------------------------------------------------------------

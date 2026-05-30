@@ -291,15 +291,15 @@ Current CMS/Reader endpoint coverage:
   `/admin/series/{id}/episodes/{epId}`,
   `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image`,
   `/admin/series/{id}/publish`, ingestion routes, feedback triage routes, auth
-  routes, Proposal Queue routes, and entitlement admin routes. These are
-  implemented by `apps/api`.
+  routes, Proposal Queue routes, Pack draft routes, and entitlement admin
+  routes. These are implemented by `apps/api`.
 - Reader SSR uses `/series/{seriesId}/episodes/{episodeId}`, `/quotes/...`,
   `/clips/...`, `/reactions`, `/feedback`, and tokenized `/deliver/{pageId}`.
   These are implemented by `apps/api`.
-- `/packs/{packId}` and public proposal listing are not implemented in
-  `apps/api` and are not part of the current core contract. Reintroduce them
-  in `openapi.yaml` only when the implementation exists or a task explicitly
-  schedules that surface.
+- `/packs/{packId}`, public Pack listing, and public proposal listing are not
+  implemented in `apps/api` and are not part of the current core contract.
+  Reintroduce them in `openapi.yaml` only when the implementation exists or a
+  task explicitly schedules that surface.
 
 ## CMS Admin Endpoints
 
@@ -325,6 +325,11 @@ Base path: `/api/v1`
 | `POST` | `/admin/proposals` | Create a Proposal Queue record |
 | `GET` | `/admin/proposals/{proposalId}` | Read one proposal record |
 | `PUT` | `/admin/proposals/{proposalId}/status` | Update proposal review status and note |
+| `GET` | `/admin/pack-drafts` | List runtime Pack draft records |
+| `POST` | `/admin/pack-drafts` | Create a runtime Pack draft |
+| `GET` | `/admin/pack-drafts/{packDraftId}` | Read one runtime Pack draft |
+| `PUT` | `/admin/pack-drafts/{packDraftId}/status` | Update Pack draft review status |
+| `POST` | `/admin/pack-drafts/{packDraftId}/adopt-proposal` | Adopt an accepted Proposal into a Pack draft |
 
 Admin endpoints require authenticated admin access. Browser CMS calls should
 send credentials so the `manga_auth` cookie is included.
@@ -356,6 +361,51 @@ Proposal statuses:
 
 Accepting a proposal records reviewer intent only. Adoption into canonical
 Episode JSON or a Pack remains a later explicit workflow.
+
+### Pack Manager State
+
+Pack Manager has two separate layers:
+
+- Runtime Pack drafts are CMS review state. They live under `PACK_DRAFTS_DIR`
+  or `pack-drafts/` by default, are ignored by Git, and are exposed only through
+  admin routes.
+- Canonical Pack manifests live under `packs/{packId}/pack.json`. They are
+  source-controlled product assets and are validated by
+  `packages/schemas/src/content.ts`.
+
+Runtime Pack draft routes do not write `contents/` or canonical `packs/`.
+Changing a Pack draft status to `published` records review intent only. A later
+explicit publish/export workflow must create or update a canonical
+`packs/{packId}/pack.json` manifest.
+
+Pack types:
+
+- `TRANSLATION`
+- `FOOTNOTE`
+- `COMMENTARY`
+- `LEARNING`
+- `ACCESSIBILITY`
+
+Pack draft statuses:
+
+- `draft`
+- `in_review`
+- `approved`
+- `published`
+- `archived`
+
+Accepted Proposal Queue records can be adopted into Pack drafts:
+
+- `translation` and `typo` proposals can be adopted into `TRANSLATION` drafts.
+- `footnote` proposals can be adopted into `FOOTNOTE` drafts.
+- `commentary` and `tag` proposals can be adopted into `COMMENTARY` or
+  `LEARNING` drafts.
+- `structure` proposals can be adopted into `ACCESSIBILITY` drafts.
+
+Only `accepted` proposals can be adopted. Adoption adds a Pack draft entry with
+the proposal target and suggested text, but it does not mutate the source
+Proposal record, canonical Episode JSON, or published Pack manifests. The same
+proposal cannot be adopted into the same Pack draft twice.
 
 ### Image Upload And Storage State
 
