@@ -301,7 +301,8 @@ canonical content only after confirmation writes to `contents/`.
 Review decisions are stored on the ingestion draft as optional
 `reviewDecisions`. `write-reviewed-draft` requires all candidates to be either
 accepted or rejected, removes rejected candidates, renumbers accepted
-Panel/Bubble structures, and keeps the result in the draft before confirmation.
+Panel/Bubble structures, and keeps the remaining candidates marked accepted in
+the draft before confirmation.
 If `confirm` is called while review decisions still exist, the API applies the
 same accepted-only filter before writing to `contents/`.
 

@@ -142,7 +142,21 @@ export function applyReviewedDraft(
     });
 
     const { reviewDecisions: _reviewDecisions, ...draftWithoutReview } = draft;
-    return { success: true, draft: { ...draftWithoutReview, pages } };
+    const reviewedDraft = { ...draftWithoutReview, pages };
+    const updatedAt = new Date().toISOString();
+    const acceptedDecisions = getDraftReviewCandidates(reviewedDraft).map((candidate) => ({
+        key: candidate.key,
+        target: candidate.target,
+        decision: "accepted" as const,
+        updatedAt,
+    }));
+    return {
+        success: true,
+        draft: {
+            ...reviewedDraft,
+            ...(acceptedDecisions.length > 0 && { reviewDecisions: acceptedDecisions }),
+        },
+    };
 }
 
 export function buildEpisodePagesFromDraft(draft: DraftPayload) {
