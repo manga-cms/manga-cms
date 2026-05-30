@@ -34,6 +34,7 @@ import {
     type DevUser,
     type EntitlementRepository,
     type FeedbackPayload,
+    type FeedbackStatus,
     type DraftPayload,
     type IngestionRepository,
 } from "@manga/domain";
@@ -473,6 +474,50 @@ app.post("/feedback", async (c) => {
     });
 
     return c.json({ ok: true, feedback_id: record.feedback_id }, 201);
+});
+
+// ===========================================================================
+// ADMIN — Feedback triage
+// ===========================================================================
+
+app.get("/admin/feedback", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const status = c.req.query("status");
+    const seriesId = c.req.query("seriesId");
+    let items = feedbackRepo.list();
+    if (status && ["new", "triaged", "closed"].includes(status)) {
+        items = items.filter((record) => record.status === status);
+    }
+    if (seriesId) {
+        items = items.filter((record) => record.series_id === seriesId);
+    }
+    return c.json({ items });
+});
+
+app.get("/admin/feedback/:feedbackId", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const record = feedbackRepo.get(c.req.param("feedbackId"));
+    if (!record) return c.json({ error: { code: "NOT_FOUND", message: "Feedback not found" } }, 404);
+    return c.json(record);
+});
+
+app.put("/admin/feedback/:feedbackId/status", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const user = getUser(c);
+    const body = await c.req.json();
+    const status = body?.status as FeedbackStatus;
+    if (!["new", "triaged", "closed"].includes(status)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "status must be new, triaged, or closed" } }, 400);
+    }
+    const result = feedbackRepo.updateStatus(c.req.param("feedbackId"), {
+        status,
+        ...(typeof body.triage_note === "string" && { triageNote: body.triage_note }),
+        ...(user?.id && { triagedBy: user.id }),
+    });
+    if (!result.success) {
+        return c.json({ error: { code: "NOT_FOUND", message: result.error } }, 404);
+    }
+    return c.json(result.record);
 });
 
 // ---------------------------------------------------------------------------

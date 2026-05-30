@@ -10,6 +10,8 @@ import CreateJob from "./pages/CreateJob";
 import JobDetail from "./pages/JobDetail";
 import Entitlements from "./pages/Entitlements";
 import PageStructureReview from "./pages/PageStructureReview";
+import FeedbackList from "./pages/FeedbackList";
+import FeedbackDetail from "./pages/FeedbackDetail";
 import { devLogin, getMe } from "./api";
 
 export default function App() {
@@ -38,6 +40,7 @@ export default function App() {
                     <Link to="/">Dashboard</Link>
                     <Link to="/works/new">+ New Work</Link>
                     <Link to="/ingestion">📥 Ingestion</Link>
+                    <Link to="/feedback">Feedback</Link>
                     <Link to="/entitlements">🔐 Entitlements</Link>
                 </nav>
                 <div className="app-session">
@@ -62,6 +65,8 @@ export default function App() {
                     <Route path="/ingestion" element={<JobsList />} />
                     <Route path="/ingestion/new" element={<CreateJob />} />
                     <Route path="/ingestion/:jobId" element={<JobDetail />} />
+                    <Route path="/feedback" element={<FeedbackList />} />
+                    <Route path="/feedback/:feedbackId" element={<FeedbackDetail />} />
                     <Route path="/entitlements" element={<Entitlements />} />
                 </Routes>
             </main>

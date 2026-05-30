@@ -290,8 +290,8 @@ Current CMS/Reader endpoint coverage:
   `/admin/series/{id}`, `/admin/series/{id}/episodes`,
   `/admin/series/{id}/episodes/{epId}`,
   `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image`,
-  `/admin/series/{id}/publish`, ingestion routes, auth routes, and entitlement
-  admin routes. These are implemented by `apps/api`.
+  `/admin/series/{id}/publish`, ingestion routes, feedback triage routes, auth
+  routes, and entitlement admin routes. These are implemented by `apps/api`.
 - Reader SSR uses `/series/{seriesId}/episodes/{episodeId}`, `/quotes/...`,
   `/clips/...`, `/reactions`, `/feedback`, and tokenized `/deliver/{pageId}`.
   These are implemented by `apps/api`.
@@ -316,9 +316,16 @@ Base path: `/api/v1`
 | `GET` | `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image` | Read admin Page image preview |
 | `POST` | `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image` | Upload Page image and update Episode image path |
 | `POST` | `/admin/series/{id}/publish` | Reload/publish Series data |
+| `GET` | `/admin/feedback` | List private Reader feedback for CMS triage |
+| `GET` | `/admin/feedback/{feedbackId}` | Read one feedback record |
+| `PUT` | `/admin/feedback/{feedbackId}/status` | Update feedback status and triage note |
 
 Admin endpoints require authenticated admin access. Browser CMS calls should
 send credentials so the `manga_auth` cookie is included.
+
+Feedback triage does not mutate canonical content, Packs, or proposals. Status
+is limited to `new`, `triaged`, or `closed`; future proposal conversion should
+be added as a separate contract.
 
 ### Image Upload And Storage State
 

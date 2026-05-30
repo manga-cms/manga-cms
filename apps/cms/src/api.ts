@@ -386,6 +386,66 @@ export async function importPreparedDirectory(input: PreparedDirectoryImportInpu
     return data as IngestionJob;
 }
 
+// ---------------------------------------------------------------------------
+// Feedback triage
+// ---------------------------------------------------------------------------
+
+export type FeedbackStatus = "new" | "triaged" | "closed";
+
+export interface FeedbackRecord {
+    feedback_id: string;
+    status: FeedbackStatus;
+    created_at: string;
+    series_id: string;
+    episode_id: string;
+    page_id?: string | null;
+    panel_id?: string | null;
+    bubble_id?: string | null;
+    mode: "read" | "explore" | "completion";
+    issue_type: "typo" | "mistranslation" | "better_translation" | "missing_note" | "display" | "broken_link" | "spoiler" | "other";
+    comment?: string;
+    lang?: string;
+    current_text?: string;
+    current_translation?: string;
+    suggested_text?: string;
+    user_id?: string | null;
+    source_url: string;
+    user_agent?: string;
+    client_time?: string;
+    client_ip?: string | null;
+    triage_note?: string;
+    triaged_by?: string;
+    triaged_at?: string;
+}
+
+export async function listFeedback(status?: FeedbackStatus): Promise<FeedbackRecord[]> {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`${API}/admin/feedback${suffix}`, { credentials: "include" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to load feedback");
+    return data.items ?? [];
+}
+
+export async function getFeedback(feedbackId: string): Promise<FeedbackRecord | null> {
+    const res = await fetch(`${API}/admin/feedback/${feedbackId}`, { credentials: "include" });
+    if (!res.ok) return null;
+    return res.json();
+}
+
+export async function updateFeedbackStatus(feedbackId: string, status: FeedbackStatus, triageNote?: string) {
+    const res = await fetch(`${API}/admin/feedback/${feedbackId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status, triage_note: triageNote }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to update feedback");
+    return data as FeedbackRecord;
+}
+
 export async function updateDraft(jobId: string, draft: DraftPayload) {
     const res = await fetch(`${API}/admin/ingestion/jobs/${jobId}/draft`, {
         method: "PUT",

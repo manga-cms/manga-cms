@@ -37,5 +37,8 @@ export interface FeedbackRecord extends Omit<FeedbackPayload, "website"> {
     feedback_id: string;
     status: FeedbackStatus;
     created_at: string;
+    triage_note?: string;
+    triaged_by?: string;
+    triaged_at?: string;
     client_ip?: string | null;
 }
