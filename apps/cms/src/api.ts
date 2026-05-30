@@ -182,6 +182,7 @@ export interface DraftPage {
     imagePath: string;
     width: number;
     height: number;
+    displayRef?: string;
     panels: DraftPanel[];
 }
 
@@ -197,6 +198,29 @@ export interface DraftBubble {
     bubbleType: string;
     textOriginal: string;
     speaker?: string;
+    bbox?: BoundingBox;
+    shortId?: string;
+    speakerConfidence?: "confirmed" | "inferred" | "unknown";
+    textDirection?: "horizontal" | "vertical";
+    lang?: string;
+    flags?: ContentFlags;
+}
+
+export type IngestionReviewDecisionValue = "pending" | "accepted" | "rejected";
+
+export interface IngestionReviewTarget {
+    kind: "panel" | "bubble";
+    pageNumber: number;
+    panelNumber: number;
+    bubbleNumber?: number;
+}
+
+export interface IngestionReviewCandidate {
+    key: string;
+    target: IngestionReviewTarget;
+    decision: IngestionReviewDecisionValue;
+    panel?: DraftPanel;
+    bubble?: DraftBubble;
 }
 
 export async function listJobs(): Promise<IngestionJob[]> {
@@ -209,6 +233,39 @@ export async function getJob(jobId: string): Promise<IngestionJob | null> {
     const res = await fetch(`${API}/admin/ingestion/jobs/${jobId}`, { credentials: "include" });
     if (!res.ok) return null;
     return res.json();
+}
+
+export async function getReviewCandidates(jobId: string): Promise<IngestionReviewCandidate[]> {
+    const res = await fetch(`${API}/admin/ingestion/jobs/${jobId}/review-candidates`, { credentials: "include" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to load review candidates");
+    return data.items ?? [];
+}
+
+export async function setReviewDecision(
+    jobId: string,
+    target: IngestionReviewTarget,
+    decision: IngestionReviewDecisionValue,
+) {
+    const res = await fetch(`${API}/admin/ingestion/jobs/${jobId}/review-decisions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ target, decision }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to save review decision");
+    return data.items as IngestionReviewCandidate[];
+}
+
+export async function writeReviewedDraft(jobId: string) {
+    const res = await fetch(`${API}/admin/ingestion/jobs/${jobId}/write-reviewed-draft`, {
+        method: "POST",
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to write reviewed draft");
+    return data.draft as DraftPayload;
 }
 
 export async function createJob(label: string, draft?: DraftPayload) {

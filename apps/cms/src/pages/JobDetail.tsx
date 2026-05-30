@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
     getJob, updateDraft, submitForReview, confirmJob, cancelJob,
-    type IngestionJob, type DraftPayload, type DraftPage,
+    getReviewCandidates, setReviewDecision, writeReviewedDraft,
+    type IngestionJob, type DraftPayload, type DraftPage, type IngestionReviewCandidate,
+    type IngestionReviewDecisionValue,
 } from "../api";
 
 export default function JobDetail() {
@@ -13,15 +15,28 @@ export default function JobDetail() {
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
     const [confirmResult, setConfirmResult] = useState<{ seriesId: string } | null>(null);
+    const [candidates, setCandidates] = useState<IngestionReviewCandidate[]>([]);
 
-    const reload = () => {
+    const reload = async () => {
         if (!jobId) return;
-        getJob(jobId).then((j) => { setJob(j); if (!j) setError("Job not found"); });
+        const j = await getJob(jobId);
+        setJob(j);
+        if (!j) {
+            setError("Job not found");
+            setCandidates([]);
+            return;
+        }
+        if (j.draft) {
+            try {
+                setCandidates(await getReviewCandidates(jobId));
+            } catch {
+                setCandidates([]);
+            }
+        }
     };
 
     useEffect(() => {
-        reload();
-        setLoading(false);
+        reload().finally(() => setLoading(false));
     }, [jobId]);
 
     const draft = job?.draft;
@@ -83,6 +98,29 @@ export default function JobDetail() {
         finally { setBusy(false); }
     };
 
+    const markCandidate = async (candidate: IngestionReviewCandidate, decision: IngestionReviewDecisionValue) => {
+        if (!jobId) return;
+        setBusy(true);
+        setError("");
+        try {
+            setCandidates(await setReviewDecision(jobId, candidate.target, decision));
+            await reload();
+        } catch (e) { setError((e as Error).message); }
+        finally { setBusy(false); }
+    };
+
+    const doWriteReviewedDraft = async () => {
+        if (!jobId) return;
+        setBusy(true);
+        setError("");
+        try {
+            const nextDraft = await writeReviewedDraft(jobId);
+            setJob((current) => current ? { ...current, draft: nextDraft } : current);
+            await reload();
+        } catch (e) { setError((e as Error).message); }
+        finally { setBusy(false); }
+    };
+
     const doCancel = async () => {
         if (!jobId) return;
         setBusy(true);
@@ -98,6 +136,10 @@ export default function JobDetail() {
 
     const isEditable = job.status === "queued" || job.status === "draft";
     const isReviewable = job.status === "waiting_review";
+    const candidateSummary = candidates.reduce((acc, candidate) => {
+        acc[candidate.decision] += 1;
+        return acc;
+    }, { pending: 0, accepted: 0, rejected: 0 } as Record<IngestionReviewDecisionValue, number>);
 
     return (
         <div>
@@ -170,6 +212,44 @@ export default function JobDetail() {
             {draft && isReviewable && (
                 <div>
                     <h2>Review — 確認してください</h2>
+                    <div className="card">
+                        <h3>Structure Candidates</h3>
+                        <div className="review-summary">
+                            <span className="badge badge-warn">Pending {candidateSummary.pending}</span>
+                            <span className="badge badge-ok">Accepted {candidateSummary.accepted}</span>
+                            <span className="badge">Rejected {candidateSummary.rejected}</span>
+                        </div>
+                        {candidates.length === 0 ? (
+                            <p className="card-meta">No Page / Panel / Bubble candidates found in this draft.</p>
+                        ) : (
+                            <div style={{ display: "grid", gap: "0.5rem", marginTop: "1rem" }}>
+                                {candidates.map((candidate) => (
+                                    <div key={candidate.key} className="candidate-row">
+                                        <div>
+                                            <strong>
+                                                {candidate.target.kind === "panel"
+                                                    ? `P${candidate.target.pageNumber} Panel ${candidate.target.panelNumber}`
+                                                    : `P${candidate.target.pageNumber} Panel ${candidate.target.panelNumber} Bubble ${candidate.target.bubbleNumber}`}
+                                            </strong>
+                                            <p className="card-meta">
+                                                {candidate.bubble?.textOriginal || candidate.panel?.reactionTags.join(", ") || candidate.key}
+                                            </p>
+                                        </div>
+                                        <span className={`badge ${candidate.decision === "accepted" ? "badge-ok" : candidate.decision === "pending" ? "badge-warn" : ""}`}>
+                                            {candidate.decision}
+                                        </span>
+                                        <button type="button" className="btn btn-outline" disabled={busy} onClick={() => markCandidate(candidate, "accepted")}>Accept</button>
+                                        <button type="button" className="btn btn-outline" disabled={busy} onClick={() => markCandidate(candidate, "rejected")}>Reject</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="section-actions" style={{ marginTop: "1rem" }}>
+                            <button type="button" className="btn btn-outline" disabled={busy || candidateSummary.pending > 0} onClick={doWriteReviewedDraft}>
+                                Write accepted structure to draft
+                            </button>
+                        </div>
+                    </div>
 
                     <h3>series.json になる内容</h3>
                     <div className="json-preview">

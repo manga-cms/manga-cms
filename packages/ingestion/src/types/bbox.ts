@@ -12,6 +12,8 @@ export type BubbleClassification =
     | "thought"
     | "narration"
     | "sfx"
+    | "caption"
+    | "other"
     | "unknown";
 
 export type InputSourceKind =

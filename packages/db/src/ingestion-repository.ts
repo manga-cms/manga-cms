@@ -8,9 +8,17 @@ import type { PrismaClient } from "@prisma/client";
 import type {
     IngestionJob,
     IngestionRepository,
+    IngestionReviewCandidate,
+    IngestionReviewDecision,
     DraftPayload,
 } from "@manga/domain";
-import type { ContentWriteRepository } from "@manga/domain";
+import {
+    applyReviewDecision,
+    applyReviewedDraft,
+    buildEpisodePagesFromDraft,
+    getDraftReviewCandidates,
+    type ContentWriteRepository,
+} from "@manga/domain";
 
 export class DbIngestionRepository implements IngestionRepository {
     constructor(
@@ -78,6 +86,45 @@ export class DbIngestionRepository implements IngestionRepository {
         return { success: true };
     }
 
+    async getReviewCandidates(jobId: string): Promise<{ success: true; candidates: IngestionReviewCandidate[] } | { success: false; error: string }> {
+        const row = await this.prisma.ingestionJob.findUnique({ where: { id: jobId } });
+        if (!row) return { success: false, error: "Job not found" };
+        if (!row.draftJson) return { success: false, error: "No draft payload to review" };
+        return { success: true, candidates: getDraftReviewCandidates(JSON.parse(row.draftJson) as DraftPayload) };
+    }
+
+    async setReviewDecision(
+        jobId: string,
+        decision: Omit<IngestionReviewDecision, "key" | "updatedAt"> & { updatedAt?: string },
+    ): Promise<{ success: true; candidates: IngestionReviewCandidate[] } | { success: false; error: string }> {
+        const row = await this.prisma.ingestionJob.findUnique({ where: { id: jobId } });
+        if (!row) return { success: false, error: "Job not found" };
+        if (!row.draftJson) return { success: false, error: "No draft payload to review" };
+        const result = applyReviewDecision(JSON.parse(row.draftJson) as DraftPayload, decision);
+        if (!result.success) return result;
+        await this.prisma.ingestionJob.update({
+            where: { id: jobId },
+            data: { draftJson: JSON.stringify(result.draft) },
+        });
+        return { success: true, candidates: result.candidates };
+    }
+
+    async writeReviewedDraft(jobId: string): Promise<{ success: true; draft: DraftPayload } | { success: false; error: string }> {
+        const row = await this.prisma.ingestionJob.findUnique({ where: { id: jobId } });
+        if (!row) return { success: false, error: "Job not found" };
+        if (!row.draftJson) return { success: false, error: "No draft payload to review" };
+        if (row.status !== "draft" && row.status !== "waiting_review") {
+            return { success: false, error: `Cannot write reviewed draft from status "${row.status}"` };
+        }
+        const result = applyReviewedDraft(JSON.parse(row.draftJson) as DraftPayload);
+        if (!result.success) return result;
+        await this.prisma.ingestionJob.update({
+            where: { id: jobId },
+            data: { draftJson: JSON.stringify(result.draft) },
+        });
+        return { success: true, draft: result.draft };
+    }
+
     async submitForReview(jobId: string): Promise<{ success: true } | { success: false; error: string }> {
         const row = await this.prisma.ingestionJob.findUnique({ where: { id: jobId } });
         if (!row) return { success: false, error: "Job not found" };
@@ -123,35 +170,14 @@ export class DbIngestionRepository implements IngestionRepository {
                 throw new Error(existing.error);
             }
 
-            // Build pages
-            const pages = (d.pages ?? []).map((p) => ({
-                id: `${d.seriesId}-${d.episodeId}-p${String(p.pageNumber).padStart(2, "0")}`,
-                pageNumber: p.pageNumber,
-                images: { ja: p.imagePath ?? "" } as Record<string, string | undefined>,
-                width: p.width ?? 500,
-                height: p.height ?? 760,
-                panels: (p.panels ?? []).map((pn) => ({
-                    id: `${d.seriesId}-${d.episodeId}-p${String(p.pageNumber).padStart(2, "0")}-pnl${pn.panelNumber}`,
-                    panelNumber: pn.panelNumber,
-                    bbox: pn.bbox ?? { x: 0, y: 0, width: 100, height: 100 },
-                    reactionTags: pn.reactionTags ?? [],
-                    bubbles: (pn.bubbles ?? []).map((b) => ({
-                        id: `${d.seriesId}-${d.episodeId}-p${String(p.pageNumber).padStart(2, "0")}-pnl${pn.panelNumber}-b${b.bubbleNumber}`,
-                        shortId: `b${b.bubbleNumber}`,
-                        bubbleNumber: b.bubbleNumber,
-                        bubbleType: b.bubbleType ?? "speech",
-                        textOriginal: b.textOriginal ?? "",
-                        speaker: b.speaker,
-                        bbox: { x: 0, y: 0, width: 100, height: 40 },
-                    })),
-                })),
-            }));
+            const pageResult = buildEpisodePagesFromDraft(d);
+            if (!pageResult.success) throw new Error(pageResult.error);
 
             const epResult = this.writer.saveEpisode(d.seriesId, {
                 id: d.episodeId,
                 episodeNumber: d.episodeNumber,
                 title: d.episodeTitle,
-                pages: pages as any,
+                pages: pageResult.pages as any,
             });
 
             if (!epResult.success) throw new Error(epResult.error);

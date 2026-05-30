@@ -589,6 +589,104 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /admin/ingestion/jobs/{jobId}/review-candidates:
+    get:
+      tags: [Ingestion]
+      summary: Read Page / Panel / Bubble candidates for review
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          description: Review candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestionReviewCandidate"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs/{jobId}/review-decisions:
+    put:
+      tags: [Ingestion]
+      summary: Persist one candidate review decision
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestionReviewDecisionInput"
+      responses:
+        "200":
+          description: Updated review candidate list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, items]
+                properties:
+                  ok:
+                    type: boolean
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestionReviewCandidate"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs/{jobId}/write-reviewed-draft:
+    post:
+      tags: [Ingestion]
+      summary: Replace the draft with accepted review candidates only
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          description: Reviewed draft
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, draft]
+                properties:
+                  ok:
+                    type: boolean
+                  draft:
+                    $ref: "#/components/schemas/DraftPayload"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /admin/ingestion/jobs/{jobId}/draft:
     put:
       tags: [Ingestion]
@@ -1635,7 +1733,135 @@ components:
         pages:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/DraftPage"
+        reviewDecisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/IngestionReviewDecision"
+
+    DraftPage:
+      type: object
+      required: [pageNumber, imagePath, width, height, panels]
+      properties:
+        pageNumber:
+          type: integer
+        imagePath:
+          type: string
+        width:
+          type: integer
+        height:
+          type: integer
+        displayRef:
+          type: string
+        panels:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftPanel"
+
+    DraftPanel:
+      type: object
+      required: [panelNumber, bbox, reactionTags, bubbles]
+      properties:
+        panelNumber:
+          type: integer
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
+        reactionTags:
+          type: array
+          items:
+            type: string
+        bubbles:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftBubble"
+
+    DraftBubble:
+      type: object
+      required: [bubbleNumber, bubbleType, textOriginal]
+      properties:
+        bubbleNumber:
+          type: integer
+        bubbleType:
+          type: string
+          enum: [speech, thought, narration, sfx, caption, other]
+        textOriginal:
+          type: string
+        speaker:
+          type: string
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
+        shortId:
+          type: string
+        speakerConfidence:
+          type: string
+          enum: [confirmed, inferred, unknown]
+        textDirection:
+          type: string
+          enum: [horizontal, vertical]
+        lang:
+          type: string
+        flags:
+          $ref: "#/components/schemas/ContentFlags"
+
+    IngestionReviewTarget:
+      type: object
+      required: [kind, pageNumber, panelNumber]
+      properties:
+        kind:
+          type: string
+          enum: [panel, bubble]
+        pageNumber:
+          type: integer
+        panelNumber:
+          type: integer
+        bubbleNumber:
+          type: integer
+
+    IngestionReviewDecision:
+      type: object
+      required: [key, target, decision, updatedAt]
+      properties:
+        key:
+          type: string
+        target:
+          $ref: "#/components/schemas/IngestionReviewTarget"
+        decision:
+          type: string
+          enum: [pending, accepted, rejected]
+        note:
+          type: string
+        reviewerId:
+          type: string
+        updatedAt:
+          type: string
+
+    IngestionReviewDecisionInput:
+      type: object
+      required: [target, decision]
+      properties:
+        target:
+          $ref: "#/components/schemas/IngestionReviewTarget"
+        decision:
+          type: string
+          enum: [pending, accepted, rejected]
+        note:
+          type: string
+
+    IngestionReviewCandidate:
+      type: object
+      required: [key, target, decision]
+      properties:
+        key:
+          type: string
+        target:
+          $ref: "#/components/schemas/IngestionReviewTarget"
+        decision:
+          type: string
+          enum: [pending, accepted, rejected]
+        panel:
+          $ref: "#/components/schemas/DraftPanel"
+        bubble:
+          $ref: "#/components/schemas/DraftBubble"
 
     IngestionJob:
       type: object

@@ -287,6 +287,9 @@ Current gap:
 | `POST` | `/admin/ingestion/jobs` | Create ingestion job |
 | `GET` | `/admin/ingestion/jobs` | List ingestion jobs |
 | `GET` | `/admin/ingestion/jobs/{jobId}` | Read ingestion job detail and draft |
+| `GET` | `/admin/ingestion/jobs/{jobId}/review-candidates` | Read Page / Panel / Bubble candidates for CMS review |
+| `PUT` | `/admin/ingestion/jobs/{jobId}/review-decisions` | Persist one candidate accept/reject decision |
+| `POST` | `/admin/ingestion/jobs/{jobId}/write-reviewed-draft` | Replace the draft with accepted candidates only |
 | `PUT` | `/admin/ingestion/jobs/{jobId}/draft` | Update draft payload |
 | `POST` | `/admin/ingestion/jobs/{jobId}/submit` | Submit draft for review |
 | `POST` | `/admin/ingestion/jobs/{jobId}/confirm` | Confirm draft into `contents/` |
@@ -294,6 +297,13 @@ Current gap:
 
 Ingestion draft state is not the same as canonical content state. A draft enters
 canonical content only after confirmation writes to `contents/`.
+
+Review decisions are stored on the ingestion draft as optional
+`reviewDecisions`. `write-reviewed-draft` requires all candidates to be either
+accepted or rejected, removes rejected candidates, renumbers accepted
+Panel/Bubble structures, and keeps the result in the draft before confirmation.
+If `confirm` is called while review decisions still exist, the API applies the
+same accepted-only filter before writing to `contents/`.
 
 ## Auth, Entitlement, Purchase, And Redeem Endpoints
 

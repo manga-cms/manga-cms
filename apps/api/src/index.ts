@@ -826,6 +826,58 @@ app.get("/admin/ingestion/jobs/:jobId", async (c) => {
     return c.json(job);
 });
 
+// GET /admin/ingestion/jobs/:jobId/review-candidates — List Page/Panel/Bubble candidates
+app.get("/admin/ingestion/jobs/:jobId/review-candidates", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const result = await ingestion.getReviewCandidates(c.req.param("jobId"));
+    if (!result.success) {
+        const status = result.error === "Job not found" ? 404 : 400;
+        return c.json({ error: { code: status === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: result.error } }, status);
+    }
+    return c.json({ items: result.candidates });
+});
+
+// PUT /admin/ingestion/jobs/:jobId/review-decisions — Persist one candidate decision
+app.put("/admin/ingestion/jobs/:jobId/review-decisions", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const user = getUser(c);
+    const body = await c.req.json();
+    const target = body?.target;
+    const decision = body?.decision;
+    if (
+        !target ||
+        (target.kind !== "panel" && target.kind !== "bubble") ||
+        typeof target.pageNumber !== "number" ||
+        typeof target.panelNumber !== "number" ||
+        (target.kind === "bubble" && typeof target.bubbleNumber !== "number") ||
+        !["pending", "accepted", "rejected"].includes(decision)
+    ) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid review decision payload" } }, 400);
+    }
+    const result = await ingestion.setReviewDecision(c.req.param("jobId"), {
+        target,
+        decision,
+        ...(typeof body.note === "string" && { note: body.note }),
+        ...(user?.id && { reviewerId: user.id }),
+    });
+    if (!result.success) {
+        const status = result.error === "Job not found" ? 404 : 400;
+        return c.json({ error: { code: status === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: result.error } }, status);
+    }
+    return c.json({ ok: true, items: result.candidates });
+});
+
+// POST /admin/ingestion/jobs/:jobId/write-reviewed-draft — Keep only accepted candidates in draft
+app.post("/admin/ingestion/jobs/:jobId/write-reviewed-draft", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const result = await ingestion.writeReviewedDraft(c.req.param("jobId"));
+    if (!result.success) {
+        const status = result.error === "Job not found" ? 404 : 400;
+        return c.json({ error: { code: status === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: result.error } }, status);
+    }
+    return c.json({ ok: true, draft: result.draft });
+});
+
 // PUT /admin/ingestion/jobs/:jobId/draft — Update draft payload
 app.put("/admin/ingestion/jobs/:jobId/draft", async (c) => {
     const denied = requireAdmin(c); if (denied) return denied;
