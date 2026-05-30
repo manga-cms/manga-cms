@@ -542,6 +542,9 @@ export default function PageStructureReview() {
                 episodeNumber: episode.episodeNumber,
                 title: episode.title,
                 publishedAt: episode.publishedAt,
+                publishStartAt: episode.publishStartAt,
+                publishEndAt: episode.publishEndAt,
+                visibility: episode.visibility,
                 pages: episode.pages,
             });
             setSaved(true);
