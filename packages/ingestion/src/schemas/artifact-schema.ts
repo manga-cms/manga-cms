@@ -32,6 +32,8 @@ const BubbleClassificationSchema = z.enum([
     "thought",
     "narration",
     "sfx",
+    "caption",
+    "other",
     "unknown",
 ]);
 

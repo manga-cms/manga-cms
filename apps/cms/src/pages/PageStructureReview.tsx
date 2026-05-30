@@ -567,7 +567,7 @@ export default function PageStructureReview() {
                 <div>
                     <h1>Page Structure Review</h1>
                     <p className="card-meta">{seriesId} / {episode.id} — panel and bubble structure stays in canonical content only after save.</p>
-                    <p className="card-meta">Ingestion candidate decisions are local-only until Thread A adds a persisted review endpoint.</p>
+                    <p className="card-meta">Ingestion job candidate decisions are persisted from the Ingestion review screen before canonical draft write.</p>
                 </div>
                 <div className="section-actions">
                     <Link to={`/works/${seriesId}/episodes/${episode.id}`} className="btn btn-outline">Episode</Link>
