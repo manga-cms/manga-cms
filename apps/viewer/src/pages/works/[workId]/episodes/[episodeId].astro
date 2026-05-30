@@ -34,11 +34,16 @@ let next: { id: string; title: string; episodeNumber: number } | null = null;
 let dataSource: "api" | "loader" | "none" = "none";
 let isGated = false;
 let gatedMessage = "";
+let isUnavailable = false;
+let unavailableMessage = "";
+let apiError = "";
 
 // Forward request cookies for SSR auth propagation
 const requestCookies = Astro.request.headers.get("cookie") ?? undefined;
 
-if (isApiConfigured()) {
+const apiConfigured = isApiConfigured();
+
+if (apiConfigured) {
   const result = await fetchEpisode(workId, episodeId, requestCookies);
   if (result.data) {
     seriesTitle = result.data.series.title;
@@ -53,11 +58,13 @@ if (isApiConfigured()) {
       isGated = true;
       gatedMessage = (result.data as any).message ?? "このエピソードを読むには購入が必要です";
     }
+  } else {
+    apiError = result.error ?? "API request failed";
   }
 }
 
 // Fallback to shared content loader (ONLY for free episodes)
-if (!episode) {
+if (!episode && !apiConfigured) {
   const work = getSeries(workId);
   const ep = getEpisode(workId, episodeId);
   if (work && ep) {
@@ -81,6 +88,24 @@ if (!episode) {
   }
 }
 
+if (!episode && apiConfigured) {
+  const fallbackSeriesForUnavailable = getSeries(workId);
+  seriesTitle ||= fallbackSeriesForUnavailable?.title ?? workId;
+  seriesCoverUrl ||= fallbackSeriesForUnavailable?.coverUrl ?? "";
+  seriesShareImageUrl ||= fallbackSeriesForUnavailable?.shareImageUrl ?? "";
+  episode = {
+    title: "現在公開されていません",
+    episodeNumber: 0,
+    publishedAt: "",
+    pages: [],
+  };
+  isUnavailable = true;
+  unavailableMessage = apiError.startsWith("404")
+    ? "このエピソードは現在公開されていないか、存在しません。"
+    : "APIからエピソードを取得できませんでした。時間をおいて再度お試しください。";
+  dataSource = "api";
+}
+
 // Check first page for gated flag (API response)
 if (episode && !isGated && dataSource === "api") {
   // We need to check a page endpoint to see if it's gated
@@ -92,11 +117,31 @@ if (!episode) {
   return new Response(null, { status: 404, statusText: "Not Found" });
 }
 
+const isSafeReaderImageSrc = (src: unknown): src is string => {
+  if (typeof src !== "string" || src.length === 0) return false;
+  if (src === "/placeholder-page.svg") return true;
+  if (src.startsWith("/api/v1/deliver/") || src.startsWith("/deliver/")) return true;
+  try {
+    const url = new URL(src);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    if (url.pathname.includes("/contents/")) return false;
+    if (/\/pages\/[^/]+\.(jpe?g|png|webp|gif)$/i.test(url.pathname)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const resolveReaderImageSrc = (page: any) => {
+  const preferred = page.images?.ja;
+  return isSafeReaderImageSrc(preferred) ? preferred : "/placeholder-page.svg";
+};
+
 const viewerPages = episode.pages.map((page: any) => ({
   id: page.id,
   pageNumber: page.pageNumber,
   displayRef: page.displayRef,
-  src: page.images?.ja ?? "/placeholder-page.svg",
+  src: resolveReaderImageSrc(page),
   width: page.width,
   height: page.height,
   panels: (page.panels ?? []).map((panel: any) => ({
@@ -149,18 +194,28 @@ const episodeOgImage = hasPublicShareImageUrl
           ← {seriesTitle}
         </a>
 
-        <div class="episode-header">
-          <span class="ep-number badge">Episode {episode.episodeNumber}</span>
-          <h1>{episode.title}</h1>
-          <p class="text-muted">{episode.publishedAt}</p>
-          {import.meta.env.DEV && dataSource === "loader" && !isGated && (
-            <p class="data-source-hint text-muted">⚠ API未接続 — ローカルデータ表示中（開発モード）</p>
-          )}
-        </div>
+        {!isUnavailable && (
+          <div class="episode-header">
+            <span class="ep-number badge">Episode {episode.episodeNumber}</span>
+            <h1>{episode.title}</h1>
+            <p class="text-muted">{episode.publishedAt}</p>
+            {import.meta.env.DEV && dataSource === "loader" && !isGated && (
+              <p class="data-source-hint text-muted">⚠ API未接続 — ローカルデータ表示中（開発モード）</p>
+            )}
+          </div>
+        )}
       </>
     )}
 
-    {isGated ? (
+    {isUnavailable ? (
+      <div class="placeholder-reader card">
+        <h1>このエピソードは現在公開されていません</h1>
+        <p class="text-muted">{unavailableMessage}</p>
+        <div class="gated-actions">
+          <a href={`/works/${workId}`} class="btn-viewer btn-primary-viewer">作品ページに戻る</a>
+        </div>
+      </div>
+    ) : isGated ? (
       <div class="gated-overlay card">
         <div class="gated-icon">🔒</div>
         <h2>このエピソードはロックされています</h2>
