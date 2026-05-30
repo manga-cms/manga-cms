@@ -2,6 +2,7 @@ export * from "./artifacts/index.js";
 export * from "./drafts/index.js";
 export * from "./metrics/index.js";
 export * from "./pipeline/index.js";
+export * from "./prepared-directory.js";
 export * from "./providers/index.js";
 export * from "./schemas/index.js";
 export * from "./types/index.js";

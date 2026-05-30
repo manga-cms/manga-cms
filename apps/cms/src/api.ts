@@ -259,6 +259,7 @@ export interface DraftPayload {
 export interface DraftPage {
     pageNumber: number;
     imagePath: string;
+    sourceImagePath?: string;
     width: number;
     height: number;
     displayRef?: string;
@@ -356,6 +357,32 @@ export async function createJob(label: string, draft?: DraftPayload) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message ?? "Failed to create job");
+    return data as IngestionJob;
+}
+
+export interface PreparedDirectoryImportInput {
+    label?: string;
+    sourceDir: string;
+    seriesId: string;
+    seriesTitle: string;
+    seriesDescription?: string;
+    seriesStatus?: string;
+    episodeId: string;
+    episodeNumber: number;
+    episodeTitle: string;
+    defaultWidth?: number;
+    defaultHeight?: number;
+}
+
+export async function importPreparedDirectory(input: PreparedDirectoryImportInput) {
+    const res = await fetch(`${API}/admin/ingestion/import/prepared-directory`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Prepared directory import failed");
     return data as IngestionJob;
 }
 

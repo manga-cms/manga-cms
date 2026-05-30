@@ -11,11 +11,12 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { extname, isAbsolute, join, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { getEmailProvider, isEmailConfigured } from "./email.js";
 import { RateLimiter } from "./rate-limit.js";
 import { FeedbackPayloadSchema } from "@manga/schemas";
+import { buildPreparedDirectoryDraft } from "@manga/ingestion";
 import {
     FileContentRepository,
     createFileWriter,
@@ -33,6 +34,7 @@ import {
     type DevUser,
     type EntitlementRepository,
     type FeedbackPayload,
+    type DraftPayload,
     type IngestionRepository,
 } from "@manga/domain";
 
@@ -89,6 +91,10 @@ const __dirname = import.meta.dirname ?? dirname(fileURLToPath(import.meta.url))
 
 const CONTENTS_DIR =
     process.env.CONTENTS_DIR ?? join(__dirname, "../../../contents");
+const IMPORTS_DIR =
+    process.env.IMPORTS_DIR ?? join(__dirname, "../../../imports");
+const DRAFT_ASSETS_DIR =
+    process.env.DRAFT_ASSETS_DIR ?? join(__dirname, "../../../draft-assets");
 
 const readRepo = new FileContentRepository(CONTENTS_DIR);
 const writer = createFileWriter(CONTENTS_DIR, () => {
@@ -247,7 +253,33 @@ const IMAGE_MIME_TO_EXT: Record<string, string> = {
     "image/gif": "gif",
 };
 
+const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 const MAX_IMAGE_UPLOAD_BYTES = Number(process.env.MAX_IMAGE_UPLOAD_BYTES ?? 10 * 1024 * 1024);
+
+function isSafeRelativePath(value: string): boolean {
+    if (!value || value.includes("\0") || value.includes("\\") || isAbsolute(value)) return false;
+    return value.split("/").every((part) => part.length > 0 && part !== "." && part !== "..");
+}
+
+function copyDraftAssetsToContents(draft: DraftPayload): void {
+    for (const page of draft.pages ?? []) {
+        if (!page.sourceImagePath) continue;
+        if (!isSafeRelativePath(page.sourceImagePath) || !isSafeRelativePath(page.imagePath)) {
+            throw new Error(`Unsafe draft asset path for page ${page.pageNumber}`);
+        }
+        const source = resolve(DRAFT_ASSETS_DIR, page.sourceImagePath);
+        if (!isPathInside(DRAFT_ASSETS_DIR, source) || !existsSync(source)) {
+            throw new Error(`Draft asset not found for page ${page.pageNumber}`);
+        }
+        const episodeDir = resolve(CONTENTS_DIR, draft.seriesId, draft.episodeId);
+        const destination = resolve(episodeDir, page.imagePath);
+        if (!isPathInside(episodeDir, destination)) {
+            throw new Error(`Unsafe canonical image path for page ${page.pageNumber}`);
+        }
+        mkdirSync(dirname(destination), { recursive: true });
+        copyFileSync(source, destination);
+    }
+}
 
 async function readImageUpload(c: any): Promise<
     | { success: true; bytes: Buffer; mime: string; ext: string; originalName?: string; sha256: string }
@@ -981,17 +1013,17 @@ if (process.env.DATABASE_URL) {
     try {
         const { getPrisma, DbIngestionRepository, ApiKeyRepository, PurchaseRepository, MagicLinkRepository } = await import("@manga/db");
         const prisma = getPrisma();
-        ingestion = new DbIngestionRepository(prisma, writer);
+        ingestion = new DbIngestionRepository(prisma, writer, copyDraftAssetsToContents);
         apiKeyRepo = new ApiKeyRepository(prisma);
         purchaseRepo = new PurchaseRepository(prisma);
         magicLinkRepo = new MagicLinkRepository(prisma);
         console.log("✅ DB-backed ingestion, API keys, purchases, magic link");
     } catch (e) {
         console.warn("⚠ DB ingestion import failed, falling back to file-backed:", (e as Error).message);
-        ingestion = createFileIngestionRepository(DRAFTS_DIR, writer);
+        ingestion = createFileIngestionRepository(DRAFTS_DIR, writer, copyDraftAssetsToContents);
     }
 } else {
-    ingestion = createFileIngestionRepository(DRAFTS_DIR, writer);
+    ingestion = createFileIngestionRepository(DRAFTS_DIR, writer, copyDraftAssetsToContents);
     console.log("📁 File-backed ingestion (no DATABASE_URL)");
 }
 
@@ -1005,6 +1037,109 @@ app.use("*", async (c, next) => {
         }
     }
     await next();
+});
+
+function listPreparedImageFiles(sourceDir: string): string[] {
+    return readdirSync(sourceDir, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && IMAGE_EXTENSIONS.has(extname(entry.name).toLowerCase()))
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function preparedImportError(c: any, message: string, status = 400): Response {
+    return c.json({ error: { code: status === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message } }, status);
+}
+
+// POST /admin/ingestion/import/prepared-directory — Create draft job from local prepared assets.
+app.post("/admin/ingestion/import/prepared-directory", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const body = await c.req.json();
+    const sourceDirInput = String(body.sourceDir ?? "");
+    if (!isSafeRelativePath(sourceDirInput)) {
+        return preparedImportError(c, "sourceDir must be a safe path relative to IMPORTS_DIR");
+    }
+
+    const sourceDir = resolve(IMPORTS_DIR, sourceDirInput);
+    if (!isPathInside(IMPORTS_DIR, sourceDir) || !existsSync(sourceDir)) {
+        return preparedImportError(c, "Prepared source directory not found", 404);
+    }
+
+    const seriesId = String(body.seriesId ?? "");
+    const seriesTitle = String(body.seriesTitle ?? "");
+    const episodeId = String(body.episodeId ?? "");
+    const episodeTitle = String(body.episodeTitle ?? "");
+    const episodeNumber = Number(body.episodeNumber ?? 1);
+    if (!seriesId || !seriesTitle || !episodeId || !episodeTitle || !Number.isInteger(episodeNumber) || episodeNumber < 1) {
+        return preparedImportError(c, "seriesId, seriesTitle, episodeId, episodeNumber, and episodeTitle are required");
+    }
+
+    try {
+        const job = await ingestion.createJob(body.label ?? `${seriesTitle} - ${episodeTitle}`);
+        const sourceFiles = Array.isArray(body.pages) && body.pages.length > 0
+            ? body.pages.map((page: any) => String(page.sourcePath ?? page.fileName ?? ""))
+            : listPreparedImageFiles(sourceDir);
+
+        if (sourceFiles.length === 0) {
+            return preparedImportError(c, "No supported image files found in prepared source directory");
+        }
+
+        const draftPages = sourceFiles.map((fileName: string, index: number) => {
+            if (!fileName || !isSafeRelativePath(fileName)) {
+                throw new Error(`Unsafe page source path at index ${index}`);
+            }
+            const ext = extname(fileName).toLowerCase();
+            if (!IMAGE_EXTENSIONS.has(ext)) {
+                throw new Error(`Unsupported image extension: ${fileName}`);
+            }
+            const source = resolve(sourceDir, fileName);
+            if (!isPathInside(sourceDir, source) || !existsSync(source)) {
+                throw new Error(`Prepared image not found: ${fileName}`);
+            }
+            const bodyPage = Array.isArray(body.pages) ? body.pages[index] ?? {} : {};
+            const pageNumber = Number(bodyPage.pageNumber ?? index + 1);
+            if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+                throw new Error(`Invalid pageNumber for ${fileName}`);
+            }
+            const normalizedExt = ext === ".jpeg" ? ".jpg" : ext;
+            const canonicalFileName = `p${String(pageNumber).padStart(3, "0")}${normalizedExt}`;
+            const sourceImagePath = `${job.id}/pages/${canonicalFileName}`;
+            const draftAssetPath = resolve(DRAFT_ASSETS_DIR, sourceImagePath);
+            if (!isPathInside(DRAFT_ASSETS_DIR, draftAssetPath)) {
+                throw new Error(`Unsafe draft asset path for ${fileName}`);
+            }
+            mkdirSync(dirname(draftAssetPath), { recursive: true });
+            copyFileSync(source, draftAssetPath);
+            return {
+                pageNumber,
+                imagePath: `pages/${canonicalFileName}`,
+                sourceImagePath,
+                width: Number(bodyPage.width ?? body.defaultWidth ?? 500),
+                height: Number(bodyPage.height ?? body.defaultHeight ?? 760),
+                displayRef: typeof bodyPage.displayRef === "string" && bodyPage.displayRef ? bodyPage.displayRef : undefined,
+            };
+        });
+
+        const draft = buildPreparedDirectoryDraft({
+            seriesId,
+            seriesTitle,
+            seriesDescription: typeof body.seriesDescription === "string" ? body.seriesDescription : undefined,
+            seriesStatus: body.seriesStatus,
+            episodeId,
+            episodeNumber,
+            episodeTitle,
+            pages: draftPages,
+            defaultWidth: Number(body.defaultWidth ?? 500),
+            defaultHeight: Number(body.defaultHeight ?? 760),
+        });
+        const update = await ingestion.updateDraft(job.id, draft);
+        if (!update.success) {
+            return preparedImportError(c, update.error);
+        }
+        const created = await ingestion.getJob(job.id);
+        return c.json(created ?? job, 201);
+    } catch (error) {
+        return preparedImportError(c, error instanceof Error ? error.message : String(error));
+    }
 });
 
 // POST /admin/ingestion/jobs — Create a new ingestion job

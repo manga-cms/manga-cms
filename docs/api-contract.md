@@ -355,9 +355,16 @@ Current image handling is path-based:
 | `POST` | `/admin/ingestion/jobs/{jobId}/submit` | Submit draft for review |
 | `POST` | `/admin/ingestion/jobs/{jobId}/confirm` | Confirm draft into `contents/` |
 | `POST` | `/admin/ingestion/jobs/{jobId}/cancel` | Cancel ingestion job |
+| `POST` | `/admin/ingestion/import/prepared-directory` | Copy prepared local Page images into draft asset storage and create an ingestion draft job |
 
 Ingestion draft state is not the same as canonical content state. A draft enters
 canonical content only after confirmation writes to `contents/`.
+
+Prepared directory imports read from the API server `IMPORTS_DIR`, copy images
+to draft asset storage, and store canonical target paths such as
+`pages/p001.png` in the draft. The draft may also carry `sourceImagePath`,
+which is copied into `contents/{seriesId}/{episodeId}/` only when the job is
+confirmed.
 
 Review decisions are stored on the ingestion draft as optional
 `reviewDecisions`. `write-reviewed-draft` requires all candidates to be either

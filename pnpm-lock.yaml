@@ -23,6 +23,9 @@ importers:
       '@manga/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@manga/ingestion':
+        specifier: workspace:*
+        version: link:../../packages/ingestion
       '@manga/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas

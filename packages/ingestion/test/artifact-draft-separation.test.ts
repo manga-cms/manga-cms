@@ -5,6 +5,7 @@ import {
     AlignmentArtifactSchema,
     BubbleDraftSchema,
     buildCanonicalDraft,
+    buildPreparedDirectoryDraft,
     CanonicalDraftPayloadSchema,
     GeminiProvider,
     OCRArtifactSchema,
@@ -50,6 +51,31 @@ test("artifact schemas require metadata, confidence, and provider info", async (
         assert.equal(typeof parsed.confidence, "number");
         assert.ok(parsed.metadata.model.length > 0);
     }
+});
+
+test("prepared directory draft keeps source assets outside canonical image path", () => {
+    const draft = buildPreparedDirectoryDraft({
+        seriesId: "rain-world",
+        seriesTitle: "Rain World",
+        episodeId: "ep01",
+        episodeNumber: 1,
+        episodeTitle: "Rain Ruins",
+        pages: [
+            {
+                imagePath: "pages/p001.png",
+                sourceImagePath: "job-123/pages/p001.png",
+                width: 768,
+                height: 1024,
+                displayRef: "P1",
+            },
+        ],
+    });
+
+    assert.equal(draft.pages[0]?.imagePath, "pages/p001.png");
+    assert.equal(draft.pages[0]?.sourceImagePath, "job-123/pages/p001.png");
+    assert.equal(draft.pages[0]?.displayRef, "P1");
+    assert.deepEqual(draft.pages[0]?.panels, []);
+    assert.doesNotThrow(() => CanonicalDraftPayloadSchema.parse(draft));
 });
 
 test("canonical drafts exclude artifact metadata and confidence while matching DraftPayload", async () => {

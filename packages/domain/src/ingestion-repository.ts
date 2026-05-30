@@ -25,6 +25,8 @@ import type {
 } from "./ingestion-types.js";
 import type { ContentWriteRepository } from "./content-writer.js";
 
+export type IngestionAssetPublisher = (draft: DraftPayload) => void;
+
 export function ingestionReviewKey(target: IngestionReviewTarget): string {
     const base = `p${target.pageNumber}:panel${target.panelNumber}`;
     return target.kind === "panel" ? `panel:${base}` : `bubble:${base}:bubble${target.bubbleNumber}`;
@@ -200,6 +202,7 @@ export class FileIngestionRepository implements IngestionRepository {
     constructor(
         private draftsDir: string,
         private writer: ContentWriteRepository,
+        private publishDraftAssets?: IngestionAssetPublisher,
     ) {
         mkdirSync(this.draftsDir, { recursive: true });
     }
@@ -366,6 +369,7 @@ export class FileIngestionRepository implements IngestionRepository {
             // accepted candidates are allowed into canonical content.
             const pageResult = buildEpisodePagesFromDraft(d);
             if (!pageResult.success) throw new Error(pageResult.error);
+            this.publishDraftAssets?.(d);
 
             const epResult = this.writer.saveEpisode(d.seriesId, {
                 id: d.episodeId,
@@ -410,6 +414,7 @@ export class FileIngestionRepository implements IngestionRepository {
 export function createFileIngestionRepository(
     draftsDir: string,
     writer: ContentWriteRepository,
+    publishDraftAssets?: IngestionAssetPublisher,
 ): IngestionRepository {
-    return new FileIngestionRepository(draftsDir, writer);
+    return new FileIngestionRepository(draftsDir, writer, publishDraftAssets);
 }

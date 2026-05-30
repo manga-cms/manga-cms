@@ -680,6 +680,39 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /admin/ingestion/import/prepared-directory:
+    post:
+      tags: [Ingestion]
+      summary: Import prepared local episode assets into an ingestion draft job
+      description: >
+        Reads image files from a path under the API server IMPORTS_DIR, copies
+        them into draft asset storage, and creates an ingestion draft job.
+        This does not write canonical contents/ data until the job is reviewed
+        and confirmed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreparedDirectoryImportInput"
+      responses:
+        "201":
+          description: Created ingestion job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionJob"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /admin/ingestion/jobs/{jobId}:
     get:
       tags: [Ingestion]
@@ -1956,6 +1989,54 @@ components:
           items:
             $ref: "#/components/schemas/IngestionReviewDecision"
 
+    PreparedDirectoryImportInput:
+      type: object
+      required: [sourceDir, seriesId, seriesTitle, episodeId, episodeNumber, episodeTitle]
+      properties:
+        label:
+          type: string
+        sourceDir:
+          type: string
+          description: Safe path relative to API server IMPORTS_DIR.
+        seriesId:
+          type: string
+        seriesTitle:
+          type: string
+        seriesDescription:
+          type: string
+        seriesStatus:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        episodeId:
+          type: string
+        episodeNumber:
+          type: integer
+        episodeTitle:
+          type: string
+        defaultWidth:
+          type: integer
+          default: 500
+        defaultHeight:
+          type: integer
+          default: 760
+        pages:
+          type: array
+          description: Optional explicit page mapping. If omitted, supported image files in sourceDir are sorted by filename.
+          items:
+            type: object
+            required: [sourcePath]
+            properties:
+              sourcePath:
+                type: string
+              pageNumber:
+                type: integer
+              displayRef:
+                type: string
+              width:
+                type: integer
+              height:
+                type: integer
+
     DraftPage:
       type: object
       required: [pageNumber, imagePath, width, height, panels]
@@ -1964,6 +2045,9 @@ components:
           type: integer
         imagePath:
           type: string
+        sourceImagePath:
+          type: string
+          description: Draft asset source copied into canonical contents only when the ingestion job is confirmed.
         width:
           type: integer
         height:

@@ -18,12 +18,14 @@ import {
     buildEpisodePagesFromDraft,
     getDraftReviewCandidates,
     type ContentWriteRepository,
+    type IngestionAssetPublisher,
 } from "@manga/domain";
 
 export class DbIngestionRepository implements IngestionRepository {
     constructor(
         private prisma: PrismaClient,
         private writer: ContentWriteRepository,
+        private publishDraftAssets?: IngestionAssetPublisher,
     ) { }
 
     private toJob(row: any): IngestionJob {
@@ -172,6 +174,7 @@ export class DbIngestionRepository implements IngestionRepository {
 
             const pageResult = buildEpisodePagesFromDraft(d);
             if (!pageResult.success) throw new Error(pageResult.error);
+            this.publishDraftAssets?.(d);
 
             const epResult = this.writer.saveEpisode(d.seriesId, {
                 id: d.episodeId,

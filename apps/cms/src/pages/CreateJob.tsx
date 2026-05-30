@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createJob, type DraftPayload } from "../api";
+import { createJob, importPreparedDirectory, type DraftPayload } from "../api";
 
 function slugify(text: string): string {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -15,6 +15,10 @@ export default function CreateJob() {
     const [epId, setEpId] = useState("ep01");
     const [epNum, setEpNum] = useState(1);
     const [epTitle, setEpTitle] = useState("");
+    const [sourceDir, setSourceDir] = useState("");
+    const [defaultWidth, setDefaultWidth] = useState(500);
+    const [defaultHeight, setDefaultHeight] = useState(760);
+    const [mode, setMode] = useState<"manual" | "prepared">("prepared");
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
 
@@ -24,6 +28,10 @@ export default function CreateJob() {
         e.preventDefault();
         if (!seriesTitle.trim() || !epTitle.trim()) {
             setError("タイトルを入力してください");
+            return;
+        }
+        if (mode === "prepared" && !sourceDir.trim()) {
+            setError("Source Directory を入力してください");
             return;
         }
 
@@ -43,7 +51,21 @@ export default function CreateJob() {
         setSaving(true);
         setError("");
         try {
-            const job = await createJob(label || `${seriesTitle} - ${epTitle}`, draft);
+            const job = mode === "prepared"
+                ? await importPreparedDirectory({
+                    label: label || `${seriesTitle} - ${epTitle}`,
+                    sourceDir,
+                    seriesId: autoSeriesId,
+                    seriesTitle,
+                    seriesDescription: seriesDesc,
+                    seriesStatus: "ongoing",
+                    episodeId: epId,
+                    episodeNumber: epNum,
+                    episodeTitle: epTitle,
+                    defaultWidth,
+                    defaultHeight,
+                })
+                : await createJob(label || `${seriesTitle} - ${epTitle}`, draft);
             nav(`/ingestion/${job.id}`);
         } catch (err) {
             setError((err as Error).message);
@@ -58,6 +80,13 @@ export default function CreateJob() {
             <form onSubmit={handleSubmit} style={{ maxWidth: "36rem" }}>
                 <div className="card">
                     <h2>ジョブ情報</h2>
+                    <div className="form-group">
+                        <label>Import Mode</label>
+                        <select value={mode} onChange={(e) => setMode(e.target.value as "manual" | "prepared")}>
+                            <option value="prepared">Prepared directory</option>
+                            <option value="manual">Manual draft stub</option>
+                        </select>
+                    </div>
                     <div className="form-group">
                         <label>ラベル</label>
                         <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="自動生成されます" />
@@ -95,6 +124,29 @@ export default function CreateJob() {
                         <input value={epTitle} onChange={(e) => setEpTitle(e.target.value)} placeholder="第1話 雨の始まり" />
                     </div>
                 </div>
+
+                {mode === "prepared" && (
+                    <div className="card">
+                        <h2>Prepared Assets</h2>
+                        <div className="form-group">
+                            <label>Source Directory</label>
+                            <input value={sourceDir} onChange={(e) => setSourceDir(e.target.value)} placeholder="rain-world/ep01/pages" />
+                            <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                                API server reads this path relative to IMPORTS_DIR. Supported files: jpg, png, webp, gif.
+                            </div>
+                        </div>
+                        <div className="page-editor-grid">
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label>Default Width</label>
+                                <input type="number" min={1} value={defaultWidth} onChange={(e) => setDefaultWidth(Number(e.target.value))} />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label>Default Height</label>
+                                <input type="number" min={1} value={defaultHeight} onChange={(e) => setDefaultHeight(Number(e.target.value))} />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {error && <div className="error-msg">{error}</div>}
 

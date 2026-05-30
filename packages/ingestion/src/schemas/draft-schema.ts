@@ -18,8 +18,10 @@ export const PanelDraftSchema = z.object({
 export const PageDraftSchema = z.object({
     pageNumber: z.number().int().positive(),
     imagePath: z.string().min(1),
+    sourceImagePath: z.string().min(1).optional(),
     width: z.number().nonnegative(),
     height: z.number().nonnegative(),
+    displayRef: z.string().min(1).optional(),
     panels: z.array(PanelDraftSchema),
 }).strict();
 
