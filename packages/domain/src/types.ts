@@ -201,6 +201,13 @@ export interface PackManifest extends PackSummary {
     entries: PackEntry[];
 }
 
+export type PublishedPackEntry = Omit<PackEntry, "sourceProposalId" | "metadata">;
+
+export interface PublishedPack extends Omit<PackManifest, "sourcePackDraftId" | "entries" | "isPublished"> {
+    isPublished: true;
+    entries: PublishedPackEntry[];
+}
+
 // ---------------------------------------------------------------------------
 // Locale
 // ---------------------------------------------------------------------------

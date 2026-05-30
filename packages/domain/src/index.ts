@@ -10,5 +10,6 @@ export * from "./proposal-types.js";
 export * from "./proposal-repository.js";
 export * from "./pack-draft-types.js";
 export * from "./pack-draft-repository.js";
+export * from "./pack-loader.js";
 export * from "./pack-writer.js";
 export * from "./delivery.js";

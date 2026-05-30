@@ -106,6 +106,11 @@ Proposal
 - Pack export writes a source-controlled canonical manifest under `packs/`.
   This is the first step that can make approved Pack content available to
   Reader workflows, subject to Reader support and deployment.
+- Reader availability is now driven by published canonical Pack manifests:
+  `isPublished: true` Packs can appear in `availablePacks` on Episode/Page
+  payloads after the content itself passes publication and entitlement checks.
+  Runtime Pack drafts, unpublished manifests, proposal IDs, draft IDs, and
+  private metadata are not part of the public Reader payload.
 - Proposal-to-Pack compatibility is intentionally narrow: translation/typo to
   Translation Packs, footnotes to Footnote Packs, commentary/tag to Commentary
   or Learning Packs, and structure proposals to Accessibility Packs.

@@ -283,6 +283,13 @@ Public Reader visibility:
   404 for draft/hidden, scheduled, expired, or archived Series/Episodes.
 - `/quotes`, `/clips`, `/reactions`, and `/deliver/{pageId}` also exclude
   draft/hidden, scheduled, expired, and archived content.
+- Episode and Page reader payloads may include `availablePacks`. This array is
+  built only from canonical `packs/{packId}/pack.json` manifests with
+  `isPublished: true`; runtime Pack drafts and unpublished manifests are not
+  exposed to Public Reader clients.
+- `availablePacks` entries are scoped to the returned Page. Public payloads
+  include Pack identity, display metadata, target, text/note fields, and omit
+  runtime draft/proposal identifiers and private entry metadata.
 
 Current CMS/Reader endpoint coverage:
 
@@ -296,10 +303,11 @@ Current CMS/Reader endpoint coverage:
 - Reader SSR uses `/series/{seriesId}/episodes/{episodeId}`, `/quotes/...`,
   `/clips/...`, `/reactions`, `/feedback`, and tokenized `/deliver/{pageId}`.
   These are implemented by `apps/api`.
-- `/packs/{packId}`, public Pack listing, and public proposal listing are not
-  implemented in `apps/api` and are not part of the current core contract.
-  Reintroduce them in `openapi.yaml` only when the implementation exists or a
-  task explicitly schedules that surface.
+- Public Reader Pack availability is embedded in Episode/Page reader payloads.
+  Standalone `/packs/{packId}`, public Pack listing, and public proposal
+  listing are not implemented in `apps/api` and are not part of the current
+  core contract. Reintroduce them in `openapi.yaml` only when the implementation
+  exists or a task explicitly schedules that surface.
 
 ## CMS Admin Endpoints
 
@@ -387,6 +395,12 @@ If export sets `is_published: true`, the generated manifest has
 `isPublished: true` and defaults to `packClass: official` unless a pack class is
 provided. The API also moves the runtime Pack draft to `published` review state.
 This still does not mutate canonical Episode JSON.
+
+Public Reader availability reads canonical Pack manifests from `PACKS_DIR` or
+`packs/` by default. Only `isPublished: true` manifests are eligible, and
+`packClass: deprecated` manifests are excluded. The API filters entries to the
+requested Series/Episode/Page/Panel/Bubble before adding them to
+`availablePacks`.
 
 Pack types:
 

@@ -32,6 +32,7 @@ import {
     createFileEntitlementRepository,
     createFileFeedbackRepository,
     createFilePackDraftRepository,
+    createFilePackRepository,
     createFilePackWriter,
     createFileProposalRepository,
     isPublicNow,
@@ -55,6 +56,7 @@ import {
     type ProposalStatus,
     type DraftPayload,
     type IngestionRepository,
+    type PublishedPack,
 } from "@manga/domain";
 
 // ---------------------------------------------------------------------------
@@ -128,6 +130,7 @@ const proposalRepo = createFileProposalRepository(PROPOSALS_DIR);
 const PACK_DRAFTS_DIR = process.env.PACK_DRAFTS_DIR ?? join(__dirname, "../../../pack-drafts");
 const packDraftRepo = createFilePackDraftRepository(PACK_DRAFTS_DIR);
 const PACKS_DIR = process.env.PACKS_DIR ?? join(__dirname, "../../../packs");
+const packRepo = createFilePackRepository(PACKS_DIR);
 const packWriter = createFilePackWriter(PACKS_DIR);
 
 const accessPolicy = new DefaultAccessPolicy();
@@ -176,6 +179,39 @@ function publicSeriesMeta(series: any) {
         ...(series.publishEndAt ? { publishEndAt: series.publishEndAt } : {}),
         ...(series.visibility ? { visibility: series.visibility } : {}),
     };
+}
+
+function publishedPacksForPage(seriesId: string, episodeId: string, page: any): PublishedPack[] {
+    const panelIds = (page.panels ?? []).map((panel: any) => panel.id);
+    const bubbleIds = (page.panels ?? []).flatMap((panel: any) =>
+        (panel.bubbles ?? []).map((bubble: any) => bubble.id),
+    );
+    return packRepo.listPacksForPage({
+        seriesId,
+        episodeId,
+        pageId: page.id,
+        panelIds,
+        bubbleIds,
+    }).map((pack) => ({
+        id: pack.id,
+        type: pack.type,
+        ...(pack.packClass ? { packClass: pack.packClass } : {}),
+        ...(pack.language ? { language: pack.language } : {}),
+        version: pack.version,
+        ...(pack.title ? { title: pack.title } : {}),
+        ...(pack.authorLabel ? { authorLabel: pack.authorLabel } : {}),
+        isPublished: true,
+        ...(pack.targetSeriesId ? { targetSeriesId: pack.targetSeriesId } : {}),
+        ...(pack.targetEpisodeId ? { targetEpisodeId: pack.targetEpisodeId } : {}),
+        entries: pack.entries.map((entry) => ({
+            id: entry.id,
+            target: entry.target,
+            ...(entry.language ? { language: entry.language } : {}),
+            ...(entry.originalText ? { originalText: entry.originalText } : {}),
+            ...(entry.text ? { text: entry.text } : {}),
+            ...(entry.note ? { note: entry.note } : {}),
+        })),
+    }));
 }
 
 function publicEpisodeSummary(ep: any) {
@@ -801,6 +837,7 @@ app.post("/admin/pack-drafts/:packDraftId/export", async (c) => {
     if (!result.success) {
         return c.json({ error: { code: "VALIDATION_ERROR", message: result.error } }, 400);
     }
+    packRepo.reload();
 
     if (result.pack.isPublished && draft.status !== "published") {
         packDraftRepo.updateStatus(draft.pack_draft_id, {
@@ -890,7 +927,7 @@ app.get("/series/:seriesId/episodes/:episodeId/pages/:pageNumber", async (c) => 
                 speaker: b.speaker ?? null,
             })),
         })),
-        availablePacks: [],
+        availablePacks: publishedPacksForPage(seriesId, episodeId, page),
     });
 });
 
@@ -950,7 +987,11 @@ app.get("/series/:seriesId/episodes/:episodeId", async (c) => {
                     deliveryImages[locale] = makeDeliveryUrl(c, page.id, token, locale);
                 }
             }
-            return { ...page, images: deliveryImages };
+            return {
+                ...page,
+                images: deliveryImages,
+                availablePacks: publishedPacksForPage(seriesId, episodeId, page),
+            };
         }),
     };
 
