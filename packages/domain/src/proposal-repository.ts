@@ -8,6 +8,7 @@ export interface ProposalRepository {
     create(input: ProposalCreateInput): ProposalRecord;
     list(filters?: { status?: ProposalStatus; kind?: ProposalKind; seriesId?: string }): ProposalRecord[];
     get(proposalId: string): ProposalRecord | undefined;
+    getBySourceFeedbackId(feedbackId: string): ProposalRecord | undefined;
     updateStatus(
         proposalId: string,
         input: { status: ProposalStatus; reviewNote?: string; reviewedBy?: string },
@@ -64,6 +65,10 @@ export class FileProposalRepository implements ProposalRepository {
 
     get(proposalId: string): ProposalRecord | undefined {
         return this.readAll().find((record) => record.proposal_id === proposalId);
+    }
+
+    getBySourceFeedbackId(feedbackId: string): ProposalRecord | undefined {
+        return this.readAll().find((record) => record.source_feedback_id === feedbackId);
     }
 
     updateStatus(

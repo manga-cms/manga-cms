@@ -626,6 +626,19 @@ app.post("/admin/feedback/:feedbackId/proposal", async (c) => {
     const feedbackId = c.req.param("feedbackId");
     const feedback = feedbackRepo.get(feedbackId);
     if (!feedback) return c.json({ error: { code: "NOT_FOUND", message: "Feedback not found" } }, 404);
+    const existingProposal = proposalRepo.getBySourceFeedbackId(feedbackId);
+    if (existingProposal) {
+        return c.json({
+            error: {
+                code: "VALIDATION_ERROR",
+                message: `Feedback already converted to proposal ${existingProposal.proposal_id}`,
+            },
+            proposal_id: existingProposal.proposal_id,
+        }, 400);
+    }
+    if (feedback.status !== "new") {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Only new feedback can be converted to a proposal" } }, 400);
+    }
 
     const user = getUser(c);
     const proposal = proposalRepo.create({

@@ -336,7 +336,9 @@ send credentials so the `manga_auth` cookie is included.
 
 Feedback triage does not mutate canonical content or Packs. Status is limited
 to `new`, `triaged`, or `closed`. Feedback can be converted into a private
-Proposal Queue record through `/admin/feedback/{feedbackId}/proposal`.
+Proposal Queue record through `/admin/feedback/{feedbackId}/proposal`. Only
+`new` feedback can be converted, and the API rejects repeated conversion for
+the same feedback record.
 
 Proposal Queue records are runtime review state, not canonical content and not
 published Packs. They are file-backed by default under `PROPOSALS_DIR` or
