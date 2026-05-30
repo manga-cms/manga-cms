@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-05-29
+Last updated: 2026-05-30
 
 This document tracks the path from the current repository state to a public launch.
 
@@ -8,8 +8,28 @@ This document tracks the path from the current repository state to a public laun
 
 | Target | Progress | Meaning |
 |--------|---------:|---------|
-| Public beta launch | 100% | Free/public reading experience with viewer, contents, API, CMS, publish/import, protected reading paths, and PoC validation tooling — all exit criteria met |
+| Public technical beta foundation | 100% | Free/public reading infrastructure with viewer, contents, API, CMS, publish/import, protected reading paths, and PoC validation tooling — foundation exit criteria met |
+| First public content launch | 72% | The platform can publish, but a release-quality first Series still needs cleared assets, stronger mobile reader QA, CMS editing polish, and launch smoke rehearsal |
 | Commercial launch | 76% | Beta + CMS, ingestion, entitlement, gated delivery, production auth, and operational readiness |
+
+## Public Launch Readiness
+
+These percentages track the remaining path to putting a real public manga site in front of readers, not just whether the repository has the technical primitives.
+
+| Area | Readiness | Notes |
+|------|----------:|-------|
+| Contract and source-of-truth | 94% | Series/Episode/Page/Panel/Bubble contracts, OpenAPI, domain types, schemas, content and Pack storage are in place |
+| Public Reader functionality | 84% | API-backed reader, gating, publication windows, focus targets, feedback, and Pack display exist; mobile polish and share surfaces remain |
+| Reader mobile immersion | 58% | RTL keys/taps/swipe exist, but preload, double-tap zoom, touch feel, and blank-page prevention need dedicated QA and polish |
+| CMS publish workflow | 80% | Create/edit/publish, scheduling, bulk episode visibility, image upload, ingestion, and page structure review exist |
+| CMS structure editing UX | 64% | Drag editing and templates exist; zoom/pan, undo/redo, autosave/dirty guard, and high-resolution editing ergonomics remain |
+| Ingestion and first content intake | 82% | Prepared directory import and Page Manifest JSON exist; real cleared assets and repeatable launch import checklist remain |
+| Proposal and Pack governance | 78% | Feedback triage, Proposal Queue, Pack Drafts, adoption, canonical Pack export, and published Pack display exist |
+| Rights and roles | 52% | Contract and admin API skeleton exist; CMS UI and enforcement in Pack/proposal workflows remain |
+| Production operations | 70% | CI, production build, DB-backed runtime pieces, magic links, delivery containment, and env checks exist; monitoring, CDN, backups, cleanup jobs, and incident drills remain |
+| Real public content readiness | 25% | Requires rights-cleared artwork/story/lettering/translations/comments and a confirmed launch positioning |
+
+Overall first public content launch readiness: 72%.
 
 ## Current Status
 
@@ -48,6 +68,91 @@ The product boundary is now explicit:
 - Reader: reading, sharing, approved pack display, lightweight proposals
 - CMS: content structure editing, review, pack management, publishing, Reader preview
 - Rights: role/language/pack scoped permissions for proposing, editing, reviewing, publishing, and commercial usage
+
+## UX Meta Review Decisions
+
+Antigravity's UX review is mostly adopted. A few points were already partially addressed, and the adopted follow-up work is tracked below.
+
+Accepted:
+
+- Split the fat Viewer episode page. `apps/viewer/src/pages/works/[workId]/episodes/[episodeId].astro` is about 1,950 lines and mixes SSR data loading, metadata, reader layout, study panel UI, feedback modal, and client-side reader interactions.
+- Improve mobile reader interaction quality. Basic RTL tap/key/swipe exists, but native-feeling page movement, double-tap zoom, and image preload/blank-page prevention need focused work.
+- Reduce Study/Explore Mode information density on mobile. Explore exists, but the side panel should become a responsive bottom sheet or focused inspector so the manga image remains primary.
+- Upgrade read-complete. Completion feedback exists, but a dedicated read-complete surface for next episode, reaction, contribution, and sharing is still needed.
+- Add share/OGP depth. Episode OGP exists; Page/Clip/Quote dynamic share images remain a launch-quality gap.
+- Improve CMS structure editing. `PageStructureReview.tsx` is about 930 lines and supports drag editing, but high-resolution editing needs zoom/pan and better precision controls.
+- Add CMS undo/redo, dirty guard, and local autosave for structure review.
+- Add a translation workspace with surrounding context, not only isolated Bubble editing.
+- Continue improving Proposal/Pack next actions. Accepted Proposal to Pack Draft adoption is now present, but workflow-level guidance and status surfacing can be clearer.
+
+Not adopted as stated:
+
+- Do not assume Edge Functions as the first OGP implementation. The first step is a renderer contract and server-side image generation path; edge deployment can come later.
+- Do not make Reader a full editing surface. Reader remains lightweight proposal/reporting only; CMS owns editing and approval.
+
+### Adopted UX Tasks
+
+#### Viewer refactor and mobile reader polish
+
+1. Extract Viewer episode page modules:
+   - data resolution and metadata helpers
+   - reader toolbar
+   - reader frame/page renderer
+   - study/explore panel
+   - feedback modal
+   - client reader controller script
+2. Add image preload:
+   - preload current, previous, and next Page images
+   - keep current page visible until next image is decoded
+   - add blank-page prevention state for slow delivery URLs
+3. Add touch polish:
+   - swipe threshold tuning for RTL reading
+   - double-tap zoom to panel/page focus
+   - pinch/drag-safe behavior without triggering accidental page turns
+4. Convert Explore panel on small screens:
+   - bottom sheet layout
+   - compact target summary
+   - proposal form behind an explicit open action
+5. Build read-complete surface:
+   - next Episode action
+   - reaction action
+   - share action
+   - contribution/report action
+6. Add share image path:
+   - Page OGP first
+   - Clip/Quote OGP after official Clip/Quote records exist
+   - avoid exposing raw origin image paths
+
+#### CMS structure and translation polish
+
+1. Split `PageStructureReview.tsx`:
+   - page selector/sidebar
+   - canvas/overlay editor
+   - panel list
+   - bubble list
+   - inspector
+   - script assist
+   - review decision helpers
+2. Add canvas zoom/pan:
+   - zoom in/out/reset controls
+   - pan mode
+   - fit-to-width and fit-to-screen presets
+   - coordinate conversion tests for bbox editing
+3. Add editing safety:
+   - undo/redo stack
+   - keyboard shortcuts
+   - dirty state and browser unload guard
+   - local autosave or recoverable draft cache
+4. Add translation workspace MVP:
+   - selected Bubble editor
+   - previous/next Bubble context
+   - previous/next Panel context
+   - glossary/voice memo placeholder
+   - proposal or Pack Draft write path kept explicit
+5. Improve workflow next actions:
+   - after feedback converts to proposal, show proposal destination and next action
+   - after proposal is accepted, surface compatible Pack Drafts and adoption state
+   - after Pack Draft export, show canonical Pack and Reader availability state
 
 Authoritative specs:
 
