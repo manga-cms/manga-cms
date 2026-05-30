@@ -353,6 +353,11 @@ Proposal Queue records are runtime review state, not canonical content and not
 published Packs. They are file-backed by default under `PROPOSALS_DIR` or
 `proposals/`, and that directory is ignored by Git.
 
+File-backed Proposal Queue writes use a local lock around create and
+read-modify-write status changes. This reduces lost updates in local and small
+single-host deployments, but it is not a substitute for moving runtime review
+state to `packages/db` before multi-host production operation.
+
 Proposal kinds:
 
 - `translation`
@@ -390,6 +395,10 @@ or canonical `packs/`. The explicit boundary is
 `packs/{packId}/pack.json` from an `approved` or `published` Pack draft with at
 least one entry. `pack_id` must be a safe path segment. Existing canonical Packs
 are not overwritten unless `overwrite: true` is supplied.
+
+File-backed Pack draft writes use the same local lock strategy around create,
+status updates, and proposal adoption. This prevents most accidental local
+lost-update cases while the MVP remains file-backed.
 
 If export sets `is_published: true`, the generated manifest has
 `isPublished: true` and defaults to `packClass: official` unless a pack class is
