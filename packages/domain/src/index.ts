@@ -13,4 +13,5 @@ export * from "./pack-draft-types.js";
 export * from "./pack-draft-repository.js";
 export * from "./pack-loader.js";
 export * from "./pack-writer.js";
+export * from "./rights-types.js";
 export * from "./delivery.js";

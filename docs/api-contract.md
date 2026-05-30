@@ -443,6 +443,55 @@ is allowed for now because some Proposal kinds can legitimately feed multiple
 Pack types; CMS surfaces existing adoptions so reviewers can avoid accidental
 duplicates.
 
+### Rights And Permission State
+
+Rights/Role Manager is a runtime governance layer. It is separate from reader
+entitlements:
+
+- Entitlement answers whether a user can read gated content.
+- Rights grants answer whether a user can propose, edit, review, publish, or
+  commercially use content or Packs.
+
+The initial contract is defined by `packages/domain/src/rights-types.ts`,
+`packages/schemas/src/rights.ts`, and the `Rights*` component schemas in
+`openapi.yaml`. No admin Rights API routes are implemented yet; add routes only
+when persistence and CMS workflows are scheduled.
+
+Rights roles:
+
+- `owner`
+- `editor`
+- `translator`
+- `reviewer`
+- `contributor`
+- `moderator`
+- `viewer`
+- `original_rights_holder`
+- `translation_reviewer`
+- `footnote_contributor`
+- `pack_maintainer`
+- `publisher`
+
+Rights permissions:
+
+- `propose_translation`
+- `propose_footnote`
+- `edit_structure`
+- `edit_translation`
+- `review_translation`
+- `review_footnote`
+- `approve_translation`
+- `approve_footnote`
+- `publish_pack`
+- `manage_rights`
+- `moderate_proposals`
+- `commercial_use`
+
+Grant scope can include `series_id`, `episode_id`, `language`, `pack_id`,
+`usage`, and `territory`. Language-specific grants do not imply all-language
+grants. Pack-specific grants do not imply original-content rights. Commercial
+use requires an explicit `commercial_use` permission and matching usage scope.
+
 ### Image Upload And Storage State
 
 Current image handling is path-based:
