@@ -2642,6 +2642,142 @@ components:
         path:
           type: string
 
+    RightsRole:
+      type: string
+      enum:
+        - owner
+        - editor
+        - translator
+        - reviewer
+        - contributor
+        - moderator
+        - viewer
+        - original_rights_holder
+        - translation_reviewer
+        - footnote_contributor
+        - pack_maintainer
+        - publisher
+
+    RightsPermission:
+      type: string
+      enum:
+        - propose_translation
+        - propose_footnote
+        - edit_structure
+        - edit_translation
+        - review_translation
+        - review_footnote
+        - approve_translation
+        - approve_footnote
+        - publish_pack
+        - manage_rights
+        - moderate_proposals
+        - commercial_use
+
+    RightsUsage:
+      type: string
+      enum:
+        - free_view
+        - paid_view
+        - promotional
+        - commercial_distribution
+
+    RightsScope:
+      type: object
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        language:
+          type: string
+          maxLength: 16
+        pack_id:
+          type: string
+        usage:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/RightsUsage"
+        territory:
+          type: string
+          maxLength: 80
+
+    RightsGrantCreateInput:
+      type: object
+      required: [subject_user_id, role, permissions, scope]
+      properties:
+        subject_user_id:
+          type: string
+          maxLength: 120
+        role:
+          $ref: "#/components/schemas/RightsRole"
+        permissions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/RightsPermission"
+        scope:
+          $ref: "#/components/schemas/RightsScope"
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+        granted_by:
+          type: string
+          nullable: true
+          maxLength: 120
+        notes:
+          type: string
+          maxLength: 2000
+
+    RightsGrantRecord:
+      allOf:
+        - $ref: "#/components/schemas/RightsGrantCreateInput"
+        - type: object
+          required: [grant_id, created_at, updated_at]
+          properties:
+            grant_id:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            revoked_at:
+              type: string
+              format: date-time
+              nullable: true
+
+    RightsPermissionCheckInput:
+      type: object
+      required: [user_id, permission, scope]
+      properties:
+        user_id:
+          type: string
+          maxLength: 120
+        permission:
+          $ref: "#/components/schemas/RightsPermission"
+        scope:
+          $ref: "#/components/schemas/RightsScope"
+
+    RightsPermissionCheckResponse:
+      type: object
+      required: [allowed, matched_grant_ids]
+      properties:
+        allowed:
+          type: boolean
+        matched_grant_ids:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
+
     PackManifestEntryTarget:
       type: object
       required: [seriesId]

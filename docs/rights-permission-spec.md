@@ -5,6 +5,15 @@ Rights control must be separate from reading entitlements.
 Reading entitlement answers: can this user read this content?
 Production permission answers: can this user propose, edit, review, publish, or commercially use this layer?
 
+## Contract Sources
+
+- `packages/domain/src/rights-types.ts`
+- `packages/schemas/src/rights.ts`
+- `openapi.yaml` `Rights*` component schemas
+
+No Rights admin API routes are implemented yet. The current phase fixes the
+shared vocabulary and validation shape before CMS UI or persistence work starts.
+
 ## Roles
 
 Minimum product roles:
@@ -35,9 +44,12 @@ Initial permission set:
 - edit_translation
 - review_translation
 - review_footnote
+- approve_translation
+- approve_footnote
 - publish_pack
 - manage_rights
 - moderate_proposals
+- commercial_use
 
 ## Scope
 
