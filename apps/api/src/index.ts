@@ -11,7 +11,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { extname, isAbsolute, join, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { getEmailProvider, isEmailConfigured } from "./email.js";
 import { RateLimiter } from "./rate-limit.js";
 import { FeedbackPayloadSchema } from "@manga/schemas";
@@ -194,6 +195,60 @@ function requireInt(c: any, raw: string, name: string): number | Response {
 function isPathInside(baseDir: string, targetPath: string): boolean {
     const rel = relative(baseDir, targetPath);
     return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+const IMAGE_MIME_TO_EXT: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+};
+
+const MAX_IMAGE_UPLOAD_BYTES = Number(process.env.MAX_IMAGE_UPLOAD_BYTES ?? 10 * 1024 * 1024);
+
+async function readImageUpload(c: any): Promise<
+    | { success: true; bytes: Buffer; mime: string; ext: string; originalName?: string; sha256: string }
+    | { success: false; response: Response }
+> {
+    const contentType = c.req.header("content-type") ?? "";
+    let bytes: Buffer;
+    let mime = contentType.split(";")[0].toLowerCase();
+    let originalName: string | undefined;
+
+    if (contentType.startsWith("multipart/form-data")) {
+        const body = await c.req.parseBody();
+        const file = body.file as any;
+        if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
+            return { success: false, response: c.json({ error: { code: "VALIDATION_ERROR", message: "Multipart field \"file\" is required" } }, 400) };
+        }
+        mime = String(file.type || "").toLowerCase();
+        originalName = typeof file.name === "string" ? file.name : undefined;
+        bytes = Buffer.from(await file.arrayBuffer());
+    } else if (mime in IMAGE_MIME_TO_EXT) {
+        bytes = Buffer.from(await c.req.arrayBuffer());
+    } else {
+        return { success: false, response: c.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Upload must be multipart/form-data or image/* binary" } }, 415) };
+    }
+
+    const ext = IMAGE_MIME_TO_EXT[mime];
+    if (!ext) {
+        return { success: false, response: c.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Supported image types: jpeg, png, webp, gif" } }, 415) };
+    }
+    if (bytes.length === 0) {
+        return { success: false, response: c.json({ error: { code: "VALIDATION_ERROR", message: "Uploaded image is empty" } }, 400) };
+    }
+    if (bytes.length > MAX_IMAGE_UPLOAD_BYTES) {
+        return { success: false, response: c.json({ error: { code: "PAYLOAD_TOO_LARGE", message: `Image must be ${MAX_IMAGE_UPLOAD_BYTES} bytes or smaller` } }, 413) };
+    }
+
+    return {
+        success: true,
+        bytes,
+        mime,
+        ext,
+        originalName,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+    };
 }
 
 function validateFeedbackPayload(body: any): { ok: true; payload: FeedbackPayload } | { ok: false; message: string } {
@@ -744,6 +799,65 @@ app.get("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", (c) => {
         status: 200,
         headers: { "Content-Type": contentType, "Cache-Control": "private, no-store" },
     });
+});
+
+// POST /admin/series/:id/episodes/:epId/pages/:pageNumber/image — Upload Page image
+app.post("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const seriesId = c.req.param("id");
+    const epId = c.req.param("epId");
+    const pageNumber = requireInt(c, c.req.param("pageNumber"), "pageNumber");
+    if (pageNumber instanceof Response) return pageNumber;
+    const locale = c.req.query("locale") ?? "ja";
+    if (!/^[A-Za-z0-9_-]{1,16}$/.test(locale)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "locale must be a safe short identifier" } }, 400);
+    }
+
+    const ep = readRepo.getEpisode(seriesId, epId);
+    if (!ep) return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
+    const page = ep.pages.find((p: any) => p.pageNumber === pageNumber);
+    if (!page) return c.json({ error: { code: "NOT_FOUND", message: "Page not found" } }, 404);
+
+    const upload = await readImageUpload(c);
+    if (!upload.success) return upload.response;
+
+    const episodeAssetDir = resolve(CONTENTS_DIR, seriesId, epId);
+    const pagesDir = resolve(episodeAssetDir, "pages");
+    const relativePath = `pages/p${String(pageNumber).padStart(2, "0")}.${locale}.${upload.ext}`;
+    const absPath = resolve(episodeAssetDir, relativePath);
+    if (!isPathInside(episodeAssetDir, absPath) || !isPathInside(episodeAssetDir, pagesDir)) {
+        return c.json({ error: { code: "INVALID_IMAGE_PATH", message: "Upload path escapes episode directory" } }, 400);
+    }
+
+    mkdirSync(pagesDir, { recursive: true });
+    writeFileSync(absPath, upload.bytes);
+
+    const pages = ep.pages.map((p: any) => p.pageNumber === pageNumber
+        ? { ...p, images: { ...(p.images ?? {}), [locale]: relativePath } }
+        : p);
+    const result = writer.saveEpisode(seriesId, {
+        id: ep.id,
+        episodeNumber: ep.episodeNumber,
+        title: ep.title,
+        publishedAt: ep.publishedAt,
+        pages,
+    });
+    if (!result.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: result.error } }, 400);
+    }
+
+    return c.json({
+        uploaded: true,
+        seriesId,
+        episodeId: epId,
+        pageNumber,
+        locale,
+        imagePath: relativePath,
+        contentType: upload.mime,
+        size: upload.bytes.length,
+        sha256: upload.sha256,
+        originalName: upload.originalName,
+    }, 201);
 });
 
 // POST /admin/series/:id/publish — Reload read cache

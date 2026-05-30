@@ -252,6 +252,7 @@ Base path: `/api/v1`
 | `PUT` | `/admin/series/{id}/episodes/{epId}` | Update Episode |
 | `GET` | `/admin/series/{id}/episodes/{epId}` | Read full Episode for CMS editing |
 | `GET` | `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image` | Read admin Page image preview |
+| `POST` | `/admin/series/{id}/episodes/{epId}/pages/{pageNumber}/image` | Upload Page image and update Episode image path |
 | `POST` | `/admin/series/{id}/publish` | Reload/publish Series data |
 
 Admin endpoints require authenticated admin access. Browser CMS calls should
@@ -269,16 +270,14 @@ Current image handling is path-based:
 - Public reader payloads replace origin paths with short-lived delivery URLs.
   Newly generated delivery URLs use `/deliver/{pageId}?lang={locale}&token=...`.
   The delivery route also accepts the legacy `locale` query name.
-- `ContentWriteRepository` writes JSON metadata and validates Series/Episode
-  identifiers plus stored asset paths, but it does not copy or persist binary
-  image uploads.
-
-Current gap:
-
-- There is no multipart or direct binary upload endpoint for Page images.
-  A future upload API needs to define accepted MIME types, per-series storage
-  location, overwrite behavior, size limits, checksum behavior, and whether the
-  API or CMS creates the final `pages/*.jpg|png|webp` relative path.
+- Admin Page image upload accepts either `multipart/form-data` with a `file`
+  field or direct `image/*` binary for JPEG, PNG, WebP, and GIF.
+- Uploads are stored under
+  `contents/{seriesId}/{episodeId}/pages/p{pageNumber}.{locale}.{ext}` and
+  replace `Episode.pages[].images[locale]`.
+- Uploads overwrite the same page/locale path. Default size limit is 10 MiB and
+  can be changed with `MAX_IMAGE_UPLOAD_BYTES`.
+- Upload responses include `imagePath`, `contentType`, `size`, and `sha256`.
 
 ## Ingestion Endpoints
 

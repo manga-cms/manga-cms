@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { saveEpisode, getSeries, getAdminEpisode, type PageData } from "../api";
+import { saveEpisode, getSeries, getAdminEpisode, uploadAdminPageImage, type PageData } from "../api";
 
 interface PageInput {
     id?: string;
@@ -37,6 +37,7 @@ export default function EpisodeEditor() {
     const [pages, setPages] = useState<PageInput[]>([]);
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(false);
+    const [uploadingPage, setUploadingPage] = useState<number | null>(null);
     const [loaded, setLoaded] = useState(false);
 
     // Load existing episode data if it exists
@@ -100,6 +101,24 @@ export default function EpisodeEditor() {
 
     const removePage = (idx: number) => {
         setPages(pages.filter((_, i) => i !== idx));
+    };
+
+    const handleImageUpload = async (idx: number, file: File | undefined) => {
+        if (!seriesId || !epId || !file) return;
+        const page = pages[idx];
+        if (!page) return;
+        setUploadingPage(page.pageNumber);
+        setError("");
+        try {
+            const result = await uploadAdminPageImage(seriesId, epId, page.pageNumber, file);
+            setPages((current) => current.map((p, pageIndex) => pageIndex === idx
+                ? { ...p, imagePath: result.imagePath, images: { ...(p.images ?? {}), ja: result.imagePath } }
+                : p));
+        } catch (err) {
+            setError((err as Error).message);
+        } finally {
+            setUploadingPage(null);
+        }
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -174,6 +193,15 @@ export default function EpisodeEditor() {
                             <div className="form-group" style={{ margin: 0 }}>
                                 <label>Image Path</label>
                                 <input value={p.imagePath} onChange={(e) => updatePage(idx, "imagePath", e.target.value)} />
+                            </div>
+                            <div className="form-group" style={{ margin: 0 }}>
+                                <label>Upload Image</label>
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                    disabled={uploadingPage === p.pageNumber}
+                                    onChange={(e) => handleImageUpload(idx, e.currentTarget.files?.[0])}
+                                />
                             </div>
                             <div className="form-group" style={{ margin: 0 }}>
                                 <label>Display Ref</label>
