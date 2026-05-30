@@ -330,6 +330,7 @@ Base path: `/api/v1`
 | `GET` | `/admin/pack-drafts/{packDraftId}` | Read one runtime Pack draft |
 | `PUT` | `/admin/pack-drafts/{packDraftId}/status` | Update Pack draft review status |
 | `POST` | `/admin/pack-drafts/{packDraftId}/adopt-proposal` | Adopt an accepted Proposal into a Pack draft |
+| `POST` | `/admin/pack-drafts/{packDraftId}/export` | Export an approved/published Pack draft to `packs/{packId}/pack.json` |
 
 Admin endpoints require authenticated admin access. Browser CMS calls should
 send credentials so the `manga_auth` cookie is included.
@@ -375,10 +376,17 @@ Pack Manager has two separate layers:
   source-controlled product assets and are validated by
   `packages/schemas/src/content.ts`.
 
-Runtime Pack draft routes do not write `contents/` or canonical `packs/`.
-Changing a Pack draft status to `published` records review intent only. A later
-explicit publish/export workflow must create or update a canonical
-`packs/{packId}/pack.json` manifest.
+Runtime Pack draft create, update, and adoption routes do not write `contents/`
+or canonical `packs/`. The explicit boundary is
+`POST /admin/pack-drafts/{packDraftId}/export`, which writes
+`packs/{packId}/pack.json` from an `approved` or `published` Pack draft with at
+least one entry. `pack_id` must be a safe path segment. Existing canonical Packs
+are not overwritten unless `overwrite: true` is supplied.
+
+If export sets `is_published: true`, the generated manifest has
+`isPublished: true` and defaults to `packClass: official` unless a pack class is
+provided. The API also moves the runtime Pack draft to `published` review state.
+This still does not mutate canonical Episode JSON.
 
 Pack types:
 

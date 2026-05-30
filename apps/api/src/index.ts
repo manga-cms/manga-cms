@@ -19,6 +19,7 @@ import {
     FeedbackPayloadSchema,
     PackDraftAdoptProposalInputSchema,
     PackDraftCreateInputSchema,
+    PackDraftExportInputSchema,
     PackDraftStatusUpdateInputSchema,
     ProposalCreateInputSchema,
     ProposalStatusUpdateInputSchema,
@@ -31,6 +32,7 @@ import {
     createFileEntitlementRepository,
     createFileFeedbackRepository,
     createFilePackDraftRepository,
+    createFilePackWriter,
     createFileProposalRepository,
     isPublicNow,
     isSeriesAndEpisodePublicNow,
@@ -125,6 +127,8 @@ const PROPOSALS_DIR = process.env.PROPOSALS_DIR ?? join(__dirname, "../../../pro
 const proposalRepo = createFileProposalRepository(PROPOSALS_DIR);
 const PACK_DRAFTS_DIR = process.env.PACK_DRAFTS_DIR ?? join(__dirname, "../../../pack-drafts");
 const packDraftRepo = createFilePackDraftRepository(PACK_DRAFTS_DIR);
+const PACKS_DIR = process.env.PACKS_DIR ?? join(__dirname, "../../../packs");
+const packWriter = createFilePackWriter(PACKS_DIR);
 
 const accessPolicy = new DefaultAccessPolicy();
 
@@ -764,6 +768,52 @@ app.post("/admin/pack-drafts/:packDraftId/adopt-proposal", async (c) => {
         return c.json({ error: { code: statusCode === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: result.error } }, statusCode);
     }
     return c.json(result.record);
+});
+
+app.post("/admin/pack-drafts/:packDraftId/export", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = PackDraftExportInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const draft = packDraftRepo.get(c.req.param("packDraftId"));
+    if (!draft) return c.json({ error: { code: "NOT_FOUND", message: "Pack draft not found" } }, 404);
+
+    const result = packWriter.exportDraft({
+        draft,
+        exportInput: {
+            packId: parsed.data.pack_id,
+            ...(parsed.data.pack_class && { packClass: parsed.data.pack_class }),
+            ...(parsed.data.title && { title: parsed.data.title }),
+            ...(parsed.data.author_label && { authorLabel: parsed.data.author_label }),
+            ...(parsed.data.is_published !== undefined && { isPublished: parsed.data.is_published }),
+            ...(parsed.data.overwrite !== undefined && { overwrite: parsed.data.overwrite }),
+        },
+    });
+    if (!result.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: result.error } }, 400);
+    }
+
+    if (result.pack.isPublished && draft.status !== "published") {
+        packDraftRepo.updateStatus(draft.pack_draft_id, {
+            status: "published",
+            reviewedBy: getUser(c)?.id ?? null,
+        });
+    }
+
+    return c.json({
+        exported: true,
+        pack: result.pack,
+        path: result.path,
+    });
 });
 
 // ---------------------------------------------------------------------------

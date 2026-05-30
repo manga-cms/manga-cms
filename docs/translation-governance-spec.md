@@ -103,6 +103,9 @@ Proposal
 - Runtime Pack draft status `published` does not by itself publish Reader
   content. Reader availability starts only after an explicit canonical
   Pack manifest/export step.
+- Pack export writes a source-controlled canonical manifest under `packs/`.
+  This is the first step that can make approved Pack content available to
+  Reader workflows, subject to Reader support and deployment.
 - Proposal-to-Pack compatibility is intentionally narrow: translation/typo to
   Translation Packs, footnotes to Footnote Packs, commentary/tag to Commentary
   or Learning Packs, and structure proposals to Accessibility Packs.

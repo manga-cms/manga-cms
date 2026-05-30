@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
     adoptProposalIntoPackDraft,
+    exportPackDraft,
     getPackDraft,
     listProposals,
     updatePackDraftStatus,
+    type PackClass,
     type PackDraftRecord,
     type PackDraftStatus,
     type PackType,
@@ -37,8 +39,18 @@ export default function PackDraftDetail() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [adoptingId, setAdoptingId] = useState("");
+    const [exporting, setExporting] = useState(false);
     const [error, setError] = useState("");
     const [saved, setSaved] = useState(false);
+    const [exportedPath, setExportedPath] = useState("");
+    const [exportForm, setExportForm] = useState({
+        pack_id: "",
+        pack_class: "draft" as PackClass,
+        title: "",
+        author_label: "community",
+        is_published: false,
+        overwrite: false,
+    });
 
     const load = async () => {
         if (!packDraftId) return;
@@ -78,6 +90,9 @@ export default function PackDraftDetail() {
             const next = await updatePackDraftStatus(packDraftId, status);
             setDraft(next);
             setSaved(true);
+            if (next.status === "approved" && exportForm.pack_class === "draft") {
+                setExportForm((current) => ({ ...current, pack_class: "official" }));
+            }
         } catch (e) {
             setError((e as Error).message);
         } finally {
@@ -101,8 +116,34 @@ export default function PackDraftDetail() {
         }
     };
 
+    const exportDraft = async () => {
+        if (!packDraftId) return;
+        setExporting(true);
+        setError("");
+        setSaved(false);
+        setExportedPath("");
+        try {
+            const result = await exportPackDraft(packDraftId, {
+                pack_id: exportForm.pack_id.trim(),
+                pack_class: exportForm.pack_class,
+                ...(exportForm.title.trim() && { title: exportForm.title.trim() }),
+                ...(exportForm.author_label.trim() && { author_label: exportForm.author_label.trim() }),
+                is_published: exportForm.is_published,
+                overwrite: exportForm.overwrite,
+            });
+            setExportedPath(result.path);
+            setSaved(true);
+            await load();
+        } catch (e) {
+            setError((e as Error).message);
+        } finally {
+            setExporting(false);
+        }
+    };
+
     if (loading) return <p style={{ color: "var(--muted)" }}>Loading...</p>;
     if (!draft) return <div className="error-msg">{error || "Pack draft not found"}</div>;
+    const canExport = ["approved", "published"].includes(draft.status) && draft.entries.length > 0;
 
     return (
         <div>
@@ -116,6 +157,7 @@ export default function PackDraftDetail() {
 
             {error && <div className="error-msg">{error}</div>}
             {saved && <div className="success-msg">Pack draft updated.</div>}
+            {exportedPath && <div className="success-msg">Canonical Pack exported: {exportedPath}</div>}
             {draft.status === "published" && (
                 <div className="success-msg">Published status is review state only. Canonical Pack export is still a separate workflow.</div>
             )}
@@ -145,6 +187,51 @@ export default function PackDraftDetail() {
                     </div>
                     <button type="button" className="btn btn-primary" disabled={saving} onClick={saveStatus}>
                         {saving ? "Saving..." : "Save status"}
+                    </button>
+                </div>
+            </div>
+
+            <div className="card">
+                <h2>Canonical Pack Export</h2>
+                {!canExport && (
+                    <div className="error-msg">Export requires at least one entry and status approved or published.</div>
+                )}
+                <div className="grid-2">
+                    <div className="form-group">
+                        <label htmlFor="pack-export-id">Pack ID</label>
+                        <input id="pack-export-id" value={exportForm.pack_id} onChange={(e) => setExportForm({ ...exportForm, pack_id: e.target.value })} placeholder="translation-en-rain-world" />
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="pack-export-class">Pack class</label>
+                        <select id="pack-export-class" value={exportForm.pack_class} onChange={(e) => setExportForm({ ...exportForm, pack_class: e.target.value as PackClass })}>
+                            <option value="draft">draft</option>
+                            <option value="official">official</option>
+                            <option value="proposal">proposal</option>
+                            <option value="deprecated">deprecated</option>
+                        </select>
+                    </div>
+                </div>
+                <div className="grid-2">
+                    <div className="form-group">
+                        <label htmlFor="pack-export-title">Title override</label>
+                        <input id="pack-export-title" value={exportForm.title} onChange={(e) => setExportForm({ ...exportForm, title: e.target.value })} placeholder={draft.title} />
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="pack-export-author">Author label</label>
+                        <input id="pack-export-author" value={exportForm.author_label} onChange={(e) => setExportForm({ ...exportForm, author_label: e.target.value })} placeholder="community" />
+                    </div>
+                </div>
+                <div className="section-actions" style={{ marginTop: 0 }}>
+                    <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                        <input type="checkbox" checked={exportForm.is_published} onChange={(e) => setExportForm({ ...exportForm, is_published: e.target.checked })} />
+                        Mark canonical Pack as published
+                    </label>
+                    <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                        <input type="checkbox" checked={exportForm.overwrite} onChange={(e) => setExportForm({ ...exportForm, overwrite: e.target.checked })} />
+                        Overwrite existing pack
+                    </label>
+                    <button type="button" className="btn btn-primary" disabled={!canExport || exporting || !exportForm.pack_id.trim()} onClick={exportDraft}>
+                        {exporting ? "Exporting..." : "Export Pack"}
                     </button>
                 </div>
             </div>

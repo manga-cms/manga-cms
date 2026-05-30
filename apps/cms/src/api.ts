@@ -521,6 +521,7 @@ export async function createProposalFromFeedback(feedbackId: string) {
 // ---------------------------------------------------------------------------
 
 export type PackType = "TRANSLATION" | "FOOTNOTE" | "COMMENTARY" | "LEARNING" | "ACCESSIBILITY";
+export type PackClass = "proposal" | "draft" | "official" | "deprecated";
 export type PackDraftStatus = "draft" | "in_review" | "approved" | "published" | "archived";
 
 export interface PackDraftEntry {
@@ -617,6 +618,35 @@ export async function adoptProposalIntoPackDraft(packDraftId: string, proposalId
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message ?? "Failed to adopt proposal");
     return data as PackDraftRecord;
+}
+
+export async function exportPackDraft(packDraftId: string, input: {
+    pack_id: string;
+    pack_class?: PackClass;
+    title?: string;
+    author_label?: string;
+    is_published?: boolean;
+    overwrite?: boolean;
+}) {
+    const res = await fetch(`${API}/admin/pack-drafts/${packDraftId}/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to export pack draft");
+    return data as {
+        exported: true;
+        path: string;
+        pack: {
+            id: string;
+            type: PackType;
+            packClass?: PackClass;
+            isPublished: boolean;
+            entries: unknown[];
+        };
+    };
 }
 
 export async function updateDraft(jobId: string, draft: DraftPayload) {

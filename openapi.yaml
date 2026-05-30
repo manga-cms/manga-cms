@@ -648,6 +648,40 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /admin/pack-drafts/{packDraftId}/export:
+    post:
+      tags: [PackManager]
+      summary: Export a Pack draft into canonical packs storage
+      description: >
+        Writes `packs/{pack_id}/pack.json` from an approved or published runtime
+        Pack draft. This is the explicit boundary where review state becomes a
+        canonical Pack manifest.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftExportInput"
+      responses:
+        "200":
+          description: Pack manifest exported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftExportResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /deliver/{pageId}:
     get:
       tags: [Delivery]
@@ -2570,6 +2604,37 @@ components:
       required: [proposal_id]
       properties:
         proposal_id:
+          type: string
+
+    PackDraftExportInput:
+      type: object
+      required: [pack_id]
+      properties:
+        pack_id:
+          type: string
+          maxLength: 120
+        pack_class:
+          $ref: "#/components/schemas/PackClass"
+        title:
+          type: string
+          maxLength: 200
+        author_label:
+          type: string
+          maxLength: 120
+        is_published:
+          type: boolean
+        overwrite:
+          type: boolean
+
+    PackDraftExportResponse:
+      type: object
+      required: [exported, pack, path]
+      properties:
+        exported:
+          type: boolean
+        pack:
+          $ref: "#/components/schemas/PackManifest"
+        path:
           type: string
 
     PackManifest:
