@@ -682,6 +682,128 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /admin/rights/grants:
+    get:
+      tags: [Rights]
+      summary: List runtime Rights grants
+      description: Lists CMS governance grants. These records are runtime permission state and are separate from reader entitlements.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RightsPermission"
+        - name: includeRevoked
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Rights grant records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RightsGrantRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Rights]
+      summary: Create a runtime Rights grant
+      description: Creates a governance grant only. It does not grant reader entitlement or mutate canonical content.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RightsGrantCreateInput"
+      responses:
+        "201":
+          description: Rights grant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RightsGrantRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/rights/grants/{grantId}/revoke:
+    post:
+      tags: [Rights]
+      summary: Revoke a runtime Rights grant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/grantId"
+      responses:
+        "200":
+          description: Revoked Rights grant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RightsGrantRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/rights/check:
+    post:
+      tags: [Rights]
+      summary: Check whether a user has a Rights permission
+      description: Checks runtime governance grants only. This endpoint does not check reader entitlements.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RightsPermissionCheckInput"
+      responses:
+        "200":
+          description: Rights permission check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RightsPermissionCheckResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /deliver/{pageId}:
     get:
       tags: [Delivery]
@@ -1766,6 +1888,12 @@ components:
         type: string
     packDraftId:
       name: packDraftId
+      in: path
+      required: true
+      schema:
+        type: string
+    grantId:
+      name: grantId
       in: path
       required: true
       schema:

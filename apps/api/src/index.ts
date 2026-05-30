@@ -23,6 +23,8 @@ import {
     PackDraftStatusUpdateInputSchema,
     ProposalCreateInputSchema,
     ProposalStatusUpdateInputSchema,
+    RightsGrantCreateInputSchema,
+    RightsPermissionCheckInputSchema,
 } from "@manga/schemas";
 import { buildPreparedDirectoryDraft } from "@manga/ingestion";
 import {
@@ -35,6 +37,7 @@ import {
     createFilePackRepository,
     createFilePackWriter,
     createFileProposalRepository,
+    createFileRightsRepository,
     isPublicNow,
     isSeriesAndEpisodePublicNow,
     DefaultAccessPolicy,
@@ -57,6 +60,8 @@ import {
     type DraftPayload,
     type IngestionRepository,
     type PublishedPack,
+    type RightsPermission,
+    type RightsRepository,
 } from "@manga/domain";
 
 // ---------------------------------------------------------------------------
@@ -132,6 +137,8 @@ const packDraftRepo = createFilePackDraftRepository(PACK_DRAFTS_DIR);
 const PACKS_DIR = process.env.PACKS_DIR ?? join(__dirname, "../../../packs");
 const packRepo = createFilePackRepository(PACKS_DIR);
 const packWriter = createFilePackWriter(PACKS_DIR);
+const RIGHTS_DIR = process.env.RIGHTS_DIR ?? join(__dirname, "../../../rights");
+const rightsRepo = createFileRightsRepository(RIGHTS_DIR);
 
 const accessPolicy = new DefaultAccessPolicy();
 
@@ -851,6 +858,91 @@ app.post("/admin/pack-drafts/:packDraftId/export", async (c) => {
         pack: result.pack,
         path: result.path,
     });
+});
+
+// ===========================================================================
+// ADMIN — Rights / Role Manager
+// Runtime governance state only. Separate from reading entitlements.
+// ===========================================================================
+
+app.get("/admin/rights/grants", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const permission = c.req.query("permission") as RightsPermission | undefined;
+    const includeRevoked = c.req.query("includeRevoked") === "true";
+
+    if (permission && ![
+        "propose_translation",
+        "propose_footnote",
+        "edit_structure",
+        "edit_translation",
+        "review_translation",
+        "review_footnote",
+        "approve_translation",
+        "approve_footnote",
+        "publish_pack",
+        "manage_rights",
+        "moderate_proposals",
+        "commercial_use",
+    ].includes(permission)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid rights permission" } }, 400);
+    }
+
+    return c.json({
+        items: rightsRepo.listGrants({
+            userId: c.req.query("userId"),
+            seriesId: c.req.query("seriesId"),
+            permission,
+            includeRevoked,
+        }),
+    });
+});
+
+app.post("/admin/rights/grants", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = RightsGrantCreateInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const user = getUser(c);
+    const record = rightsRepo.createGrant({
+        ...parsed.data,
+        granted_by: parsed.data.granted_by ?? user?.id ?? null,
+    });
+    return c.json(record, 201);
+});
+
+app.post("/admin/rights/grants/:grantId/revoke", (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    const result = rightsRepo.revokeGrant(c.req.param("grantId"));
+    if (!result.success) {
+        return c.json({ error: { code: "NOT_FOUND", message: result.error } }, 404);
+    }
+    return c.json(result.record);
+});
+
+app.post("/admin/rights/check", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = RightsPermissionCheckInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    return c.json(rightsRepo.checkPermission(parsed.data));
 });
 
 // ---------------------------------------------------------------------------
