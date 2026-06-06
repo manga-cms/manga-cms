@@ -1,16 +1,16 @@
 # Roadmap
 
-Last updated: 2026-06-05
+Last updated: 2026-06-07
 
-This document tracks the path from the current repository state to a public launch.
+This document tracks the current public beta state and the path toward a stable public launch and later commercial launch.
 
 ## Overall Progress
 
 | Target | Progress | Meaning |
 |--------|---------:|---------|
 | Public technical beta foundation | 100% | Free/public reading infrastructure with viewer, contents, API, CMS, publish/import, protected reading paths, and PoC validation tooling — foundation exit criteria met |
-| First public content launch | 80% | The platform can publish, but a release-quality first Series still needs cleared assets, stronger mobile reader QA, CMS editing polish, and launch smoke rehearsal |
-| Commercial launch | 68% | Beta + CMS, ingestion, entitlement, gated delivery, and production auth exist; Stripe buyout checkout, anonymous claim/recovery, reconciliation, and multi-instance operations remain |
+| First public content launch | 90% | Public GitHub release and production hosts are live with one readable Series; remaining work is search/analytics confirmation, content operations cleanup, and launch QA hardening |
+| Commercial launch | 68% | Public launch foundation exists; Stripe buyout checkout, anonymous claim/recovery, reconciliation, paid-content operations, and multi-instance hardening remain |
 
 ## Public Launch Readiness
 
@@ -27,10 +27,50 @@ These percentages track the remaining path to putting a real public manga site i
 | Proposal and Pack governance | 92% | Feedback triage, Proposal Queue, Pack Drafts, canonical Pack export, translation import, and published Pack display exist |
 | Rights and roles | 52% | Contract and admin API skeleton exist; CMS UI and enforcement in Pack/proposal workflows remain |
 | Paid checkout and anonymous access recovery | 22% | Manual purchase/redeem and entitlement primitives exist; Stripe Checkout, webhook fulfillment, anonymous claim sessions, recovery keys, and refund/dispute automation remain |
-| Production operations | 70% | CI, production build, DB-backed runtime, magic links, delivery containment, env checks, and GA4/Search Console docs exist; Postgres production state, R2/manifest, monitoring, backups remain |
-| Real public content readiness | 25% | Requires rights-cleared artwork/story/lettering/translations/comments and a confirmed launch positioning |
+| Production operations | 82% | Production hosts are live, API health is ready, Postgres runtime is in use, deploy docs exist, and GitHub public history is cleaned; monitoring, backup drills, R2/manifest, and multi-instance operations remain |
+| Real public content readiness | 70% | Oumaga Dokidoki is live on production with ja/en Reader support; remaining work is canonical content seeding, metadata governance, Search Console visibility, and creator-facing launch polish |
 
-Overall first public content launch readiness: 80%.
+Overall first public content launch readiness: 90%.
+
+## Current Public State
+
+As of 2026-06-07, the project has crossed from staging-only preparation into
+a public production beta. The remaining roadmap is now mostly operational
+hardening, content governance, and commercial readiness rather than first
+reader enablement.
+
+Confirmed public state:
+
+- GitHub repository `manga-cms/manga-cms` is public. The public remote exposes a
+  single clean `main` history for the OSS release, with old work branches
+  removed from GitHub refs. Local private working branches may still exist on
+  developer machines and are intentionally outside the public remote.
+- `https://manga-cms.com/` returns the official site.
+- `https://read.manga-cms.com/` serves the production Reader.
+- `https://api.manga-cms.com/api/v1/health` reports production readiness with
+  a healthy DB check and loaded content.
+- Oumaga Dokidoki is readable as the first public content path.
+- Reader Share URLs, Page/Panel OGP PNGs, localized Reader metadata,
+  `robots.txt`, `sitemap.xml`, and English `noindex` gating exist in the public
+  codebase.
+- Cloudflare Web Analytics is the preferred lightweight launch analytics path.
+  GA4 remains disabled for production unless consent handling is added later.
+
+Important remaining work:
+
+1. Confirm Search Console ownership and submit production sitemaps.
+2. Confirm Cloudflare Web Analytics events appear in the dashboard for
+   `manga-cms.com` and `read.manga-cms.com`.
+3. Move Oumaga production metadata/content setup from manual runtime state to a
+   repeatable seed, publish artifact, or manifest-backed process.
+4. Add backup/restore drills for production Postgres and production content
+   volume.
+5. Add monitoring and alerting for API health, delivery failures, auth failures,
+   feedback/proposal errors, and image generation failures.
+6. Keep the current single-machine/API-volume assumption explicit until R2 and
+   manifest delivery replace production image serving for public free content.
+7. Defer paid checkout until Stripe webhook fulfillment, anonymous claim,
+   recovery, refund/dispute handling, and reconciliation are implemented.
 
 ## Current Status
 
@@ -59,7 +99,7 @@ The project has moved beyond a viewer-only prototype.
 - CMS Page Structure Review MVP exists for page-image preview, panel bbox editing, bubble bbox editing, and canonical episode save. Features like zoom/pan and undo/redo are implemented on main.
 - Reader Feedback MVP exists for hidden Read Mode reporting, Explore Mode proposals, completion-card contribution, and private JSONL feedback storage
 - Reader deep links can resolve `focus` URLs to Page / Panel / Bubble targets and open Explore Mode with the target highlighted
-- Viewer Share URLs (`/s/...`), OGP Page/Panel generation, and `robots.txt`/`sitemap.xml` are implemented on main. Staging smoke has passed; production smoke remains. Localized metadata (ja/en) is functional on main.
+- Viewer Share URLs (`/s/...`), OGP Page/Panel generation, and `robots.txt`/`sitemap.xml` are implemented and smoke-tested on production Reader URLs. Localized metadata (ja/en) is functional on main.
 - CMS features localized metadata editing, Text Export (Markdown/TSV), Translation Draft Import, and Feedback Triage capabilities.
 - CMS Page Structure Review includes panel layout templates so storyboard/name pages can be structured quickly before manual fine-tuning
 - Manga Content v2 has been accepted as a future schema-evolution direction,
@@ -159,7 +199,7 @@ Accepted:
 - ✅ Improve mobile reader interaction quality. Preload, double-tap zoom, and touch polish are active.
 - Reduce Study/Explore Mode information density on mobile. Explore exists, but the side panel should become a responsive bottom sheet or focused inspector so the manga image remains primary.
 - Upgrade read-complete. Completion feedback exists, but a dedicated read-complete surface for next episode, reaction, contribution, and sharing is still needed.
-- ✅ Add share/OGP depth. Page/Panel dynamic share images exist (pending production smoke); Clip/Quote OGP remains a launch-quality gap.
+- ✅ Add share/OGP depth. Page/Panel dynamic share images exist and production Reader smoke has passed; Clip/Quote OGP remains a launch-quality gap.
 - ✅ Improve CMS structure editing. `PageStructureReview.tsx` now supports canvas zoom/pan, undo/redo, and keyboard shortcuts.
 - ✅ Add a translation workspace. `TranslationDraftImport` and Draft export MVP are active.
 - ✅ Continue improving Proposal/Pack next actions. Feedback Triage and Draft export workflows are integrated.
@@ -170,8 +210,6 @@ Not adopted as stated:
 - Do not make Reader a full editing surface. Reader remains lightweight proposal/reporting only; CMS owns editing and approval.
 
 ### Adopted UX Tasks
-
-#### Viewer refactor and mobile reader polish
 
 #### Viewer refactor and mobile reader polish
 
@@ -187,7 +225,7 @@ Not adopted as stated:
    - reaction action
    - share action
    - contribution/report action
-6. ✅ Add share image path (Page / Panel OGP route exists in branch, Clip/Quote next)
+6. ✅ Add share image path (Page / Panel OGP route exists and production Reader smoke passed; Clip/Quote next)
 
 #### CMS structure and translation polish
 
@@ -224,10 +262,10 @@ Authoritative specs:
 | 4 | CMS and publish MVP | 92% | A creator can set up a work, add episodes/pages, template page structure, review, and publish without editing JSON manually |
 | 5 | Ingestion MVP | 84% | Upload/import, draft generation, review queue, confirmation jobs, and PoC evaluation tooling exist |
 | 6 | Commerce, entitlement, and delivery | 68% | Purchase/redeem, entitlement checks, gated delivery URLs, and watermark-capable delivery primitives exist; Stripe buyout checkout, webhook fulfillment, anonymous claim/recovery, and reconciliation remain |
-| 7 | Production hardening | 96% | DB, deploy target, observability, CI/CD, backup/recovery, and incident-ready operations are in place |
+| 7 | Production hardening | 82% | Production deploy target, Postgres runtime, CI/CD, env gates, and basic health checks are in place; observability, backup drills, incident response, and multi-instance assumptions remain |
 | 7.5 | Published asset and CDN migration | 10% | `contents/` remains canonical while published images, core JSON, Pack JSON, and `manifest.json` are exported to R2 with cache rules and immutable revision keys |
-| 7.6 | Public share URLs, metadata, and OGP | 90% | Share facade, localized metadata, language switches, Page/Panel OGP PNG, and `schemaVersion: 2` extension implemented on main; production smoke remains |
-| 8 | Scale and polish | 80% | Production auth (SSO/OAuth), full DB migration, CDN, monitoring, and operational maturity |
+| 7.6 | Public share URLs, metadata, and OGP | 94% | Share facade, localized metadata, language switches, Page/Panel OGP PNG, and `schemaVersion: 2` extension are implemented; production Reader smoke passed, SNS crawler QA remains |
+| 8 | Scale and polish | 62% | Auth and runtime primitives exist; CDN/R2, monitoring, scheduled cleanup, Redis-backed rate limits, OAuth/SSO, and commercial operations remain |
 
 ## Next Milestones
 
@@ -246,7 +284,7 @@ Priority A:
 - ✅ Add canonical path URLs for share pages so OGP does not depend on fragments
 - ✅ Add selected target highlighting
 - ✅ Add basic share link generation
-- ✅ Add Page OGP first (implemented on main, pending production smoke)
+- ✅ Add Page OGP first (implemented and smoke-tested on production Reader URLs)
 - Add read-complete card
 - Add official Quote, official Clip, and official Reaction records
 - Add `spoiler_level` and `share_policy`
@@ -312,10 +350,10 @@ schema evolution, not an immediate replacement of the active contract.
 - ✅ Polish reader interactions: panel highlighting, zoom behavior, bubble targeting, and deep-link behavior
 - ✅ Normal/study mode separation exists
 - Read-complete card exists; next step is improving next-episode/share/official-quote actions
-- ✅ Add Page OGP (implemented on main, pending production smoke)
+- ✅ Add Page OGP (implemented and smoke-tested on production Reader URLs)
 - Add official Quote, official Clip, and official Reaction surfaces before user-generated sharing
 - Add spoiler_level and share_policy to shareable units
-- Run a real deployment rehearsal with production viewer build + API + DB-backed mode
+- ✅ Run a real deployment rehearsal with production viewer build + API + DB-backed mode
 
 ### Phase 3: Complete viewer/API integration
 
@@ -384,7 +422,7 @@ critical path.
 - Next required production step: move runtime state from SQLite-on-volume to a
   Postgres provider before real paid sales or multi-instance operation.
 - Remaining: full monitoring stack, production incident response, Postgres
-  backup/restore rehearsal, and deeper recovery drills
+  backup/restore rehearsal, content-volume recovery drill, and deeper recovery drills
 
 ### Phase 7.5: Published asset and CDN migration
 
@@ -439,7 +477,7 @@ Exit criteria:
 - ✅ Share URLs do not rely on URL fragments for crawler metadata.
 - ✅ `schemaVersion: 2` content still loads, or a documented migration exists.
 - ✅ SSR can emit localized metadata without client-side JavaScript.
-- Dynamic Page/Panel OGP URLs exist with safe fallback behavior. Immutable,
+- ✅ Dynamic Page/Panel OGP URLs exist with safe fallback behavior. Immutable,
   revisioned OGP artifacts remain part of the Phase 7.5 R2/manifest path.
 - ✅ No raw `contents/`, delivery token, local-only, draft, feedback, Proposal, or
   Pack draft data is exposed in public Share HTML.
@@ -465,27 +503,29 @@ Exit criteria:
 
 ## Launch Path
 
-### To reach public beta launch
+### To stabilize the current public beta
 
-1. Run a full deployment rehearsal:
-   - viewer production build
-   - API in DB-backed mode
-   - SQLite staging bootstrap or Postgres production bootstrap
-   - real secrets/env validation
-2. Finish the last reader-facing gaps:
-   - panel highlight / zoom / deep-link polish
-   - official Quote/Clip OGP generation
-3. Add a small smoke-test checklist:
-   - login
-   - purchase/redeem
-   - gated episode read
-   - publish from CMS
-4. Ensure rollback basics exist:
-   - DB snapshot/export
-   - content backup
-   - restore instructions
-5. If the beta is expected to receive traffic spikes or host many image pages,
-   run the Phase 7.5 R2/manifest delivery path before the public announcement.
+The public beta is live. The next work is to make it repeatable and observable.
+
+1. Finish search and analytics verification:
+   - confirm Search Console Domain property ownership
+   - submit `manga-cms.com` and `read.manga-cms.com` sitemaps
+   - confirm Cloudflare Web Analytics events in the dashboard
+2. Make production content reproducible:
+   - document or automate Oumaga content restore from a rights-cleared source
+   - move runtime-only metadata patches into a seed, publish artifact, or manifest
+   - keep GitHub repository free of manga assets unless separately licensed
+3. Run production backup/recovery drills:
+   - Postgres snapshot/restore
+   - production content volume backup/restore
+   - rollback for the official site and Reader deploys
+4. Add launch monitoring:
+   - API health and DB readiness
+   - image delivery failures
+   - OGP image generation failures
+   - feedback/proposal errors
+5. If traffic or image volume increases, run the Phase 7.5 R2/manifest delivery
+   path before a larger public announcement.
 
 ### To reach commercial launch
 
