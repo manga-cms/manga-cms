@@ -11,6 +11,11 @@ import {
 } from "../lib/series-cards";
 import { isOfficialSite } from "../lib/site-config";
 
+const rootRedirectOrigin = import.meta.env.SITE_ROOT_REDIRECT_ORIGIN as string | undefined;
+if (!isOfficialSite && rootRedirectOrigin) {
+  return Astro.redirect(rootRedirectOrigin, 302);
+}
+
 const series = isOfficialSite ? [] : await getViewerSeriesCards();
 
 const viewerHighlights = [
