@@ -1,0 +1,251 @@
+---
+import type { SupportedLocale } from "@manga/domain";
+import { cloudflareWebAnalyticsConfigForRequest } from "../lib/analytics";
+import { siteConfig } from "../lib/site-config";
+
+interface Props {
+  title?: string;
+  description?: string;
+  locale?: SupportedLocale;
+  ogImage?: string;
+  ogType?: "website" | "article";
+  canonicalUrl?: string;
+  alternateUrls?: { locale: string; href: string }[];
+  robots?: string;
+  immersive?: boolean;
+}
+
+const {
+  title = siteConfig.title,
+  description = siteConfig.description,
+  locale = "ja",
+  ogImage,
+  ogType = "website",
+  canonicalUrl,
+  alternateUrls,
+  robots,
+  immersive = false,
+} = Astro.props;
+
+const siteOrigin = import.meta.env.SITE_ORIGIN as string | undefined;
+const originUrl = siteOrigin ? new URL(siteOrigin) : Astro.url;
+const currentUrl = new URL(`${Astro.url.pathname}${Astro.url.search}`, originUrl);
+const resolvedCanonical = canonicalUrl ? new URL(canonicalUrl, originUrl).href : currentUrl.href;
+const resolvedOgImage = ogImage ? new URL(ogImage, originUrl).href : undefined;
+const resolvedPathUrl = new URL(Astro.url.pathname, originUrl).href;
+const resolvedAlternateUrls = alternateUrls?.map((alternate) => ({
+  locale: alternate.locale,
+  href: new URL(alternate.href, originUrl).href,
+}));
+const cloudflareWebAnalyticsConfig = cloudflareWebAnalyticsConfigForRequest(
+  Astro.url,
+  Astro.request.headers.get("host"),
+);
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {cloudflareWebAnalyticsConfig.enabled && (
+      <script
+        defer
+        src={cloudflareWebAnalyticsConfig.scriptSrc}
+        data-cf-beacon={cloudflareWebAnalyticsConfig.beaconConfigJson}
+      />
+    )}
+    <meta name="description" content={description} />
+    {robots && <meta name="robots" content={robots} />}
+    <title>{title}</title>
+
+    <!-- OGP -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={resolvedCanonical} />
+    <meta property="og:locale" content={locale === "ja" ? "ja_JP" : "en_US"} />
+    <meta property="og:type" content={ogType} />
+    {resolvedOgImage && <meta property="og:image" content={resolvedOgImage} />}
+    <meta name="twitter:card" content={resolvedOgImage ? "summary_large_image" : "summary"} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    {resolvedOgImage && <meta name="twitter:image" content={resolvedOgImage} />}
+    <link rel="canonical" href={resolvedCanonical} />
+
+    <!-- i18n hreflang — extend when more locales are supported -->
+    {resolvedAlternateUrls ? (
+      resolvedAlternateUrls.map((alternate) => (
+        <link rel="alternate" hreflang={alternate.locale} href={alternate.href} />
+      ))
+    ) : (
+      <>
+        <link rel="alternate" hreflang="ja" href={resolvedPathUrl} />
+        <link rel="alternate" hreflang="x-default" href={resolvedPathUrl} />
+      </>
+    )}
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class={`site-mode-${siteConfig.mode}`}>
+    {!immersive && (
+      <header class="site-header">
+        <nav class="container nav-bar">
+          <a href="/" class="logo">{siteConfig.brand.label}</a>
+          <ul class="nav-links">
+            {siteConfig.navigation.map((item) => (
+              <li>
+                <a
+                  href={item.href}
+                  target={item.external ? "_blank" : undefined}
+                  rel={item.external ? "noreferrer" : undefined}
+                >
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </header>
+    )}
+
+    <main>
+      <slot />
+    </main>
+
+    {!immersive && (
+      <footer class="site-footer">
+        <div class="container">
+          <p class="text-muted">{siteConfig.description}</p>
+        </div>
+      </footer>
+    )}
+  </body>
+</html>
+
+<style is:global>
+  @import "../styles/global.css";
+
+  .site-header {
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    min-height: 3.5rem;
+    padding-block: 0.65rem;
+  }
+
+  .logo {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text);
+    letter-spacing: 0.02em;
+  }
+
+  .logo:hover {
+    color: var(--color-accent);
+  }
+
+  .nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem var(--space-lg);
+    justify-content: flex-end;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .nav-links a:hover {
+    color: var(--color-text);
+  }
+
+  .site-footer {
+    border-top: 1px solid var(--color-border);
+    padding: var(--space-xl) 0;
+    margin-top: var(--space-2xl);
+    text-align: center;
+    font-size: 0.8125rem;
+  }
+
+  .site-mode-official .site-header {
+    background: #ffffff;
+    border-bottom-color: transparent;
+    position: static;
+  }
+
+  .site-mode-official .nav-bar {
+    max-width: 880px;
+    min-height: 4.25rem;
+  }
+
+  .site-mode-official .logo {
+    color: #000000;
+    font-size: 1rem;
+    letter-spacing: 0;
+  }
+
+  .site-mode-official .nav-links {
+    gap: 0.55rem 1.25rem;
+  }
+
+  .site-mode-official .nav-links a {
+    color: #333333;
+    font-size: 0.85rem;
+  }
+
+  .site-mode-official .nav-links a:hover {
+    color: #000000;
+  }
+
+  .site-mode-official .site-footer {
+    background: #ffffff;
+    border-top-color: #eeeeee;
+    margin-top: 0;
+  }
+
+  @media (max-width: 720px) {
+    .nav-bar {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .nav-links {
+      justify-content: flex-start;
+    }
+
+    .site-mode-official .nav-bar {
+      align-items: center;
+      flex-direction: row;
+      gap: 0.75rem;
+      justify-content: space-between;
+      min-height: auto;
+      padding-block: 1rem;
+    }
+
+    .site-mode-official .nav-links {
+      column-gap: 1rem;
+      justify-content: flex-end;
+      margin-left: auto;
+      row-gap: 0.5rem;
+    }
+  }
+</style>

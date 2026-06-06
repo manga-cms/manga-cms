@@ -1,0 +1,100 @@
+---
+/**
+ * Reaction search page (SSR).
+ *
+ * Data path: API-first → content loader fallback.
+ * URL: /reaction/{tag}
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { fetchReactions, isApiConfigured } from "../../lib/api-client";
+import { findReactionPanels } from "../../data/content";
+import { isOfficialSite } from "../../lib/site-config";
+
+export const prerender = false;
+
+const { tag } = Astro.params;
+
+if (!tag) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+if (isOfficialSite) {
+  return Astro.redirect("/");
+}
+
+// --- API-first with loader fallback ---
+let items: {
+  seriesId: string;
+  seriesTitle: string;
+  episodeId: string;
+  episodeNumber: number;
+  pageNumber: number;
+  panel: { id: string; panelNumber: number; reactionTags: string[] };
+}[] = [];
+
+if (isApiConfigured()) {
+  const res = await fetchReactions(tag);
+  if (res.data) {
+    items = res.data.items;
+  }
+}
+
+if (items.length === 0) {
+  const results = findReactionPanels(tag);
+  items = results.map((r) => ({
+    seriesId: r.series.id,
+    seriesTitle: r.series.title,
+    episodeId: r.episode.id,
+    episodeNumber: r.episode.episodeNumber,
+    pageNumber: r.page.pageNumber,
+    panel: {
+      id: r.panel.id,
+      panelNumber: r.panel.panelNumber,
+      reactionTags: r.panel.reactionTags,
+    },
+  }));
+}
+---
+
+<BaseLayout title={`Reaction: ${tag}`}>
+  <section class="container page-section">
+    <h1>Reaction: <span class="accent">{tag}</span></h1>
+
+    {items.length === 0 ? (
+      <div class="card empty-state">
+        <p class="text-muted">このタグに一致するリアクションはありません。</p>
+      </div>
+    ) : (
+      <div class="results">
+        {items.map((item) => (
+          <a
+            href={`/works/${item.seriesId}/episodes/${item.episodeId}#p${item.pageNumber}`}
+            class="card result-card"
+          >
+            <div class="result-meta">
+              <span class="badge">Panel {item.panel.panelNumber}</span>
+              <span class="text-muted">{item.seriesTitle ?? item.seriesId}</span>
+            </div>
+            <div class="result-tags text-muted">
+              {item.panel.reactionTags.map((t) => (
+                <span class:list={["tag-chip", { active: t === tag }]}>{t}</span>
+              ))}
+            </div>
+          </a>
+        ))}
+      </div>
+    )}
+  </section>
+</BaseLayout>
+
+<style>
+  .page-section { padding: var(--space-xl) 0; }
+  .page-section h1 { font-size: 1.5rem; margin-bottom: var(--space-lg); }
+  .empty-state { text-align: center; padding: var(--space-2xl); }
+  .results { display: flex; flex-direction: column; gap: var(--space-md); }
+  .result-card { display: block; padding: var(--space-md); color: inherit; }
+  .result-meta { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-xs); }
+  .result-tags { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+  .tag-chip { font-size: 0.6875rem; padding: 2px 8px; border-radius: 999px; background: var(--color-surface); border: 1px solid var(--color-border); }
+  .tag-chip.active { background: var(--color-accent); color: white; border-color: var(--color-accent); }
+</style>

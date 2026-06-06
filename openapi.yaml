@@ -1,0 +1,5361 @@
+openapi: 3.1.0
+info:
+  title: Manga CMS API
+  version: 0.1.0
+  description: >
+    Contract for the current manga-cms API. Canonical content remains in
+    contents/ and uses Series -> Episode -> Page -> Panel -> Bubble terms.
+
+servers:
+  - url: https://api.example.com/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: Health
+  - name: Reader
+  - name: Feedback
+  - name: Identity
+  - name: Proposals
+  - name: GitHubHandoff
+  - name: PackManager
+  - name: Delivery
+  - name: AdminContent
+  - name: Ingestion
+  - name: Auth
+  - name: Entitlements
+  - name: RuntimeAdmin
+  - name: Redeem
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: API and dependency health
+      security: []
+      responses:
+        "200":
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /series:
+    get:
+      tags: [Reader]
+      summary: List public Series summaries
+      description: >
+        Returns Series whose publication visibility is currently public. Hidden,
+        archived, scheduled, and expired Series are omitted.
+      security: []
+      responses:
+        "200":
+          description: Series summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SeriesSummary"
+
+  /series/{seriesId}:
+    get:
+      tags: [Reader]
+      summary: Read Series detail and Episode summaries
+      description: >
+        Returns a public Series and only currently public Episode summaries.
+        Hidden, archived, scheduled, and expired Series return 404.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      responses:
+        "200":
+          description: Series detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /series/{seriesId}/episodes/{episodeId}:
+    get:
+      tags: [Reader]
+      summary: Read Episode metadata and navigation
+      description: >
+        Returns delivery URLs for entitled/free content. Locked episodes return
+        `gated: true` and no page payloads. Draft/hidden, scheduled, expired,
+        or archived Series/Episodes are not gated; they return 404.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+      responses:
+        "200":
+          description: Episode payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EpisodeResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /series/{seriesId}/episodes/{episodeId}/pages/{pageNumber}:
+    get:
+      tags: [Reader]
+      summary: Get reader Page payload
+      description: >
+        Returns page metadata, tokenized delivery image URLs, panel/bubble
+        references, and available packs. Locked pages return `gated: true` and
+        omit image URLs and panel details. Draft/hidden, scheduled, expired,
+        or archived Series/Episodes return 404.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+        - name: packs
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+      responses:
+        "200":
+          description: Reader Page payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReaderPageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /quotes/{seriesId}/{episodeId}/{pageNumber}/{panelNumber}/{bubbleNumber}:
+    get:
+      tags: [Reader]
+      summary: Read Bubble quote payload
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
+        - $ref: "#/components/parameters/panelNumber"
+        - $ref: "#/components/parameters/bubbleNumber"
+      responses:
+        "200":
+          description: Quote payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /clips/{seriesId}/{episodeId}/{pageNumber}/{panelStart}/{panelEnd}:
+    get:
+      tags: [Reader]
+      summary: Read Panel range clip payload
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
+        - name: panelStart
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: panelEnd
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Clip payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClipResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /reactions:
+    get:
+      tags: [Reader]
+      summary: Search official reaction Panels
+      security: []
+      parameters:
+        - name: tag
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Reaction search results
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReactionItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /feedback:
+    post:
+      tags: [Feedback]
+      summary: Submit reader feedback
+      description: >
+        Stores private reader feedback for internal CMS triage and does not
+        mutate canonical content or create GitHub Issues. Public Reader
+        submissions may use `anonymous` or `display_name` contributor identity.
+        Verified `github_login` identity requires a server-side GitHub
+        verification path and is not accepted by this public endpoint yet.
+      security:
+        - {}
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackPayload"
+      responses:
+        "201":
+          description: Feedback accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /feedback/{feedbackId}/status:
+    get:
+      tags: [Feedback]
+      summary: Read public feedback status
+      description: >
+        Returns minimal public status for a submitted feedback ID. This endpoint
+        is intended for submitters to check triage state and does not expose
+        private comment text, contributor identity, client IP, or admin notes.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/feedbackId"
+      responses:
+        "200":
+          description: Public feedback status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackPublicStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /identity/github/oauth/callback:
+    post:
+      tags: [Identity]
+      summary: Verify GitHub identity through server-side OAuth callback
+      description: >
+        Contract placeholder for server-side GitHub OAuth identity verification.
+        The current skeleton validates the callback payload and returns 501
+        until GitHub token exchange and user lookup are wired. It does not post
+        to GitHub or create Issues/PRs.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubOAuthCallbackInput"
+      responses:
+        "200":
+          description: Verified GitHub identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubIdentityVerificationRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "501":
+          description: OAuth callback is contracted but not implemented
+
+  /admin/identity/github/verifications:
+    get:
+      tags: [Identity]
+      summary: List verified GitHub identity records
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/GitHubIdentityVerificationStatus"
+        - name: githubLogin
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: subjectUserId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Verified GitHub identity records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GitHubIdentityVerificationRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Identity]
+      summary: Create a trusted-admin verified GitHub identity record
+      description: >
+        Trusted admin path for recording a verified GitHub login when OAuth is
+        not yet wired. This creates private runtime verification state and does
+        not call GitHub.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubIdentityTrustedCreateInput"
+      responses:
+        "201":
+          description: Verified GitHub identity record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubIdentityVerificationRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/identity/github/verifications/{verificationId}:
+    get:
+      tags: [Identity]
+      summary: Read one verified GitHub identity record
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/verificationId"
+      responses:
+        "200":
+          description: Verified GitHub identity record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubIdentityVerificationRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/identity/github/verifications/{verificationId}/revoke:
+    post:
+      tags: [Identity]
+      summary: Revoke a verified GitHub identity record
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/verificationId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubIdentityVerificationRevokeInput"
+      responses:
+        "200":
+          description: Verified GitHub identity record revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubIdentityVerificationRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/feedback:
+    get:
+      tags: [Feedback]
+      summary: List feedback records for CMS triage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/FeedbackStatus"
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Feedback records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FeedbackRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/feedback/{feedbackId}:
+    get:
+      tags: [Feedback]
+      summary: Read one feedback record for CMS triage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/feedbackId"
+      responses:
+        "200":
+          description: Feedback record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/feedback/{feedbackId}/status:
+    put:
+      tags: [Feedback]
+      summary: Update feedback triage status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/feedbackId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated feedback record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/feedback/{feedbackId}/proposal:
+    post:
+      tags: [Proposals]
+      summary: Convert private feedback into a CMS proposal
+      description: Creates a Proposal Queue record from a Reader feedback record and marks the feedback triaged.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/feedbackId"
+      responses:
+        "201":
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/feedback/{feedbackId}/github-handoff:
+    post:
+      tags: [GitHubHandoff]
+      summary: Queue a GitHub handoff for one feedback record
+      description: >
+        Creates private handoff intent only. No GitHub API call is made.
+        Direct issue or PR modes require a verified `github_login` contributor
+        identity; anonymous and display-name identities are limited to
+        `triage_issue_comment`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/feedbackId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubHandoffTargetCreateInput"
+      responses:
+        "201":
+          description: GitHub handoff queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/proposals:
+    get:
+      tags: [Proposals]
+      summary: List CMS proposal records
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ProposalStatus"
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ProposalKind"
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Proposal records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProposalRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Proposals]
+      summary: Create a CMS proposal record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposalCreateInput"
+      responses:
+        "201":
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/proposals/{proposalId}:
+    get:
+      tags: [Proposals]
+      summary: Read one proposal record
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/proposalId"
+      responses:
+        "200":
+          description: Proposal record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/proposals/{proposalId}/status:
+    put:
+      tags: [Proposals]
+      summary: Update proposal review status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/proposalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposalStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated proposal record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProposalRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/proposals/{proposalId}/github-handoff:
+    post:
+      tags: [GitHubHandoff]
+      summary: Queue a GitHub handoff for one proposal record
+      description: >
+        Creates private handoff intent only. No GitHub API call is made.
+        Direct issue or PR modes require a verified `github_login` contributor
+        identity; anonymous and display-name identities are limited to
+        `triage_issue_comment`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/proposalId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubHandoffTargetCreateInput"
+      responses:
+        "201":
+          description: GitHub handoff queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/github-handoffs:
+    get:
+      tags: [GitHubHandoff]
+      summary: List queued GitHub handoff records
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/GitHubHandoffStatus"
+        - name: targetType
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/GitHubHandoffTargetType"
+        - name: targetId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: GitHub handoff records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GitHubHandoffRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [GitHubHandoff]
+      summary: Queue a GitHub handoff record
+      description: >
+        Creates private handoff intent only. No GitHub API call is made.
+        Default mode is `triage_issue_comment`. Direct issue or PR modes are
+        rejected unless contributor identity is verified `github_login`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubHandoffCreateInput"
+      responses:
+        "201":
+          description: GitHub handoff queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/github-handoffs/triage-draft:
+    post:
+      tags: [GitHubHandoff]
+      summary: Generate a GitHub triage Issue draft
+      description: >
+        Builds a bot-authored Markdown draft from queued
+        `triage_issue_comment` handoff records. This endpoint does not call the
+        GitHub API and does not change handoff status. Operators or a later
+        sync worker can use the returned Markdown as the body of an
+        Episode-level or daily triage Issue/comment.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubTriageDraftInput"
+      responses:
+        "200":
+          description: GitHub triage draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubTriageDraft"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/github-handoffs/sync-dry-run:
+    post:
+      tags: [GitHubHandoff]
+      summary: Dry-run the GitHub handoff sync worker
+      description: >
+        Selects queued/ready handoff records, generates the triage Markdown
+        draft, and returns the planned sync result without calling GitHub or
+        mutating handoff status. This is the contract for a later GitHub App or
+        token-backed sync worker.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubHandoffSyncDryRunInput"
+      responses:
+        "200":
+          description: GitHub handoff sync dry-run result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffSyncDryRunResult"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/github-handoffs/sync-attempts:
+    get:
+      tags: [GitHubHandoff]
+      summary: List GitHub handoff sync attempts
+      description: >
+        Lists private sync-attempt runtime state. Attempts are planning and
+        retry state only; this endpoint does not call GitHub.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/GitHubHandoffSyncAttemptStatus"
+        - name: targetRepository
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: GitHub handoff sync attempts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GitHubHandoffSyncAttemptRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/github-handoffs/sync-attempts/planned:
+    post:
+      tags: [GitHubHandoff]
+      summary: Create a planned GitHub handoff sync attempt
+      description: >
+        Recomputes the sync dry-run result from queued/ready handoff records
+        and stores a planned sync attempt with retry, rate-limit, and dedupe
+        state. This endpoint does not call GitHub or mutate handoff status.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubHandoffSyncAttemptCreateInput"
+      responses:
+        "201":
+          description: Planned GitHub handoff sync attempt created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffSyncAttemptCreateResult"
+        "200":
+          description: Existing active attempt returned for the same idempotency key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffSyncAttemptCreateResult"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/github-handoffs/sync-attempts/{attemptId}:
+    get:
+      tags: [GitHubHandoff]
+      summary: Read one GitHub handoff sync attempt
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: attemptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: GitHub handoff sync attempt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffSyncAttemptRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/github-handoffs/sync-attempts/{attemptId}/status:
+    put:
+      tags: [GitHubHandoff]
+      summary: Update GitHub handoff sync attempt lifecycle status
+      description: >
+        Updates private sync-attempt lifecycle state only. This endpoint does
+        not call GitHub. `succeeded` requires `github_url` so operators cannot
+        mark a sync complete without a durable GitHub artifact URL.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: attemptId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubHandoffSyncAttemptStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated GitHub handoff sync attempt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffSyncAttemptRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/github-handoffs/{handoffId}:
+    get:
+      tags: [GitHubHandoff]
+      summary: Read one GitHub handoff record
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/handoffId"
+      responses:
+        "200":
+          description: GitHub handoff record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/github-handoffs/{handoffId}/status:
+    put:
+      tags: [GitHubHandoff]
+      summary: Update GitHub handoff queue status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/handoffId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubHandoffStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated GitHub handoff record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubHandoffRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/pack-drafts:
+    get:
+      tags: [PackManager]
+      summary: List runtime Pack draft records
+      description: Lists CMS-managed Pack drafts. These records are runtime review state and do not write canonical `packs/`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PackDraftStatus"
+        - name: type
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PackType"
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pack draft records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PackDraftRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [PackManager]
+      summary: Create a runtime Pack draft
+      description: Creates a draft review record only. It does not publish a Pack or modify canonical content.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftCreateInput"
+      responses:
+        "201":
+          description: Pack draft created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/pack-drafts/{packDraftId}:
+    get:
+      tags: [PackManager]
+      summary: Read one runtime Pack draft
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      responses:
+        "200":
+          description: Pack draft record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/pack-drafts/{packDraftId}/status:
+    put:
+      tags: [PackManager]
+      summary: Update Pack draft review status
+      description: Updates runtime review state only. `published` is an intent/status value here and does not write canonical `packs/`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftStatusUpdateInput"
+      responses:
+        "200":
+          description: Updated Pack draft record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/pack-drafts/{packDraftId}/adopt-proposal:
+    post:
+      tags: [PackManager]
+      summary: Adopt an accepted Proposal into a Pack draft
+      description: >
+        Adds a Pack draft entry from an accepted Proposal Queue record. This does
+        not modify canonical Episode JSON or published Pack manifests.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftAdoptProposalInput"
+      responses:
+        "200":
+          description: Pack draft with adopted entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/pack-drafts/{packDraftId}/translation-import:
+    post:
+      tags: [PackManager]
+      summary: Validate or apply Bubble translation rows into a Translation Pack draft
+      description: >
+        Validates normalized CSV/JSON translation rows against canonical
+        Episode Bubble IDs and optionally appends planned entries to a runtime
+        TRANSLATION Pack draft. This does not mutate canonical Episode JSON,
+        duplicate Series, export packs, or post to GitHub.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranslationPackDraftImportInput"
+      responses:
+        "200":
+          description: Translation import validation result, and Pack draft when applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslationPackDraftImportResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/pack-drafts/{packDraftId}/export:
+    post:
+      tags: [PackManager]
+      summary: Export a Pack draft into canonical packs storage
+      description: >
+        Writes `packs/{pack_id}/pack.json` from an approved or published runtime
+        Pack draft. This is the explicit boundary where review state becomes a
+        canonical Pack manifest.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftExportInput"
+      responses:
+        "200":
+          description: Pack manifest exported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftExportResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/rights/grants:
+    get:
+      tags: [Rights]
+      summary: List runtime Rights grants
+      description: Lists CMS governance grants. These records are runtime permission state and are separate from reader entitlements.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: seriesId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: permission
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RightsPermission"
+        - name: includeRevoked
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Rights grant records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RightsGrantRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Rights]
+      summary: Create a runtime Rights grant
+      description: Creates a governance grant only. It does not grant reader entitlement or mutate canonical content.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RightsGrantCreateInput"
+      responses:
+        "201":
+          description: Rights grant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RightsGrantRecord"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/rights/grants/{grantId}/revoke:
+    post:
+      tags: [Rights]
+      summary: Revoke a runtime Rights grant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/grantId"
+      responses:
+        "200":
+          description: Revoked Rights grant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RightsGrantRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/rights/check:
+    post:
+      tags: [Rights]
+      summary: Check whether a user has a Rights permission
+      description: Checks runtime governance grants only. This endpoint does not check reader entitlements.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RightsPermissionCheckInput"
+      responses:
+        "200":
+          description: Rights permission check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RightsPermissionCheckResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /deliver/{pageId}:
+    get:
+      tags: [Delivery]
+      summary: Token-verified image delivery
+      description: >
+        Serves a page image only when the short-lived delivery token matches
+        the requested page. The current implementation accepts `lang` and the
+        legacy `locale` query name.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: pageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+        - name: locale
+          in: query
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Image bytes, or a JSON placeholder when the image file is absent locally.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+            X-Watermark-Applied:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /og/page/{pageId}:
+    get:
+      tags: [Delivery]
+      summary: Redirect to a stable Page OGP image delivery URL
+      description: >
+        Stable public Page OGP image endpoint. The current MVP only supports
+        public free Episode pages and redirects to the tokenized delivery
+        endpoint, so raw filesystem paths are never exposed. Future dynamic OGP
+        composition can replace the redirect behavior behind this stable URL.
+      security: []
+      parameters:
+        - name: pageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lang
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+        - name: locale
+          in: query
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to tokenized page image delivery.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+            Cache-Control:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/series:
+    get:
+      tags: [AdminContent]
+      summary: List Series for CMS editing
+      description: Returns all Series, including hidden, archived, scheduled, and expired Series.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin Series summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SeriesSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [AdminContent]
+      summary: Create Series
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSeriesInput"
+      responses:
+        "201":
+          description: Created Series
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Series"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/series/{seriesId}:
+    get:
+      tags: [AdminContent]
+      summary: Read Series for CMS editing
+      description: Returns one Series with all Episode summaries, bypassing Public Reader visibility gating.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      responses:
+        "200":
+          description: Admin Series detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [AdminContent]
+      summary: Update Series metadata
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSeriesInput"
+      responses:
+        "200":
+          description: Updated Series
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Series"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/series/{seriesId}/episodes:
+    post:
+      tags: [AdminContent]
+      summary: Create or save Episode
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Episode"
+      responses:
+        "201":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/series/{seriesId}/episodes/{episodeId}:
+    get:
+      tags: [AdminContent]
+      summary: Read full Episode for CMS editing
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+      responses:
+        "200":
+          description: Episode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Episode"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [AdminContent]
+      summary: Update Episode
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Episode"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/series/{seriesId}/episodes/{episodeId}/pages/{pageNumber}/image:
+    get:
+      tags: [AdminContent]
+      summary: Read admin Page image preview
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+      responses:
+        "200":
+          description: Image bytes
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [AdminContent]
+      summary: Upload Page image and update Episode image path
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageNumber"
+        - name: locale
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ja
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+          image/gif:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Uploaded image metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageImageUploadResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "413":
+          description: Uploaded image exceeds size limit
+        "415":
+          description: Unsupported media type
+
+  /admin/series/{seriesId}/publish:
+    post:
+      tags: [AdminContent]
+      summary: Reload/publish Series data
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+      responses:
+        "200":
+          description: Publish result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublishResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs:
+    get:
+      tags: [Ingestion]
+      summary: List ingestion jobs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ingestion jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestionJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Ingestion]
+      summary: Create ingestion job
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                draft:
+                  $ref: "#/components/schemas/DraftPayload"
+      responses:
+        "201":
+          description: Created ingestion job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/ingestion/import/prepared-directory:
+    post:
+      tags: [Ingestion]
+      summary: Import prepared local episode assets into an ingestion draft job
+      description: >
+        Reads image files from a path under the API server IMPORTS_DIR, copies
+        them into draft asset storage, and creates an ingestion draft job.
+        This does not write canonical contents/ data until the job is reviewed
+        and confirmed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreparedDirectoryImportInput"
+      responses:
+        "201":
+          description: Created ingestion job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionJob"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs/{jobId}:
+    get:
+      tags: [Ingestion]
+      summary: Read ingestion job detail and draft
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          description: Ingestion job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs/{jobId}/review-candidates:
+    get:
+      tags: [Ingestion]
+      summary: Read Page / Panel / Bubble candidates for review
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          description: Review candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestionReviewCandidate"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs/{jobId}/review-decisions:
+    put:
+      tags: [Ingestion]
+      summary: Persist one candidate review decision
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestionReviewDecisionInput"
+      responses:
+        "200":
+          description: Updated review candidate list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, items]
+                properties:
+                  ok:
+                    type: boolean
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/IngestionReviewCandidate"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs/{jobId}/write-reviewed-draft:
+    post:
+      tags: [Ingestion]
+      summary: Replace the draft with accepted review candidates only
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          description: Reviewed draft
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, draft]
+                properties:
+                  ok:
+                    type: boolean
+                  draft:
+                    $ref: "#/components/schemas/DraftPayload"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/ingestion/jobs/{jobId}/draft:
+    put:
+      tags: [Ingestion]
+      summary: Update ingestion draft payload
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftPayload"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/ingestion/jobs/{jobId}/submit:
+    post:
+      tags: [Ingestion]
+      summary: Submit draft for review
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/ingestion/jobs/{jobId}/confirm:
+    post:
+      tags: [Ingestion]
+      summary: Confirm draft into contents/
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          description: Confirm result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [confirmed, seriesId]
+                properties:
+                  confirmed:
+                    type: boolean
+                  seriesId:
+                    type: string
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/ingestion/jobs/{jobId}/cancel:
+    post:
+      tags: [Ingestion]
+      summary: Cancel ingestion job
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/jobId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /auth/dev-login:
+    post:
+      tags: [Auth]
+      summary: Development login
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Session token and user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Magic-link login request
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Login link result
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          description: Email or DB not configured
+
+  /auth/verify:
+    get:
+      tags: [Auth]
+      summary: Magic-link verification
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          description: DB not configured
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user
+      security:
+        - {}
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authenticated]
+                properties:
+                  authenticated:
+                    type: boolean
+                    const: false
+
+  /admin/entitlements/grant:
+    post:
+      tags: [Entitlements]
+      summary: Grant entitlement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantEntitlementInput"
+      responses:
+        "201":
+          description: Entitlement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entitlement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /entitlements/check:
+    get:
+      tags: [Entitlements]
+      summary: Check current entitlement for an episode
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: seriesId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: episodeId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Access check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntitlementCheckResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /admin/entitlements/list:
+    get:
+      tags: [Entitlements]
+      summary: List entitlements for a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Entitlements
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Entitlement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/entitlements/revoke:
+    post:
+      tags: [Entitlements]
+      summary: Revoke entitlement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entitlementId]
+              properties:
+                entitlementId:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/api-keys:
+    get:
+      tags: [RuntimeAdmin]
+      summary: List API keys
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: API keys
+          content:
+            application/json:
+              schema:
+                type: object
+        "501":
+          description: Requires DATABASE_URL
+    post:
+      tags: [RuntimeAdmin]
+      summary: Create API key
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+      responses:
+        "201":
+          description: API key
+          content:
+            application/json:
+              schema:
+                type: object
+        "501":
+          description: Requires DATABASE_URL
+
+  /admin/api-keys/{id}/revoke:
+    post:
+      tags: [RuntimeAdmin]
+      summary: Revoke API key
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "501":
+          description: Requires DATABASE_URL
+
+  /admin/purchases:
+    get:
+      tags: [RuntimeAdmin]
+      summary: List purchase records
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Purchases
+          content:
+            application/json:
+              schema:
+                type: object
+        "501":
+          description: Requires DATABASE_URL
+    post:
+      tags: [RuntimeAdmin]
+      summary: Create purchase record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, codes]
+              properties:
+                productId:
+                  type: string
+                codes:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "201":
+          description: Purchase
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "501":
+          description: Requires DATABASE_URL
+
+  /admin/auth/cleanup:
+    post:
+      tags: [RuntimeAdmin]
+      summary: Cleanup expired and consumed auth tokens
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cleanup result
+          content:
+            application/json:
+              schema:
+                type: object
+        "501":
+          description: Requires DATABASE_URL
+
+  /redeem:
+    post:
+      tags: [Redeem]
+      summary: Redeem code
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: Redeem result
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "501":
+          description: Requires DATABASE_URL
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: HMAC session token
+
+  parameters:
+    seriesId:
+      name: seriesId
+      in: path
+      required: true
+      schema:
+        type: string
+    episodeId:
+      name: episodeId
+      in: path
+      required: true
+      schema:
+        type: string
+    pageNumber:
+      name: pageNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    panelNumber:
+      name: panelNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    bubbleNumber:
+      name: bubbleNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    jobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+    feedbackId:
+      name: feedbackId
+      in: path
+      required: true
+      schema:
+        type: string
+    proposalId:
+      name: proposalId
+      in: path
+      required: true
+      schema:
+        type: string
+    handoffId:
+      name: handoffId
+      in: path
+      required: true
+      schema:
+        type: string
+    verificationId:
+      name: verificationId
+      in: path
+      required: true
+      schema:
+        type: string
+    packDraftId:
+      name: packDraftId
+      in: path
+      required: true
+      schema:
+        type: string
+    grantId:
+      name: grantId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    Ok:
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok]
+            properties:
+              ok:
+                type: boolean
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Permission denied
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limited
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+    HealthResponse:
+      type: object
+      required: [status, env, seriesCount, checks, ready]
+      properties:
+        status:
+          type: string
+        env:
+          type: string
+        seriesCount:
+          type: integer
+        checks:
+          type: object
+        ready:
+          type: boolean
+
+    BoundingBox:
+      type: object
+      required: [x, y, width, height]
+      properties:
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+        imageId:
+          type: string
+        coordinateSpace:
+          type: string
+          enum: [pixel]
+
+    ContentFlags:
+      type: object
+      required: [shareable, feedback_enabled]
+      properties:
+        shareable:
+          type: boolean
+        feedback_enabled:
+          type: boolean
+        contains_spoiler:
+          type: boolean
+
+    PublicationVisibility:
+      type: string
+      enum: [public, hidden, archived]
+      description: >
+        Public Reader visibility state. `public` content can be shown when its
+        publication window is active. `hidden` is admin-only/draft-equivalent.
+        `archived` is admin-only and omitted from public discovery and direct
+        reader endpoints.
+
+    SeriesPublicationType:
+      type: string
+      enum: [serial, oneshot]
+      description: >
+        Content shape. `serial` Series have normal Series detail and Episode
+        navigation. `oneshot` Series contain a single primary Episode and may
+        route cards directly to that Episode.
+
+    SeriesLifecycleStatus:
+      type: string
+      enum: [ongoing, completed, hiatus]
+      description: >
+        Production lifecycle independent from content shape. Use `ongoing` for
+        active serialization, `completed` for finished works, and `hiatus` for
+        paused serial works.
+
+    ShareTargetKind:
+      type: string
+      enum: [episode, page, panel, bubble, clip]
+
+    OgpTargetKind:
+      type: string
+      enum: [page, panel, bubble, clip]
+
+    LocalizedContentMetadata:
+      type: object
+      description: Optional localized metadata for public share and crawler text.
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        shareTitle:
+          type: string
+        shareDescription:
+          type: string
+        authorLabel:
+          type: string
+          description: Localized author/creator display label for public cards and share metadata.
+
+    PublicImageReference:
+      type: object
+      description: Optional public-share image reference or published asset metadata.
+      properties:
+        path:
+          type: string
+        url:
+          type: string
+          description: Root-relative or http(s) public URL.
+        imageId:
+          type: string
+        contentHash:
+          type: string
+        revisionId:
+          type: string
+        alt:
+          type: string
+        width:
+          type: number
+        height:
+          type: number
+        mimeType:
+          type: string
+
+    CreatorCredit:
+      type: object
+      required: [displayName]
+      description: Future-ready creator credit entry. MVP display may use ContentPublicMetadata.authorLabel.
+      properties:
+        role:
+          type: string
+          description: Free-form role label such as author, artist, writer, translator, or editor.
+        displayName:
+          type: string
+        localizedDisplayNames:
+          type: object
+          additionalProperties:
+            type: string
+        url:
+          type: string
+          description: Root-relative or http(s) public URL.
+        sortOrder:
+          type: integer
+          minimum: 0
+
+    ContentSharePolicyMetadata:
+      type: object
+      properties:
+        allowedTargets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShareTargetKind"
+
+    ContentOgpPolicyMetadata:
+      type: object
+      properties:
+        allowedTargets:
+          type: array
+          items:
+            $ref: "#/components/schemas/OgpTargetKind"
+        allowCrop:
+          type: boolean
+        stylePreset:
+          type: string
+
+    ContentPublicSafetyMetadata:
+      type: object
+      properties:
+        rightsClearedForPreview:
+          type: boolean
+        hidden:
+          type: boolean
+        archived:
+          type: boolean
+
+    ContentPublicMetadata:
+      type: object
+      description: >
+        Optional schemaVersion: 2-compatible public share metadata extension.
+        Missing metadata preserves legacy behavior.
+      properties:
+        revisionId:
+          type: string
+        publishedRevisionId:
+          type: string
+        contentHash:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        canonicalLocale:
+          type: string
+        availableLocales:
+          type: array
+          items:
+            type: string
+        defaultReaderLocale:
+          type: string
+        authorLabel:
+          type: string
+          description: MVP single-line creator display label for public cards and share metadata.
+        creatorCredits:
+          type: array
+          description: Future-ready ordered creator credits. Use authorLabel for MVP display when present.
+          items:
+            $ref: "#/components/schemas/CreatorCredit"
+        localized:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/LocalizedContentMetadata"
+        pageImages:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/PublicImageReference"
+        coverImage:
+          $ref: "#/components/schemas/PublicImageReference"
+        shareImage:
+          $ref: "#/components/schemas/PublicImageReference"
+        shareImageAlt:
+          type: string
+        sharePolicy:
+          $ref: "#/components/schemas/ContentSharePolicyMetadata"
+        ogpPolicy:
+          $ref: "#/components/schemas/ContentOgpPolicyMetadata"
+        publicSafety:
+          $ref: "#/components/schemas/ContentPublicSafetyMetadata"
+
+    Bubble:
+      type: object
+      required: [bubbleId, panelId, stableRef, bubbleNumber, bubbleType, textOriginal, bbox]
+      properties:
+        bubbleId:
+          type: string
+        panelId:
+          type: string
+          nullable: true
+        stableRef:
+          type: string
+        displayRef:
+          type: string
+        status:
+          type: string
+          enum: [active, deprecated, deleted, merged]
+        id:
+          type: string
+          deprecated: true
+        bubbleNumber:
+          type: integer
+        shortId:
+          type: string
+          deprecated: true
+        bubbleType:
+          type: string
+          enum: [speech, thought, narration, sfx, caption, other]
+        textOriginal:
+          type: string
+        speaker:
+          type: string
+          nullable: true
+        speakerConfidence:
+          type: string
+          enum: [confirmed, inferred, unknown]
+        textDirection:
+          type: string
+          enum: [horizontal, vertical]
+        lang:
+          type: string
+        flags:
+          $ref: "#/components/schemas/ContentFlags"
+        metadata:
+          $ref: "#/components/schemas/ContentPublicMetadata"
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
+
+    Panel:
+      type: object
+      required: [panelId, stableRef, panelNumber, bbox, reactionTags]
+      properties:
+        panelId:
+          type: string
+        stableRef:
+          type: string
+        displayRef:
+          type: string
+        status:
+          type: string
+          enum: [active, deprecated, deleted, merged]
+        id:
+          type: string
+          deprecated: true
+        panelNumber:
+          type: integer
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
+        reactionTags:
+          type: array
+          items:
+            type: string
+        flags:
+          $ref: "#/components/schemas/ContentFlags"
+        metadata:
+          $ref: "#/components/schemas/ContentPublicMetadata"
+
+    Page:
+      type: object
+      required: [pageId, stableRef, pageNumber, images, width, height, panels, bubbles]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [2]
+        pageId:
+          type: string
+        stableRef:
+          type: string
+        id:
+          type: string
+          deprecated: true
+        pageNumber:
+          type: integer
+        images:
+          type: object
+          description: >
+            Locale-keyed canonical Page image references. `ja` is the canonical
+            source image key, `en` may point at a localized page image, and
+            Reader/OGP selection should prefer the requested locale then fall
+            back to canonical locale.
+          additionalProperties:
+            type: string
+        imageId:
+          type: string
+        imageHash:
+          type: string
+        coordinateSpace:
+          type: string
+          enum: [pixel]
+        width:
+          type: number
+        height:
+          type: number
+        displayRef:
+          type: string
+        status:
+          type: string
+          enum: [active, deprecated, deleted, merged]
+        flags:
+          $ref: "#/components/schemas/ContentFlags"
+        metadata:
+          $ref: "#/components/schemas/ContentPublicMetadata"
+        panels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Panel"
+        bubbles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bubble"
+        availablePacks:
+          type: array
+          description: Published canonical Packs with entries scoped to this Page.
+          items:
+            $ref: "#/components/schemas/PublishedPack"
+
+    Episode:
+      type: object
+      required: [id, episodeNumber, title, publishedAt, pages]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [2]
+        editionId:
+          type: string
+        revisionId:
+          type: string
+        id:
+          type: string
+        episodeNumber:
+          type: integer
+        title:
+          type: string
+        publishedAt:
+          type: string
+          description: Display/publication label. Does not by itself schedule availability.
+        publishStartAt:
+          type: string
+          format: date-time
+          description: Optional inclusive publication start. Future values are scheduled and hidden from Public Reader endpoints.
+        publishEndAt:
+          type: string
+          format: date-time
+          description: Optional exclusive publication end. Past values are expired and hidden from Public Reader endpoints.
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
+        purchaseUrl:
+          type: string
+          description: Optional public CTA URL for entitlement-gated Episodes. Must be root-relative or http(s).
+        redeemUrl:
+          type: string
+          description: Optional public redeem CTA URL for entitlement-gated Episodes. Must be root-relative or http(s).
+        metadata:
+          $ref: "#/components/schemas/ContentPublicMetadata"
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Page"
+
+    Series:
+      type: object
+      required: [id, title, description, publicationType, lifecycleStatus, status, coverUrl, episodes]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        publicationType:
+          $ref: "#/components/schemas/SeriesPublicationType"
+        lifecycleStatus:
+          $ref: "#/components/schemas/SeriesLifecycleStatus"
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+          deprecated: true
+          description: Legacy alias for lifecycleStatus.
+        coverUrl:
+          type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+          description: Optional inclusive publication start. Future values are scheduled and hidden from Public Reader endpoints.
+        publishEndAt:
+          type: string
+          format: date-time
+          description: Optional exclusive publication end. Past values are expired and hidden from Public Reader endpoints.
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
+        metadata:
+          $ref: "#/components/schemas/ContentPublicMetadata"
+        episodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Episode"
+
+    SeriesSummary:
+      type: object
+      required: [id, title, description, publicationType, lifecycleStatus, status, coverUrl, episodeCount]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        publicationType:
+          $ref: "#/components/schemas/SeriesPublicationType"
+        lifecycleStatus:
+          $ref: "#/components/schemas/SeriesLifecycleStatus"
+        status:
+          type: string
+          deprecated: true
+          description: Legacy alias for lifecycleStatus.
+        coverUrl:
+          type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+        publishEndAt:
+          type: string
+          format: date-time
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
+        metadata:
+          $ref: "#/components/schemas/ContentPublicMetadata"
+        episodeCount:
+          type: integer
+          description: Count of currently public Episodes.
+
+    SeriesDetail:
+      type: object
+      required: [id, title, description, publicationType, lifecycleStatus, status, coverUrl, episodes]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        publicationType:
+          $ref: "#/components/schemas/SeriesPublicationType"
+        lifecycleStatus:
+          $ref: "#/components/schemas/SeriesLifecycleStatus"
+        status:
+          type: string
+          deprecated: true
+          description: Legacy alias for lifecycleStatus.
+        coverUrl:
+          type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
+        metadata:
+          $ref: "#/components/schemas/ContentPublicMetadata"
+        publishStartAt:
+          type: string
+          format: date-time
+        publishEndAt:
+          type: string
+          format: date-time
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
+        episodes:
+          type: array
+          items:
+            type: object
+            required: [id, episodeNumber, title, publishedAt, pageCount]
+            properties:
+              id:
+                type: string
+              episodeNumber:
+                type: integer
+              title:
+                type: string
+              publishedAt:
+                type: string
+              publishStartAt:
+                type: string
+                format: date-time
+              publishEndAt:
+                type: string
+                format: date-time
+              visibility:
+                $ref: "#/components/schemas/PublicationVisibility"
+              metadata:
+                $ref: "#/components/schemas/ContentPublicMetadata"
+              pageCount:
+                type: integer
+
+    EpisodeNav:
+      type: object
+      required: [id, title, episodeNumber]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        episodeNumber:
+          type: integer
+
+    EpisodeResponse:
+      type: object
+      required: [series, episode, gated, prev, next]
+      properties:
+        series:
+          type: object
+          required: [id, title]
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            coverUrl:
+              type: string
+            shareImageUrl:
+              type: string
+              description: Stable public image URL for SEO/OGP metadata.
+            metadata:
+              $ref: "#/components/schemas/ContentPublicMetadata"
+            publishStartAt:
+              type: string
+              format: date-time
+            publishEndAt:
+              type: string
+              format: date-time
+            visibility:
+              $ref: "#/components/schemas/PublicationVisibility"
+        episode:
+          $ref: "#/components/schemas/Episode"
+        gated:
+          type: boolean
+        message:
+          type: string
+        prev:
+          anyOf:
+            - $ref: "#/components/schemas/EpisodeNav"
+            - type: "null"
+        next:
+          anyOf:
+            - $ref: "#/components/schemas/EpisodeNav"
+            - type: "null"
+
+    ReaderPageResponse:
+      type: object
+      required: [seriesId, episodeId, pageId, pageNumber, width, height, gated]
+      properties:
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        pageNumber:
+          type: integer
+        images:
+          type: object
+          additionalProperties:
+            type: string
+        width:
+          type: number
+        height:
+          type: number
+        gated:
+          type: boolean
+        message:
+          type: string
+        panels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Panel"
+        availablePacks:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishedPack"
+
+    QuoteResponse:
+      type: object
+      required: [seriesId, episodeId, pageId, panelId, pageNumber, panelNumber, bubble, panelPreview]
+      properties:
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        panelId:
+          type: string
+        pageNumber:
+          type: integer
+        panelNumber:
+          type: integer
+        bubble:
+          $ref: "#/components/schemas/Bubble"
+        panelPreview:
+          $ref: "#/components/schemas/Panel"
+
+    ClipResponse:
+      type: object
+      required: [seriesId, episodeId, pageId, pageNumber, panelStart, panelEnd, panels]
+      properties:
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        pageNumber:
+          type: integer
+        panelStart:
+          type: integer
+        panelEnd:
+          type: integer
+        panels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Panel"
+
+    ReactionItem:
+      type: object
+      required: [seriesId, seriesTitle, episodeId, episodeNumber, pageNumber, panel]
+      properties:
+        seriesId:
+          type: string
+        seriesTitle:
+          type: string
+        episodeId:
+          type: string
+        episodeNumber:
+          type: integer
+        pageNumber:
+          type: integer
+        panel:
+          $ref: "#/components/schemas/Panel"
+
+    AnonymousContributorIdentity:
+      type: object
+      additionalProperties: false
+      required: [identity_level]
+      properties:
+        identity_level:
+          type: string
+          enum: [anonymous]
+
+    DisplayNameContributorIdentity:
+      type: object
+      additionalProperties: false
+      required: [identity_level, display_name]
+      properties:
+        identity_level:
+          type: string
+          enum: [display_name]
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 80
+
+    GitHubLoginContributorIdentity:
+      type: object
+      additionalProperties: false
+      required: [identity_level, github_login, verified]
+      properties:
+        identity_level:
+          type: string
+          enum: [github_login]
+        github_login:
+          type: string
+          minLength: 1
+          maxLength: 39
+          pattern: "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"
+        github_user_id:
+          type: string
+          maxLength: 120
+        verified:
+          type: boolean
+          const: true
+
+    ContributorIdentity:
+      oneOf:
+        - $ref: "#/components/schemas/AnonymousContributorIdentity"
+        - $ref: "#/components/schemas/DisplayNameContributorIdentity"
+        - $ref: "#/components/schemas/GitHubLoginContributorIdentity"
+      discriminator:
+        propertyName: identity_level
+      description: >
+        Contributor attribution level for reader feedback and proposals.
+        Missing identity is treated as `anonymous`. Only verified
+        `github_login` can be considered for direct GitHub Issue/PR handoff.
+
+    FeedbackContributorIdentity:
+      oneOf:
+        - $ref: "#/components/schemas/AnonymousContributorIdentity"
+        - $ref: "#/components/schemas/DisplayNameContributorIdentity"
+      discriminator:
+        propertyName: identity_level
+      description: >
+        Contributor identity accepted by public `/feedback` submissions.
+        `github_login` is intentionally excluded until the API has a
+        server-side GitHub verification path.
+
+    GitHubIdentityVerificationMethod:
+      type: string
+      enum: [oauth_callback, trusted_admin]
+
+    GitHubIdentityVerificationStatus:
+      type: string
+      enum: [active, revoked]
+
+    GitHubIdentityTrustedCreateInput:
+      type: object
+      additionalProperties: false
+      required: [github_login]
+      properties:
+        github_login:
+          type: string
+          minLength: 1
+          maxLength: 39
+          pattern: "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"
+        github_user_id:
+          type: string
+          maxLength: 120
+        subject_user_id:
+          type: string
+          nullable: true
+          maxLength: 120
+        note:
+          type: string
+          maxLength: 2000
+
+    GitHubOAuthCallbackInput:
+      type: object
+      additionalProperties: false
+      required: [code, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        state:
+          type: string
+          minLength: 1
+          maxLength: 500
+        redirect_uri:
+          type: string
+          format: uri
+
+    GitHubIdentityVerificationRevokeInput:
+      type: object
+      additionalProperties: false
+      properties:
+        revoke_note:
+          type: string
+          maxLength: 2000
+
+    GitHubIdentityVerificationRecord:
+      type: object
+      required:
+        - verification_id
+        - status
+        - verification_method
+        - github_login
+        - contributor_identity
+        - created_at
+        - updated_at
+        - verified_at
+      properties:
+        verification_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/GitHubIdentityVerificationStatus"
+        verification_method:
+          $ref: "#/components/schemas/GitHubIdentityVerificationMethod"
+        github_login:
+          type: string
+        github_user_id:
+          type: string
+        subject_user_id:
+          type: string
+          nullable: true
+        contributor_identity:
+          $ref: "#/components/schemas/GitHubLoginContributorIdentity"
+        verified_by:
+          type: string
+          nullable: true
+        note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        verified_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+        revoked_by:
+          type: string
+          nullable: true
+        revoke_note:
+          type: string
+
+    FeedbackPayload:
+      type: object
+      additionalProperties: false
+      required: [series_id, episode_id, mode, issue_type, source_url]
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        page_id:
+          type: string
+          nullable: true
+        panel_id:
+          type: string
+          nullable: true
+        bubble_id:
+          type: string
+          nullable: true
+        mode:
+          type: string
+          enum: [read, explore, completion]
+        issue_type:
+          type: string
+          enum: [typo, mistranslation, better_translation, missing_note, display, broken_link, spoiler, other]
+        comment:
+          type: string
+          maxLength: 1000
+        lang:
+          type: string
+          maxLength: 16
+        current_text:
+          type: string
+          maxLength: 2000
+        current_translation:
+          type: string
+          maxLength: 2000
+        suggested_text:
+          type: string
+          maxLength: 2000
+        user_id:
+          type: string
+          nullable: true
+          maxLength: 120
+        contributor_identity:
+          $ref: "#/components/schemas/FeedbackContributorIdentity"
+        contributor_terms_accepted:
+          type: boolean
+          description: >
+            Optional acknowledgement that the submitter accepted the feedback
+            contributor terms shown by the Reader. Missing is allowed for
+            backward compatibility.
+        source_url:
+          type: string
+          format: uri
+        user_agent:
+          type: string
+          maxLength: 500
+        client_time:
+          type: string
+          maxLength: 80
+        website:
+          type: string
+          maxLength: 200
+
+    FeedbackStatus:
+      type: string
+      enum: [new, triaged, closed]
+
+    FeedbackRecord:
+      type: object
+      required: [feedback_id, status, created_at, series_id, episode_id, mode, issue_type, source_url]
+      properties:
+        feedback_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/FeedbackStatus"
+        created_at:
+          type: string
+          format: date-time
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        page_id:
+          type: string
+          nullable: true
+        panel_id:
+          type: string
+          nullable: true
+        bubble_id:
+          type: string
+          nullable: true
+        mode:
+          type: string
+          enum: [read, explore, completion]
+        issue_type:
+          type: string
+          enum: [typo, mistranslation, better_translation, missing_note, display, broken_link, spoiler, other]
+        comment:
+          type: string
+        lang:
+          type: string
+        current_text:
+          type: string
+        current_translation:
+          type: string
+        suggested_text:
+          type: string
+        user_id:
+          type: string
+          nullable: true
+        contributor_identity:
+          $ref: "#/components/schemas/ContributorIdentity"
+        contributor_terms_accepted:
+          type: boolean
+        source_url:
+          type: string
+          format: uri
+        user_agent:
+          type: string
+        client_time:
+          type: string
+        triage_note:
+          type: string
+        triaged_by:
+          type: string
+        triaged_at:
+          type: string
+          format: date-time
+        client_ip:
+          type: string
+          nullable: true
+
+    FeedbackStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/FeedbackStatus"
+        triage_note:
+          type: string
+
+    FeedbackResponse:
+      type: object
+      required: [ok, feedback_id]
+      properties:
+        ok:
+          type: boolean
+        feedback_id:
+          type: string
+
+    FeedbackPublicStatus:
+      type: object
+      required: [feedback_id, status, created_at]
+      properties:
+        feedback_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/FeedbackStatus"
+        created_at:
+          type: string
+          format: date-time
+        triaged_at:
+          type: string
+          format: date-time
+
+    ProposalKind:
+      type: string
+      enum: [translation, typo, footnote, commentary, tag, structure]
+
+    ProposalStatus:
+      type: string
+      enum: [new, triaged, accepted, rejected, closed]
+
+    ProposalTarget:
+      type: object
+      required: [series_id, episode_id]
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        page_id:
+          type: string
+          nullable: true
+        panel_id:
+          type: string
+          nullable: true
+        bubble_id:
+          type: string
+          nullable: true
+
+    ProposalCreateInput:
+      allOf:
+        - $ref: "#/components/schemas/ProposalTarget"
+        - type: object
+          description: >
+            Proposal Queue create input. Created proposals always start with
+            status `new`. For `kind: translation`, CMS clients should provide
+            bubble-level `page_id`, `panel_id`, `bubble_id`, `lang`,
+            `source_text`, and `suggested_text`. `current_text` remains as a
+            backward-compatible alias for source text.
+          required: [kind]
+          properties:
+            kind:
+              $ref: "#/components/schemas/ProposalKind"
+            status:
+              $ref: "#/components/schemas/ProposalStatus"
+              description: Optional for backward compatibility; create requests must omit it or set `new`.
+            source_feedback_id:
+              type: string
+              nullable: true
+            lang:
+              type: string
+              maxLength: 16
+            source_text:
+              type: string
+              maxLength: 4000
+              description: Source/original bubble text for translation proposals.
+            current_text:
+              type: string
+              maxLength: 4000
+              description: Backward-compatible alias for source_text.
+            current_translation:
+              type: string
+              maxLength: 4000
+            suggested_text:
+              type: string
+              maxLength: 4000
+            comment:
+              type: string
+              maxLength: 2000
+            proposer_id:
+              type: string
+              nullable: true
+              maxLength: 120
+            contributor_identity:
+              $ref: "#/components/schemas/ContributorIdentity"
+            source_url:
+              type: string
+              format: uri
+
+    ProposalRecord:
+      allOf:
+        - $ref: "#/components/schemas/ProposalCreateInput"
+        - type: object
+          required: [proposal_id, status, created_at, updated_at]
+          properties:
+            proposal_id:
+              type: string
+            status:
+              $ref: "#/components/schemas/ProposalStatus"
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            review_note:
+              type: string
+            reviewed_by:
+              type: string
+            reviewed_at:
+              type: string
+              format: date-time
+
+    ProposalStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/ProposalStatus"
+        review_note:
+          type: string
+          maxLength: 2000
+
+    GitHubHandoffTargetType:
+      type: string
+      enum: [feedback, proposal]
+
+    GitHubHandoffMode:
+      type: string
+      enum: [triage_issue_comment, direct_issue, direct_pr]
+      description: >
+        `triage_issue_comment` appends reviewed items to a bot-authored triage
+        issue. `direct_issue` and `direct_pr` require verified `github_login`
+        contributor identity.
+
+    GitHubHandoffStatus:
+      type: string
+      enum: [queued, ready, sent, failed, canceled]
+
+    GitHubHandoffTargetCreateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        mode:
+          $ref: "#/components/schemas/GitHubHandoffMode"
+        contributor_identity:
+          $ref: "#/components/schemas/ContributorIdentity"
+        requested_by:
+          type: string
+          nullable: true
+          maxLength: 120
+        triage_group_key:
+          type: string
+          maxLength: 200
+        title:
+          type: string
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 8000
+        metadata:
+          type: object
+          additionalProperties: true
+
+    GitHubHandoffCreateInput:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id]
+      properties:
+        target_type:
+          $ref: "#/components/schemas/GitHubHandoffTargetType"
+        target_id:
+          type: string
+          minLength: 1
+        mode:
+          $ref: "#/components/schemas/GitHubHandoffMode"
+        contributor_identity:
+          $ref: "#/components/schemas/ContributorIdentity"
+        requested_by:
+          type: string
+          nullable: true
+          maxLength: 120
+        triage_group_key:
+          type: string
+          maxLength: 200
+        title:
+          type: string
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 8000
+        metadata:
+          type: object
+          additionalProperties: true
+
+    GitHubHandoffRecord:
+      type: object
+      required: [handoff_id, target_type, target_id, mode, status, created_at, updated_at]
+      properties:
+        handoff_id:
+          type: string
+        target_type:
+          $ref: "#/components/schemas/GitHubHandoffTargetType"
+        target_id:
+          type: string
+        mode:
+          $ref: "#/components/schemas/GitHubHandoffMode"
+        contributor_identity:
+          $ref: "#/components/schemas/ContributorIdentity"
+        requested_by:
+          type: string
+          nullable: true
+        triage_group_key:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        status:
+          $ref: "#/components/schemas/GitHubHandoffStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        github_url:
+          type: string
+          format: uri
+        error_message:
+          type: string
+        sent_at:
+          type: string
+          format: date-time
+
+    GitHubHandoffStatusUpdateInput:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/GitHubHandoffStatus"
+        github_url:
+          type: string
+          format: uri
+        error_message:
+          type: string
+          maxLength: 2000
+
+    GitHubTriageDraftInput:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          allOf:
+            - $ref: "#/components/schemas/GitHubHandoffStatus"
+          default: queued
+        target_type:
+          $ref: "#/components/schemas/GitHubHandoffTargetType"
+        triage_group_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+        issue_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    GitHubTriageDraft:
+      type: object
+      required: [issue_title, issue_body, handoff_ids, items_count, generated_at]
+      properties:
+        issue_title:
+          type: string
+        issue_body:
+          type: string
+          description: Markdown body for a bot-authored GitHub triage Issue or comment.
+        handoff_ids:
+          type: array
+          items:
+            type: string
+        items_count:
+          type: integer
+        generated_at:
+          type: string
+          format: date-time
+        triage_group_key:
+          type: string
+
+    GitHubHandoffSyncEligibleStatus:
+      type: string
+      enum: [queued, ready]
+
+    GitHubHandoffSyncDryRunInput:
+      type: object
+      additionalProperties: false
+      properties:
+        statuses:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/GitHubHandoffSyncEligibleStatus"
+          default: [queued, ready]
+        target_type:
+          $ref: "#/components/schemas/GitHubHandoffTargetType"
+        triage_group_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+        issue_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+
+    GitHubHandoffSyncSkippedItem:
+      type: object
+      required: [handoff_id, reason]
+      properties:
+        handoff_id:
+          type: string
+        reason:
+          type: string
+
+    GitHubHandoffSyncDryRunResult:
+      type: object
+      required:
+        - dry_run
+        - generated_at
+        - selected_statuses
+        - eligible_handoff_ids
+        - skipped
+        - draft
+        - github_config_required
+        - retry_policy
+        - deduplication
+        - next_actions
+      properties:
+        dry_run:
+          type: boolean
+          const: true
+        generated_at:
+          type: string
+          format: date-time
+        selected_statuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/GitHubHandoffSyncEligibleStatus"
+        eligible_handoff_ids:
+          type: array
+          items:
+            type: string
+        skipped:
+          type: array
+          items:
+            $ref: "#/components/schemas/GitHubHandoffSyncSkippedItem"
+        draft:
+          $ref: "#/components/schemas/GitHubTriageDraft"
+        github_config_required:
+          type: array
+          items:
+            type: string
+        retry_policy:
+          type: object
+          required: [max_attempts, initial_backoff_seconds, max_backoff_seconds, retry_on]
+          properties:
+            max_attempts:
+              type: integer
+            initial_backoff_seconds:
+              type: integer
+            max_backoff_seconds:
+              type: integer
+            retry_on:
+              type: array
+              items:
+                type: string
+        deduplication:
+          type: object
+          required: [key_strategy, keys]
+          properties:
+            key_strategy:
+              type: string
+            keys:
+              type: array
+              items:
+                type: string
+        next_actions:
+          type: array
+          items:
+            type: string
+
+    GitHubHandoffSyncAttemptStatus:
+      type: string
+      enum: [planned, in_progress, succeeded, retryable_failed, permanent_failed, canceled]
+
+    GitHubHandoffSyncAttemptCreateInput:
+      type: object
+      additionalProperties: false
+      required: [target_repository]
+      properties:
+        statuses:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/GitHubHandoffSyncEligibleStatus"
+          default: [queued, ready]
+        target_type:
+          $ref: "#/components/schemas/GitHubHandoffTargetType"
+        triage_group_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+        issue_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        target_repository:
+          type: string
+          pattern: "^[^/\\s]+/[^/\\s]+$"
+          description: GitHub repository in owner/name form.
+        target_issue_number:
+          type: integer
+          minimum: 1
+          description: Existing triage Issue number to comment on.
+        issue_grouping_rule:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Rule for choosing or creating the future triage Issue.
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 10
+        next_retry_at:
+          type: string
+          format: date-time
+        rate_limit_reset_at:
+          type: string
+          format: date-time
+      description: >
+        Request body for storing a planned attempt. The API recomputes the
+        dry-run result server-side and requires either target_issue_number or
+        issue_grouping_rule.
+
+    GitHubHandoffSyncAttemptRecord:
+      type: object
+      required:
+        - attempt_id
+        - status
+        - handoff_ids
+        - selected_statuses
+        - skipped
+        - target_repository
+        - draft
+        - draft_body_hash
+        - idempotency_key
+        - dedupe_keys
+        - retry_policy
+        - attempt_count
+        - max_attempts
+        - created_at
+        - updated_at
+      properties:
+        attempt_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/GitHubHandoffSyncAttemptStatus"
+        handoff_ids:
+          type: array
+          items:
+            type: string
+        selected_statuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/GitHubHandoffSyncEligibleStatus"
+        skipped:
+          type: array
+          items:
+            $ref: "#/components/schemas/GitHubHandoffSyncSkippedItem"
+        target_repository:
+          type: string
+        target_issue_number:
+          type: integer
+        issue_grouping_rule:
+          type: string
+        triage_group_key:
+          type: string
+        draft:
+          $ref: "#/components/schemas/GitHubTriageDraft"
+        draft_body_hash:
+          type: string
+        idempotency_key:
+          type: string
+        dedupe_keys:
+          type: array
+          items:
+            type: string
+        retry_policy:
+          type: object
+          required: [max_attempts, initial_backoff_seconds, max_backoff_seconds, retry_on]
+          properties:
+            max_attempts:
+              type: integer
+            initial_backoff_seconds:
+              type: integer
+            max_backoff_seconds:
+              type: integer
+            retry_on:
+              type: array
+              items:
+                type: string
+        attempt_count:
+          type: integer
+        max_attempts:
+          type: integer
+        next_retry_at:
+          type: string
+          format: date-time
+        rate_limit_reset_at:
+          type: string
+          format: date-time
+        last_error:
+          type: string
+        github_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    GitHubHandoffSyncAttemptStatusUpdateInput:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [in_progress, succeeded, retryable_failed, permanent_failed, canceled]
+        attempt_count:
+          type: integer
+          minimum: 0
+          maximum: 100
+        last_error:
+          type: string
+          maxLength: 2000
+        next_retry_at:
+          type: string
+          format: date-time
+        rate_limit_reset_at:
+          type: string
+          format: date-time
+        github_url:
+          type: string
+          format: uri
+      description: >
+        Lifecycle update input. `succeeded` requires `github_url`; other
+        statuses may update attempt_count, last_error, next_retry_at, and
+        rate_limit_reset_at without posting to GitHub.
+
+    GitHubHandoffSyncAttemptCreateResult:
+      type: object
+      required: [attempt, deduped]
+      properties:
+        attempt:
+          $ref: "#/components/schemas/GitHubHandoffSyncAttemptRecord"
+        deduped:
+          type: boolean
+          description: True when an active attempt with the same idempotency key already existed.
+
+    ImportedBubbleSource:
+      type: string
+      enum: [psd_text_layer]
+
+    ImportDetectionMetadata:
+      type: object
+      additionalProperties: false
+      description: Draft-only ingestion/review metadata. This is not canonical Bubble metadata.
+      properties:
+        ocrConfidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: OCR text confidence for the imported candidate.
+        detectionConfidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Region or Bubble detection confidence for the imported candidate.
+        textCenter:
+          type: object
+          additionalProperties: false
+          required: [x, y]
+          description: Optional OCR text center in page pixel coordinates.
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+        detectorRunId:
+          type: string
+          minLength: 1
+          description: Detector or OCR run id for audit/debug lookup.
+        sourceDetector:
+          type: string
+          minLength: 1
+          description: Detector, OCR, parser, or provider name that produced the candidate metadata.
+        sourceArtifactIds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: Source artifact ids used to build this review candidate.
+
+    ImportedBubbleDraft:
+      type: object
+      additionalProperties: false
+      required: [stableRef, source, textOriginal, layerName, groupPath, visible]
+      properties:
+        stableRef:
+          type: string
+          minLength: 1
+        source:
+          $ref: "#/components/schemas/ImportedBubbleSource"
+        textOriginal:
+          type: string
+        layerName:
+          type: string
+        groupPath:
+          type: array
+          items:
+            type: string
+        visible:
+          type: boolean
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
+        bubbleType:
+          type: string
+          enum: [speech, thought, narration, sfx, caption, other]
+        speaker:
+          type: string
+        speakerConfidence:
+          type: string
+          enum: [confirmed, inferred, unknown]
+        textDirection:
+          type: string
+          enum: [horizontal, vertical]
+        lang:
+          type: string
+        sourceLayerId:
+          type: string
+          minLength: 1
+        detectionMetadata:
+          $ref: "#/components/schemas/ImportDetectionMetadata"
+        notes:
+          type: array
+          items:
+            type: string
+
+    PageImportResult:
+      type: object
+      additionalProperties: false
+      required: [sourceFile, parser, bubbles, warnings, unsupported]
+      properties:
+        sourceFile:
+          type: string
+          minLength: 1
+        parser:
+          type: string
+          minLength: 1
+        parserVersion:
+          type: string
+        pageNumber:
+          type: integer
+          minimum: 1
+        displayRef:
+          type: string
+          minLength: 1
+        width:
+          type: number
+          exclusiveMinimum: 0
+        height:
+          type: number
+          exclusiveMinimum: 0
+        detectionMetadata:
+          $ref: "#/components/schemas/ImportDetectionMetadata"
+        bubbles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportedBubbleDraft"
+        warnings:
+          type: array
+          items:
+            type: string
+        unsupported:
+          type: array
+          items:
+            type: string
+
+    PackType:
+      type: string
+      enum: [TRANSLATION, FOOTNOTE, COMMENTARY, LEARNING, ACCESSIBILITY]
+
+    PackClass:
+      type: string
+      enum: [proposal, draft, official, deprecated]
+
+    PackDraftStatus:
+      type: string
+      enum: [draft, in_review, approved, published, archived]
+
+    PackEntryTarget:
+      type: object
+      required: [series_id]
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+          nullable: true
+        page_id:
+          type: string
+          nullable: true
+        panel_id:
+          type: string
+          nullable: true
+        bubble_id:
+          type: string
+          nullable: true
+
+    PackDraftEntry:
+      type: object
+      required: [entry_id, target, adopted_at]
+      properties:
+        entry_id:
+          type: string
+        source_proposal_id:
+          type: string
+          nullable: true
+        target:
+          $ref: "#/components/schemas/PackEntryTarget"
+        lang:
+          type: string
+        original_text:
+          type: string
+        current_translation:
+          type: string
+        text:
+          type: string
+        note:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        adopted_at:
+          type: string
+          format: date-time
+        adopted_by:
+          type: string
+          nullable: true
+
+    PackDraftCreateInput:
+      type: object
+      required: [type, title]
+      properties:
+        type:
+          $ref: "#/components/schemas/PackType"
+        title:
+          type: string
+          maxLength: 200
+        language:
+          type: string
+          maxLength: 16
+        target_series_id:
+          type: string
+        target_episode_id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        created_by:
+          type: string
+          nullable: true
+          maxLength: 120
+
+    PackDraftRecord:
+      allOf:
+        - $ref: "#/components/schemas/PackDraftCreateInput"
+        - type: object
+          required: [pack_draft_id, status, version, entries, created_at, updated_at]
+          properties:
+            pack_draft_id:
+              type: string
+            status:
+              $ref: "#/components/schemas/PackDraftStatus"
+            version:
+              type: integer
+              minimum: 1
+            entries:
+              type: array
+              items:
+                $ref: "#/components/schemas/PackDraftEntry"
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            reviewed_by:
+              type: string
+              nullable: true
+            reviewed_at:
+              type: string
+              format: date-time
+
+    PackDraftStatusUpdateInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/PackDraftStatus"
+
+    PackDraftAdoptProposalInput:
+      type: object
+      required: [proposal_id]
+      properties:
+        proposal_id:
+          type: string
+
+    TranslationImportSourceFormat:
+      type: string
+      enum: [json, csv]
+
+    TranslationPackDraftImportEntry:
+      type: object
+      required: [bubble_id]
+      properties:
+        bubble_id:
+          type: string
+        text:
+          type: string
+          maxLength: 4000
+          description: Imported target-language translation text.
+        suggested_text:
+          type: string
+          maxLength: 4000
+          description: Backward-compatible alias for text.
+        source_text:
+          type: string
+          maxLength: 4000
+          description: Optional source text from the import row for mismatch checks.
+        current_translation:
+          type: string
+          maxLength: 4000
+        page_id:
+          type: string
+          description: Optional operator/import hint; API uses canonical Bubble target when applying.
+        panel_id:
+          type: string
+          nullable: true
+          description: Optional operator/import hint; API uses canonical Bubble target when applying.
+        row_number:
+          type: integer
+          minimum: 1
+        row_ref:
+          type: string
+          maxLength: 120
+        comment:
+          type: string
+          maxLength: 2000
+
+    TranslationPackDraftImportInput:
+      type: object
+      required: [series_id, episode_id, lang, source_format, entries]
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        lang:
+          type: string
+          maxLength: 16
+        source_format:
+          $ref: "#/components/schemas/TranslationImportSourceFormat"
+        apply:
+          type: boolean
+          default: false
+        entries:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/TranslationPackDraftImportEntry"
+
+    TranslationImportIssueKind:
+      type: string
+      enum:
+        - unmatched_bubble
+        - duplicate_bubble
+        - missing_bubble
+        - source_text_mismatch
+        - existing_entry_conflict
+        - invalid_pack_draft
+
+    TranslationImportIssue:
+      type: object
+      required: [kind, severity, message]
+      properties:
+        kind:
+          $ref: "#/components/schemas/TranslationImportIssueKind"
+        severity:
+          type: string
+          enum: [error, warning]
+        bubble_id:
+          type: string
+        page_id:
+          type: string
+        panel_id:
+          type: string
+          nullable: true
+        row_number:
+          type: integer
+          minimum: 1
+        row_ref:
+          type: string
+          maxLength: 120
+        message:
+          type: string
+
+    TranslationImportSummary:
+      type: object
+      required:
+        - total_canonical_bubbles
+        - total_import_rows
+        - matched_rows
+        - planned_entries
+        - unmatched_bubbles
+        - duplicate_bubbles
+        - missing_bubbles
+        - existing_entry_conflicts
+        - error_count
+        - warning_count
+      properties:
+        total_canonical_bubbles:
+          type: integer
+          minimum: 0
+        total_import_rows:
+          type: integer
+          minimum: 0
+        matched_rows:
+          type: integer
+          minimum: 0
+        planned_entries:
+          type: integer
+          minimum: 0
+        unmatched_bubbles:
+          type: integer
+          minimum: 0
+        duplicate_bubbles:
+          type: integer
+          minimum: 0
+        missing_bubbles:
+          type: integer
+          minimum: 0
+        existing_entry_conflicts:
+          type: integer
+          minimum: 0
+        error_count:
+          type: integer
+          minimum: 0
+        warning_count:
+          type: integer
+          minimum: 0
+
+    TranslationPackDraftImportResult:
+      type: object
+      required: [series_id, episode_id, lang, source_format, can_apply, summary, issues, planned_entries]
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        lang:
+          type: string
+        source_format:
+          $ref: "#/components/schemas/TranslationImportSourceFormat"
+        can_apply:
+          type: boolean
+        summary:
+          $ref: "#/components/schemas/TranslationImportSummary"
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranslationImportIssue"
+        planned_entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackDraftEntry"
+
+    TranslationPackDraftImportResponse:
+      type: object
+      required: [applied, result]
+      properties:
+        applied:
+          type: boolean
+        result:
+          $ref: "#/components/schemas/TranslationPackDraftImportResult"
+        record:
+          $ref: "#/components/schemas/PackDraftRecord"
+
+    PackDraftExportInput:
+      type: object
+      required: [pack_id]
+      properties:
+        pack_id:
+          type: string
+          maxLength: 120
+        pack_class:
+          $ref: "#/components/schemas/PackClass"
+        title:
+          type: string
+          maxLength: 200
+        author_label:
+          type: string
+          maxLength: 120
+        is_published:
+          type: boolean
+        overwrite:
+          type: boolean
+
+    PackDraftExportResponse:
+      type: object
+      required: [exported, pack, path]
+      properties:
+        exported:
+          type: boolean
+        pack:
+          $ref: "#/components/schemas/PackManifest"
+        path:
+          type: string
+
+    RightsRole:
+      type: string
+      enum:
+        - owner
+        - editor
+        - translator
+        - reviewer
+        - contributor
+        - moderator
+        - viewer
+        - original_rights_holder
+        - translation_reviewer
+        - footnote_contributor
+        - pack_maintainer
+        - publisher
+
+    RightsPermission:
+      type: string
+      enum:
+        - propose_translation
+        - propose_footnote
+        - edit_structure
+        - edit_translation
+        - review_translation
+        - review_footnote
+        - approve_translation
+        - approve_footnote
+        - publish_pack
+        - manage_rights
+        - moderate_proposals
+        - commercial_use
+
+    RightsUsage:
+      type: string
+      enum:
+        - free_view
+        - paid_view
+        - promotional
+        - commercial_distribution
+
+    RightsScope:
+      type: object
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        language:
+          type: string
+          maxLength: 16
+        pack_id:
+          type: string
+        usage:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/RightsUsage"
+        territory:
+          type: string
+          maxLength: 80
+
+    RightsGrantCreateInput:
+      type: object
+      required: [subject_user_id, role, permissions, scope]
+      properties:
+        subject_user_id:
+          type: string
+          maxLength: 120
+        role:
+          $ref: "#/components/schemas/RightsRole"
+        permissions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/RightsPermission"
+        scope:
+          $ref: "#/components/schemas/RightsScope"
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+        granted_by:
+          type: string
+          nullable: true
+          maxLength: 120
+        notes:
+          type: string
+          maxLength: 2000
+
+    RightsGrantRecord:
+      allOf:
+        - $ref: "#/components/schemas/RightsGrantCreateInput"
+        - type: object
+          required: [grant_id, created_at, updated_at]
+          properties:
+            grant_id:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            revoked_at:
+              type: string
+              format: date-time
+              nullable: true
+
+    RightsPermissionCheckInput:
+      type: object
+      required: [user_id, permission, scope]
+      properties:
+        user_id:
+          type: string
+          maxLength: 120
+        permission:
+          $ref: "#/components/schemas/RightsPermission"
+        scope:
+          $ref: "#/components/schemas/RightsScope"
+
+    RightsPermissionCheckResponse:
+      type: object
+      required: [allowed, matched_grant_ids]
+      properties:
+        allowed:
+          type: boolean
+        matched_grant_ids:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
+
+    PackManifestEntryTarget:
+      type: object
+      required: [seriesId]
+      properties:
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageId:
+          type: string
+        panelId:
+          type: string
+        bubbleId:
+          type: string
+
+    PackManifestEntry:
+      type: object
+      required: [id, target]
+      properties:
+        id:
+          type: string
+        target:
+          $ref: "#/components/schemas/PackManifestEntryTarget"
+        language:
+          type: string
+        originalText:
+          type: string
+        text:
+          type: string
+        note:
+          type: string
+        sourceProposalId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    PublishedPackEntry:
+      type: object
+      required: [id, target]
+      properties:
+        id:
+          type: string
+        target:
+          $ref: "#/components/schemas/PackManifestEntryTarget"
+        language:
+          type: string
+        originalText:
+          type: string
+        text:
+          type: string
+        note:
+          type: string
+
+    PublishedPack:
+      type: object
+      required: [id, type, version, isPublished, entries]
+      description: Public Reader Pack payload. It omits runtime draft/proposal IDs and private metadata.
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/PackType"
+        packClass:
+          $ref: "#/components/schemas/PackClass"
+        language:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        authorLabel:
+          type: string
+        isPublished:
+          type: boolean
+          enum: [true]
+        targetSeriesId:
+          type: string
+        targetEpisodeId:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublishedPackEntry"
+
+    PackManifest:
+      type: object
+      required: [id, type, version, isPublished, entries]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/PackType"
+        packClass:
+          $ref: "#/components/schemas/PackClass"
+        language:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        authorLabel:
+          type: string
+        isPublished:
+          type: boolean
+        targetSeriesId:
+          type: string
+        targetEpisodeId:
+          type: string
+        sourcePackDraftId:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackManifestEntry"
+
+    CreateSeriesInput:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        publicationType:
+          $ref: "#/components/schemas/SeriesPublicationType"
+        lifecycleStatus:
+          $ref: "#/components/schemas/SeriesLifecycleStatus"
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+          deprecated: true
+          description: Legacy alias for lifecycleStatus.
+        cover:
+          type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+        publishEndAt:
+          type: string
+          format: date-time
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
+        metadata:
+          $ref: "#/components/schemas/ContentPublicMetadata"
+
+    UpdateSeriesInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        publicationType:
+          $ref: "#/components/schemas/SeriesPublicationType"
+        lifecycleStatus:
+          $ref: "#/components/schemas/SeriesLifecycleStatus"
+        status:
+          type: string
+          enum: [ongoing, completed, hiatus]
+          deprecated: true
+          description: Legacy alias for lifecycleStatus.
+        cover:
+          type: string
+        shareImageUrl:
+          type: string
+          description: Stable public image URL for SEO/OGP metadata.
+        publishStartAt:
+          type: string
+          format: date-time
+        publishEndAt:
+          type: string
+          format: date-time
+        visibility:
+          $ref: "#/components/schemas/PublicationVisibility"
+        metadata:
+          nullable: true
+          description: >
+            Partial public metadata patch. Object values are deep-merged with
+            existing Series metadata so omitted keys are preserved. Send null
+            to clear Series metadata.
+          allOf:
+            - $ref: "#/components/schemas/ContentPublicMetadata"
+
+    PublishResponse:
+      type: object
+      required: [published, seriesId, episodeCount, viewerUrl, apiUrl]
+      properties:
+        published:
+          type: boolean
+        seriesId:
+          type: string
+        episodeCount:
+          type: integer
+        viewerUrl:
+          type: string
+        apiUrl:
+          type: string
+
+    PageImageUploadResponse:
+      type: object
+      required: [uploaded, seriesId, episodeId, pageNumber, locale, imagePath, contentType, size, sha256]
+      properties:
+        uploaded:
+          type: boolean
+        seriesId:
+          type: string
+        episodeId:
+          type: string
+        pageNumber:
+          type: integer
+        locale:
+          type: string
+        imagePath:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+        sha256:
+          type: string
+        originalName:
+          type: string
+
+    DraftPayload:
+      type: object
+      required: [seriesId, seriesTitle, episodeId, episodeNumber, episodeTitle, pages]
+      properties:
+        seriesId:
+          type: string
+        seriesTitle:
+          type: string
+        seriesDescription:
+          type: string
+        seriesStatus:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        episodeId:
+          type: string
+        episodeNumber:
+          type: integer
+        episodeTitle:
+          type: string
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftPage"
+        reviewDecisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/IngestionReviewDecision"
+
+    PreparedDirectoryImportInput:
+      type: object
+      required: [sourceDir, seriesId, seriesTitle, episodeId, episodeNumber, episodeTitle]
+      properties:
+        label:
+          type: string
+        sourceDir:
+          type: string
+          description: Safe path relative to API server IMPORTS_DIR.
+        seriesId:
+          type: string
+        seriesTitle:
+          type: string
+        seriesDescription:
+          type: string
+        seriesStatus:
+          type: string
+          enum: [ongoing, completed, hiatus]
+        episodeId:
+          type: string
+        episodeNumber:
+          type: integer
+        episodeTitle:
+          type: string
+        defaultWidth:
+          type: integer
+          default: 500
+        defaultHeight:
+          type: integer
+          default: 760
+        pages:
+          type: array
+          description: Optional explicit page mapping. If omitted, supported image files in sourceDir are sorted by filename.
+          items:
+            type: object
+            required: [sourcePath]
+            properties:
+              sourcePath:
+                type: string
+              pageNumber:
+                type: integer
+              displayRef:
+                type: string
+              width:
+                type: integer
+              height:
+                type: integer
+
+    DraftPage:
+      type: object
+      required: [pageNumber, imagePath, width, height, panels]
+      properties:
+        pageNumber:
+          type: integer
+        imagePath:
+          type: string
+        sourceImagePath:
+          type: string
+          description: Draft asset source copied into canonical contents only when the ingestion job is confirmed.
+        width:
+          type: integer
+        height:
+          type: integer
+        displayRef:
+          type: string
+        panels:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftPanel"
+
+    DraftPanel:
+      type: object
+      required: [panelNumber, bbox, reactionTags, bubbles]
+      properties:
+        panelNumber:
+          type: integer
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
+        reactionTags:
+          type: array
+          items:
+            type: string
+        bubbles:
+          type: array
+          items:
+            $ref: "#/components/schemas/DraftBubble"
+
+    DraftBubble:
+      type: object
+      required: [bubbleNumber, bubbleType, textOriginal]
+      properties:
+        bubbleNumber:
+          type: integer
+        bubbleType:
+          type: string
+          enum: [speech, thought, narration, sfx, caption, other]
+        textOriginal:
+          type: string
+        speaker:
+          type: string
+        bbox:
+          $ref: "#/components/schemas/BoundingBox"
+        shortId:
+          type: string
+        speakerConfidence:
+          type: string
+          enum: [confirmed, inferred, unknown]
+        textDirection:
+          type: string
+          enum: [horizontal, vertical]
+        lang:
+          type: string
+        flags:
+          $ref: "#/components/schemas/ContentFlags"
+
+    IngestionReviewTarget:
+      type: object
+      required: [kind, pageNumber, panelNumber]
+      properties:
+        kind:
+          type: string
+          enum: [panel, bubble]
+        pageNumber:
+          type: integer
+        panelNumber:
+          type: integer
+        bubbleNumber:
+          type: integer
+
+    IngestionReviewDecision:
+      type: object
+      required: [key, target, decision, updatedAt]
+      properties:
+        key:
+          type: string
+        target:
+          $ref: "#/components/schemas/IngestionReviewTarget"
+        decision:
+          type: string
+          enum: [pending, accepted, rejected]
+        note:
+          type: string
+        reviewerId:
+          type: string
+        updatedAt:
+          type: string
+
+    IngestionReviewDecisionInput:
+      type: object
+      required: [target, decision]
+      properties:
+        target:
+          $ref: "#/components/schemas/IngestionReviewTarget"
+        decision:
+          type: string
+          enum: [pending, accepted, rejected]
+        note:
+          type: string
+
+    IngestionReviewCandidate:
+      type: object
+      required: [key, target, decision]
+      properties:
+        key:
+          type: string
+        target:
+          $ref: "#/components/schemas/IngestionReviewTarget"
+        decision:
+          type: string
+          enum: [pending, accepted, rejected]
+        panel:
+          $ref: "#/components/schemas/DraftPanel"
+        bubble:
+          $ref: "#/components/schemas/DraftBubble"
+
+    IngestionJob:
+      type: object
+      required: [id, status, createdAt, updatedAt, label, draft]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [queued, draft, waiting_review, confirmed, failed, canceled]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        label:
+          type: string
+        draft:
+          anyOf:
+            - $ref: "#/components/schemas/DraftPayload"
+            - type: "null"
+        errorMessage:
+          type: string
+
+    User:
+      type: object
+      required: [id, name, role]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, user]
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    MeResponse:
+      type: object
+      required: [authenticated, user]
+      properties:
+        authenticated:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/User"
+
+    GrantEntitlementInput:
+      type: object
+      required: [userId, targetId]
+      properties:
+        userId:
+          type: string
+        targetType:
+          type: string
+          enum: [SERIES, EPISODE, VOLUME, PACK, BUNDLE]
+          default: EPISODE
+        targetId:
+          type: string
+        source:
+          type: string
+          enum: [PURCHASE, CONTRIBUTOR_REWARD, PROMO, ADMIN_GRANT, SUBSCRIPTION]
+          default: ADMIN_GRANT
+
+    Entitlement:
+      type: object
+      required: [id, userId, targetType, targetId, source, status, grantedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: string
+        source:
+          type: string
+        status:
+          type: string
+        grantedAt:
+          type: string
+
+    EntitlementCheckResponse:
+      type: object
+      required: [entitled]
+      properties:
+        entitled:
+          type: boolean
+        free:
+          type: boolean
+        userId:
+          type: string
+        reason:
+          type: string

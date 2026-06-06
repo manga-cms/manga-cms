@@ -1,0 +1,274 @@
+---
+import { siteConfig } from "../../lib/site-config";
+
+interface Props {
+  workId: string;
+  episodeId: string;
+  seriesTitle: string;
+  episodeTitle: string;
+  nextEpisodeId?: string;
+  nextEpisodeTitle?: string;
+  pageCount: number;
+  viewerPagesJson: string;
+  feedbackApiBaseJson: string;
+  readerDisplayMetadataJson?: string;
+  initialLocale?: string;
+}
+
+const {
+  workId,
+  episodeId,
+  seriesTitle,
+  episodeTitle,
+  nextEpisodeId,
+  nextEpisodeTitle,
+  pageCount,
+  viewerPagesJson,
+  feedbackApiBaseJson,
+  readerDisplayMetadataJson = "{}",
+  initialLocale = "ja",
+} = Astro.props;
+
+const readerBackHref = siteConfig.mode === "official" ? "/" : `/works/${workId}`;
+const normalizedInitialLocale = initialLocale === "en" ? "en" : "ja";
+---
+
+<div
+  class="reader-shell"
+  data-work-id={workId}
+  data-episode-id={episodeId}
+  data-series-title={seriesTitle}
+  data-episode-title={episodeTitle}
+  data-next-episode-id={nextEpisodeId}
+  data-next-episode-title={nextEpisodeTitle}
+  data-ui-locale={normalizedInitialLocale}
+  data-content-locale={normalizedInitialLocale}
+  data-reader-theme="light"
+>
+  <div class="reader-toolbar" data-reader-toolbar aria-label="リーダー操作" data-ui-aria-label="toolbarAria">
+    <div class="reader-meta">
+      <a href={readerBackHref} class="reader-back" data-reader-back-title>← {seriesTitle}</a>
+    </div>
+    <div class="reader-title" aria-live="polite">
+      <span data-reader-title-text>{episodeTitle}</span>
+    </div>
+    <div class="reader-header-controls">
+      <label class="reader-language-select">
+        <span>Language</span>
+        <select data-ui-locale-select aria-label="Language">
+          <option value="ja" selected={normalizedInitialLocale === "ja"} data-ui-label="localeJa">日本語</option>
+          <option value="en" selected={normalizedInitialLocale === "en"} data-ui-label="localeEn">English</option>
+        </select>
+      </label>
+      <div class="reader-settings" data-reader-settings>
+      <button
+        type="button"
+        class="reader-settings-toggle"
+        data-reader-settings-toggle
+        aria-expanded="false"
+        aria-label="表示設定"
+        data-ui-aria-label="settingsAria"
+      >
+        <svg class="reader-settings-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" />
+          <path d="M19.4 13.7a7.9 7.9 0 0 0 0-3.4l2-1.5-1.9-3.2-2.4 1a8 8 0 0 0-2.9-1.7L13.9 2h-3.8l-.4 2.9a8 8 0 0 0-2.9 1.7l-2.4-1-1.9 3.2 2 1.5a7.9 7.9 0 0 0 0 3.4l-2 1.5 1.9 3.2 2.4-1a8 8 0 0 0 2.9 1.7l.4 2.9h3.8l.4-2.9a8 8 0 0 0 2.9-1.7l2.4 1 1.9-3.2-2.1-1.5Z" />
+        </svg>
+      </button>
+      <div class="reader-settings-menu" data-reader-settings-menu hidden>
+        <p class="reader-settings-title" data-ui-label="settingsTitle">表示設定</p>
+        <div class="reader-settings-group">
+          <span data-ui-label="settingsTheme">テーマ</span>
+          <div class="reader-segmented" aria-label="表示テーマ" data-ui-aria-label="themeAria">
+            <button type="button" class="reader-segmented-button is-active" data-reader-theme-button="light" aria-pressed="true" data-ui-label="themeLight">ライト</button>
+            <button type="button" class="reader-segmented-button" data-reader-theme-button="dark" aria-pressed="false" data-ui-label="themeDark">ダーク</button>
+          </div>
+        </div>
+        <div class="reader-settings-group">
+          <span data-ui-label="settingsLayout">ページ表示</span>
+          <div class="reader-segmented reader-layout-toggle" aria-label="ページ表示" data-ui-aria-label="layoutAria">
+            <button type="button" class="reader-segmented-button is-active" data-reader-layout-button="single" aria-pressed="true" data-ui-label="layoutSingle">単ページ</button>
+            <button type="button" class="reader-segmented-button" data-reader-layout-button="spread" aria-pressed="false" data-ui-label="layoutSpread">見開き</button>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+    <p class="reader-hint text-muted" data-ui-label="readerHint">スワイプ・左右キー・画面左右タップでページ送り</p>
+  </div>
+
+  <div class="reader-stage" data-reader-stage>
+    <button type="button" class="reader-nav-zone reader-nav-next" data-reader-next aria-label="次のページへ" data-ui-aria-label="nextPageAria">←</button>
+    <div class="reader-viewport" id="reader" tabindex="0" aria-label="漫画リーダー" data-ui-aria-label="readerAria">
+      <div class="reader-track" data-reader-track></div>
+      <div class="reader-loading" data-reader-loading hidden>
+        <span class="reader-loading-spinner" aria-hidden="true"></span>
+        <span data-reader-loading-text data-ui-label="loadingPage">ページを読み込み中</span>
+      </div>
+    </div>
+    <button type="button" class="reader-nav-zone reader-nav-prev" data-reader-prev aria-label="前のページへ" data-ui-aria-label="prevPageAria">→</button>
+    <button type="button" class="reader-start-over" data-reader-start-over data-ui-label="startOver" hidden>最初から読む</button>
+    <button type="button" class="reader-shared-target" data-reader-shared-target hidden>共有された位置へ移動</button>
+    <div class="reader-pick-prompt" data-reader-pick-prompt hidden>
+      <span data-reader-pick-label>対象を選択</span>
+      <button type="button" data-reader-pick-cancel data-ui-label="cancelPick">キャンセル</button>
+    </div>
+    <div class="reader-page-scrubber" data-reader-page-scrubber>
+      <output class="reader-page-scrubber-label" data-reader-page-scrubber-label for="reader-page-range">p01 / {pageCount}</output>
+      <input
+        id="reader-page-range"
+        data-reader-page-range
+        type="range"
+        min="1"
+        max={pageCount}
+        value="1"
+        step="1"
+        aria-label="ページ移動"
+        data-ui-aria-label="pageScrubberAria"
+      />
+    </div>
+  </div>
+
+  <aside class="study-panel" data-study-panel>
+    <div class="study-panel-grabber" aria-hidden="true"></div>
+    <div>
+      <p class="study-panel-kicker" data-ui-label="exploreKicker">コマ・フキダシ / 報告</p>
+      <h2 data-explore-title><span data-ui-label="explorePagePrefix">ページ</span> <span data-note-page>1</span></h2>
+      <p class="text-muted" data-explore-summary data-ui-label="exploreSummaryDefault">フキダシやコマを選ぶと、原文確認や軽い報告ができます。</p>
+    </div>
+    <div class="explore-detail" data-explore-detail>
+      <p class="text-muted" data-ui-label="exploreDetailDefault">ページ内のフキダシ/コマを選択してください。</p>
+    </div>
+    <div class="reader-target-picker" data-reader-target-picker>
+      <button type="button" data-reader-target-pick="page" data-ui-label="targetPickPage">ページを報告</button>
+      <button type="button" data-reader-target-pick="panel" data-ui-label="targetPickPanel">コマを選ぶ</button>
+      <button type="button" data-reader-target-pick="bubble" data-ui-label="targetPickBubble">フキダシを選ぶ</button>
+      <button type="button" data-reader-target-pick="region" data-ui-label="targetPickRegion">位置を指定</button>
+    </div>
+    <label class="study-note-input">
+      <span data-ui-label="noteLabel">脚注・翻訳メモ</span>
+      <textarea
+        data-note-input
+        rows="5"
+        placeholder="例: このセリフに補足がほしい、翻訳では別案がありそう、など"
+        data-ui-placeholder="notePlaceholder"
+      ></textarea>
+    </label>
+    <div class="study-target-grid">
+      <label>
+        <span data-ui-label="noteScopeLabel">対象</span>
+        <select data-note-scope>
+          <option value="page" data-ui-label="noteScopePage">ページ全体</option>
+          <option value="panel" data-ui-label="noteScopePanel">コマ</option>
+          <option value="bubble" data-ui-label="noteScopeBubble">フキダシ</option>
+          <option value="region" data-ui-label="noteScopeRegion">任意位置</option>
+        </select>
+      </label>
+      <label>
+        <span data-ui-label="noteTargetLabel">対象メモ</span>
+        <input data-note-target placeholder="例: 右上のフキダシ / 2コマ目 / 画面中央" data-ui-placeholder="noteTargetPlaceholder" />
+      </label>
+    </div>
+    <p class="text-muted study-panel-note" data-note-anchor>位置指定なし。ページ画像をクリックすると、注の位置候補を保存できます。</p>
+    <p class="text-muted study-panel-note" data-ui-label="readerPolicyNote">Readerでは軽い報告だけを受け付けます。</p>
+  </aside>
+  <script type="application/json" id="reader-pages" set:html={viewerPagesJson}></script>
+  <script type="application/json" id="feedback-api-base" set:html={feedbackApiBaseJson}></script>
+  <script type="application/json" id="reader-display-metadata" set:html={readerDisplayMetadataJson}></script>
+  <div class="reader-context-menu" data-reader-context-menu hidden></div>
+  <div class="reader-toast" data-reader-toast hidden></div>
+  <div class="reader-task-sheet" data-reader-task-sheet hidden>
+    <div class="reader-task-backdrop" data-task-close></div>
+    <div class="reader-task-dialog" role="dialog" aria-modal="true" aria-label="操作を選ぶ" data-ui-aria-label="taskChoiceAria">
+      <div>
+        <p class="study-panel-kicker" data-task-kicker></p>
+        <h2 data-task-title>操作を選ぶ</h2>
+        <p class="text-muted" data-task-description></p>
+      </div>
+      <div class="reader-task-options" data-task-options></div>
+      <button type="button" class="btn-viewer btn-ghost-viewer" data-task-close data-ui-label="close">閉じる</button>
+    </div>
+  </div>
+  <div class="reader-share-sheet" data-reader-share-sheet hidden>
+    <div class="reader-share-backdrop" data-share-close></div>
+    <div class="reader-share-dialog" role="dialog" aria-modal="true" aria-label="共有" data-ui-aria-label="shareSheetAria">
+      <div>
+        <p class="study-panel-kicker" data-ui-label="shareKicker">共有</p>
+        <h2 data-share-title>このページを共有</h2>
+        <p class="text-muted" data-share-target>URLを共有できます。</p>
+      </div>
+      <div class="reader-share-actions">
+        <button type="button" class="btn-viewer btn-primary-viewer" data-share-native data-ui-label="shareNative">共有</button>
+        <a class="btn-viewer btn-ghost-viewer" data-share-x target="_blank" rel="noreferrer">X</a>
+        <a class="btn-viewer btn-ghost-viewer" data-share-line target="_blank" rel="noreferrer">LINE</a>
+        <a class="btn-viewer btn-ghost-viewer" data-share-bluesky target="_blank" rel="noreferrer">Bluesky</a>
+        <button type="button" class="btn-viewer btn-ghost-viewer" data-share-copy data-ui-label="copyUrl">URLをコピー</button>
+        <button type="button" class="btn-viewer btn-ghost-viewer" data-share-close data-ui-label="close">閉じる</button>
+      </div>
+    </div>
+  </div>
+  <div class="feedback-modal" data-feedback-modal hidden>
+    <div class="feedback-modal-backdrop" data-feedback-close></div>
+    <form class="feedback-dialog" data-feedback-form>
+      <input type="text" name="website" autocomplete="off" tabindex="-1" class="feedback-honeypot" aria-hidden="true" />
+      <div>
+        <p class="study-panel-kicker" data-feedback-kicker data-ui-label="feedbackKicker">Feedback</p>
+        <h2 data-feedback-title>報告する</h2>
+        <p class="text-muted" data-feedback-target data-ui-label="feedbackTargetSelected">対象を選択中</p>
+        <p class="feedback-source-text" data-feedback-source-text hidden></p>
+        <p class="feedback-status text-muted" data-feedback-status role="status" aria-live="polite" hidden></p>
+      </div>
+      <label>
+        <span data-ui-label="issueTypeLabel">種類</span>
+        <select name="issue_type" data-feedback-issue>
+          <option value="typo" data-ui-label="issueTypo">誤字</option>
+          <option value="mistranslation" data-ui-label="issueMistranslation">誤訳</option>
+          <option value="display" data-ui-label="issueDisplay">表示崩れ</option>
+          <option value="broken_link" data-ui-label="issueBrokenLink">リンク切れ</option>
+          <option value="better_translation" data-ui-label="issueBetterTranslation">よりよい訳</option>
+          <option value="missing_note" data-ui-label="issueMissingNote">注釈提案</option>
+          <option value="other" data-ui-label="issueOther">その他</option>
+        </select>
+      </label>
+      <fieldset class="feedback-identity" data-feedback-identity>
+        <legend data-ui-label="identityLabel">投稿者表示</legend>
+        <div class="feedback-identity-options">
+          <label class="feedback-identity-option">
+            <input type="radio" name="identity_level" value="anonymous" data-feedback-identity-level checked />
+            <span data-ui-label="identityAnonymous">匿名</span>
+          </label>
+          <label class="feedback-identity-option">
+            <input type="radio" name="identity_level" value="display_name" data-feedback-identity-level />
+            <span data-ui-label="identityDisplayName">表示名あり</span>
+          </label>
+        </div>
+        <label data-feedback-display-name-wrap hidden>
+          <span data-ui-label="displayNameLabel">表示名</span>
+          <input
+            name="display_name"
+            data-feedback-display-name
+            maxlength="80"
+            autocomplete="nickname"
+            placeholder="例: いち読者"
+            data-ui-placeholder="displayNamePlaceholder"
+          />
+        </label>
+      </fieldset>
+      <label>
+        <span data-ui-label="feedbackCommentLabel">コメント</span>
+        <textarea name="comment" data-feedback-comment maxlength="1000" rows="4" placeholder="気づいた点を短く書いてください" data-ui-placeholder="feedbackCommentPlaceholder"></textarea>
+      </label>
+      <label data-feedback-suggested-wrap hidden>
+        <span data-ui-label="suggestedLabel">提案文</span>
+        <textarea name="suggested_text" data-feedback-suggested maxlength="2000" rows="3" placeholder="翻訳案や注釈案があれば入力してください" data-ui-placeholder="suggestedPlaceholder"></textarea>
+      </label>
+      <label class="feedback-terms">
+        <input type="checkbox" name="contributor_terms" value="accepted" data-feedback-terms />
+        <span data-ui-label="contributorTermsLabel">送信内容が作品改善のために保存・共有される場合があることを確認しました</span>
+      </label>
+      <div class="feedback-actions">
+        <button type="button" class="btn-viewer btn-ghost-viewer" data-feedback-close data-ui-label="close">閉じる</button>
+        <button type="submit" class="btn-viewer btn-primary-viewer" data-feedback-submit data-ui-label="submit" disabled>送信</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,140 @@
+---
+/**
+ * Quote share page (SSR).
+ *
+ * Data path: API-first → content loader fallback.
+ * URL: /quote/{seriesId}/{episodeId}/{page}/{panel}/{bubble}
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { fetchQuote, isApiConfigured } from "../../lib/api-client";
+import { findBubbleBySlug } from "../../data/content";
+import { siteConfig } from "../../lib/site-config";
+
+export const prerender = false;
+
+const rawSlug = Astro.params.slug;
+if (!rawSlug) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+const slug = rawSlug.split("/");
+
+if (siteConfig.mode === "official" && !siteConfig.content.demoSeriesIds.includes(slug[0] ?? "")) {
+  return Astro.redirect("/");
+}
+
+// --- API-first with loader fallback ---
+let seriesId = "";
+let seriesTitle = "";
+let episodeId = "";
+let episodeNumber = 0;
+let pageNumber = 0;
+let bubble: { textOriginal: string; speaker?: string | null; bubbleType: string; shortId?: string; displayRef?: string } | null = null;
+let linkEpisode = "";
+
+if (isApiConfigured() && slug.length >= 5) {
+  const res = await fetchQuote(slug[0], slug[1], Number(slug[2]), Number(slug[3]), Number(slug[4]));
+  if (res.data) {
+    seriesId = res.data.seriesId;
+    episodeId = res.data.episodeId;
+    pageNumber = res.data.pageNumber;
+    bubble = res.data.bubble;
+    // Fetch series title — use seriesId as fallback display
+    seriesTitle = seriesId;
+    episodeNumber = 0; // Not in quote response
+    linkEpisode = `/works/${seriesId}/episodes/${episodeId}#p${pageNumber}`;
+  }
+}
+
+if (!bubble) {
+  const result = findBubbleBySlug(slug);
+  if (!result) {
+    return new Response(null, { status: 404, statusText: "Quote Not Found" });
+  }
+  seriesId = result.series.id;
+  seriesTitle = result.series.title;
+  episodeId = result.episode.id;
+  episodeNumber = result.episode.episodeNumber;
+  pageNumber = result.page.pageNumber;
+  bubble = result.bubble;
+  linkEpisode = `/works/${seriesId}/episodes/${episodeId}#p${pageNumber}`;
+}
+
+const quoteTitle = `「${bubble.textOriginal.slice(0, 30)}」 — ${seriesTitle}`;
+---
+
+<BaseLayout
+  title={quoteTitle}
+  description={`${bubble.textOriginal} — ${seriesTitle}`}
+>
+  <section class="container page-section">
+    <div class="quote-card card">
+      <div class="quote-source text-muted">
+        {seriesTitle} — Page {pageNumber}
+      </div>
+      <blockquote class="quote-text">
+        「{bubble.textOriginal}」
+      </blockquote>
+      {bubble.speaker && (
+        <div class="quote-speaker">— {bubble.speaker}</div>
+      )}
+      <div class="quote-meta text-muted">
+        <span class="badge">{bubble.bubbleType}</span>
+        <span>ID: {bubble.displayRef ?? bubble.shortId}</span>
+      </div>
+      <div class="quote-actions">
+        <a href={linkEpisode}>
+          エピソードを読む →
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-section {
+    padding: var(--space-xl) 0;
+    max-width: 32rem;
+    margin: 0 auto;
+  }
+
+  .quote-card {
+    text-align: center;
+    padding: var(--space-xl);
+  }
+
+  .quote-source {
+    font-size: 0.75rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .quote-text {
+    font-size: 1.5rem;
+    line-height: 1.5;
+    font-weight: 500;
+    margin-bottom: var(--space-md);
+    border: none;
+    padding: 0;
+  }
+
+  .quote-speaker {
+    color: var(--color-accent);
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: var(--space-lg);
+  }
+
+  .quote-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    font-size: 0.75rem;
+    margin-bottom: var(--space-lg);
+  }
+
+  .quote-actions a {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+</style>

@@ -1,0 +1,323 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { getSeries } from "../../../data/content";
+import { fetchSeries, isApiConfigured } from "../../../lib/api-client";
+import {
+  lifecycleStatusLabel,
+  primaryOneshotEpisode,
+  publicationTypeLabel,
+} from "../../../lib/series-cards";
+import { isOfficialSite } from "../../../lib/site-config";
+
+export const prerender = false;
+
+const { workId } = Astro.params;
+
+if (isOfficialSite) {
+  return Astro.redirect("/");
+}
+
+const localWork = workId ? getSeries(workId) : undefined;
+const apiWork = workId && isApiConfigured() ? await fetchSeries(workId) : { data: null, error: null };
+
+const work = apiWork.data
+  ? {
+      id: apiWork.data.id,
+      title: apiWork.data.title,
+      description: apiWork.data.description || "作品情報を準備中です。",
+      publicationType: apiWork.data.publicationType ?? "serial",
+      lifecycleStatus: apiWork.data.lifecycleStatus ?? apiWork.data.status,
+      status: apiWork.data.status,
+      coverUrl: apiWork.data.coverUrl,
+      shareImageUrl: apiWork.data.shareImageUrl,
+      episodes: apiWork.data.episodes.map((episode) => ({
+        id: episode.id,
+        episodeNumber: episode.episodeNumber,
+        title: episode.title,
+        publishedAt: episode.publishedAt,
+        pageCount: episode.pageCount,
+      })),
+    }
+  : localWork
+    ? {
+        id: localWork.id,
+        title: localWork.title,
+        description: localWork.description || "作品情報を準備中です。",
+        publicationType: localWork.publicationType ?? "serial",
+        lifecycleStatus: localWork.lifecycleStatus ?? localWork.status,
+        status: localWork.status,
+        coverUrl: localWork.coverUrl,
+        shareImageUrl: localWork.shareImageUrl,
+        episodes: localWork.episodes.map((episode) => ({
+          id: episode.id,
+          episodeNumber: episode.episodeNumber,
+          title: episode.title,
+          publishedAt: episode.publishedAt,
+          pageCount: episode.pages.length,
+        })),
+      }
+    : null;
+
+if (!work) {
+  return Astro.redirect("/works");
+}
+
+const oneshotEpisode = primaryOneshotEpisode(work);
+if (oneshotEpisode) {
+  return Astro.redirect(`/works/${work.id}/episodes/${oneshotEpisode.id}`);
+}
+
+const isPublicImageUrl = (value: string | undefined) =>
+  Boolean(value && (value.startsWith("/") || /^https?:\/\//.test(value)));
+const workOgImage = isPublicImageUrl(work.shareImageUrl)
+  ? work.shareImageUrl
+  : isPublicImageUrl(work.coverUrl)
+    ? work.coverUrl
+    : "/placeholder-cover.svg";
+
+---
+
+<BaseLayout title={`${work.title} — Manga Viewer`} description={work.description} ogImage={workOgImage}>
+  <section class="container page-section">
+    <a href="/works" class="breadcrumb text-muted">← 作品一覧</a>
+    <div class="work-header">
+      <figure class="cover-frame" aria-hidden="true">
+        {work.coverUrl ? (
+          <img src={work.coverUrl} alt="" class="cover" onerror="this.nextElementSibling.hidden=false;this.remove()" />
+        ) : null}
+        <span class="cover-fallback" hidden={Boolean(work.coverUrl)}>{work.title.slice(0, 1)}</span>
+      </figure>
+      <div class="work-meta">
+        <p class="work-kicker">Work</p>
+        <h1>{work.title}</h1>
+        <p class="work-description">{work.description}</p>
+        <div class="work-badges">
+          <span class="badge">{publicationTypeLabel(work.publicationType)}</span>
+          <span class="badge">{lifecycleStatusLabel(work.lifecycleStatus ?? work.status)}</span>
+          <span class="episode-count">{work.episodes.length} 話</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="episode-heading">
+      <h2>エピソード</h2>
+      {work.episodes.length > 0 && <p class="text-muted">公開中の話を選んでください。</p>}
+    </div>
+
+    {work.episodes.length > 0 ? (
+      <div class="episode-list">
+        {work.episodes.map((ep) => (
+          <a href={`/works/${work.id}/episodes/${ep.id}`} class="episode-card">
+            <div class="ep-number">第{ep.episodeNumber}話</div>
+            <div class="ep-info">
+              <h3>{ep.title}</h3>
+              <span class="text-muted">{ep.publishedAt}</span>
+            </div>
+            <div class="ep-pages text-muted">{ep.pageCount ?? "—"} pages</div>
+            <span class="ep-read">読む</span>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <div class="empty-state">
+        <p class="empty-title">公開中のエピソードはまだありません。</p>
+        <p class="text-muted">追加されると、このページに読みやすい一覧として表示されます。</p>
+      </div>
+    )}
+  </section>
+</BaseLayout>
+
+<style>
+  .page-section {
+    padding-block: clamp(2.5rem, 6vw, 4.5rem);
+  }
+
+  .breadcrumb {
+    display: inline-block;
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-lg);
+  }
+
+  .work-header {
+    align-items: start;
+    border-bottom: 1px solid var(--color-border);
+    display: grid;
+    gap: clamp(1.25rem, 4vw, 2rem);
+    grid-template-columns: 132px minmax(0, 1fr);
+    margin-bottom: 1.75rem;
+    padding-bottom: clamp(1.75rem, 5vw, 3rem);
+  }
+
+  .cover-frame {
+    align-items: center;
+    aspect-ratio: 2 / 3;
+    background: #f4f4f1;
+    border: 1px solid var(--color-border);
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    overflow: hidden;
+    width: 132px;
+  }
+
+  .cover {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .cover-fallback {
+    color: var(--color-text-muted);
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .work-kicker {
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.65rem;
+    text-transform: uppercase;
+  }
+
+  .work-meta h1 {
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    line-height: 1.18;
+    margin-bottom: 0.9rem;
+  }
+
+  .work-description {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+    line-height: 1.9;
+    margin-bottom: 1rem;
+    max-width: 42rem;
+  }
+
+  .work-badges {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+  }
+
+  .episode-count {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+  }
+
+  .episode-heading {
+    align-items: end;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  h2 {
+    font-size: 1.2rem;
+    line-height: 1.3;
+  }
+
+  .episode-list {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .episode-card {
+    align-items: center;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: inherit;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 5rem minmax(0, 1fr) auto auto;
+    padding: 1rem;
+    text-decoration: none;
+  }
+
+  .episode-card:hover,
+  .episode-card:focus-visible {
+    color: inherit;
+  }
+
+  .episode-card h3,
+  .episode-card span,
+  .episode-card div {
+    text-decoration: none;
+  }
+
+  .episode-card:hover,
+  .episode-card:focus-visible {
+    border-color: #cbd5e1;
+  }
+
+  .ep-number {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+  }
+
+  .ep-info h3 {
+    font-size: 0.9375rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .ep-info span {
+    font-size: 0.75rem;
+  }
+
+  .ep-pages {
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .ep-read {
+    color: var(--color-text);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: var(--color-border);
+    text-underline-offset: 0.25em;
+  }
+
+  .empty-state {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: clamp(2rem, 6vw, 3rem);
+  }
+
+  .empty-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+  }
+
+  @media (max-width: 700px) {
+    .work-header {
+      grid-template-columns: 104px minmax(0, 1fr);
+    }
+
+    .cover-frame {
+      width: 104px;
+    }
+
+    .episode-heading {
+      align-items: start;
+      display: grid;
+    }
+
+    .episode-card {
+      grid-template-columns: 1fr auto;
+      gap: 0.35rem 0.8rem;
+    }
+
+    .ep-number,
+    .ep-pages {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

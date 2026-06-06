@@ -1,0 +1,39 @@
+{
+    "name": "@manga/db",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "db:generate": "pnpm run db:generate:sqlite",
+        "db:generate:sqlite": "prisma generate --schema=./prisma/schema.prisma",
+        "db:generate:postgres": "prisma generate --schema=./prisma/schema.postgres.prisma",
+        "db:push": "pnpm run db:push:sqlite",
+        "db:push:sqlite": "prisma db push --schema=./prisma/schema.prisma",
+        "db:push:postgres": "prisma db push --schema=./prisma/schema.postgres.prisma",
+        "db:migrate": "pnpm run db:migrate:sqlite",
+        "db:migrate:sqlite": "prisma migrate dev --schema=./prisma/schema.prisma",
+        "db:prepare:postgres-migrate": "mkdir -p ./prisma/postgres && cp ./prisma/schema.postgres.prisma ./prisma/postgres/schema.prisma",
+        "db:migrate:postgres": "pnpm run db:prepare:postgres-migrate && prisma migrate dev --schema=./prisma/postgres/schema.prisma",
+        "db:migrate:deploy:postgres": "pnpm run db:prepare:postgres-migrate && prisma migrate deploy --schema=./prisma/postgres/schema.prisma",
+        "db:migrate:status:postgres": "pnpm run db:prepare:postgres-migrate && prisma migrate status --schema=./prisma/postgres/schema.prisma",
+        "db:migrate:baseline:postgres": "pnpm run db:prepare:postgres-migrate && prisma migrate resolve --schema=./prisma/postgres/schema.prisma --applied 20260606000000_init"
+    },
+    "dependencies": {
+        "@prisma/client": "^6.0.0",
+        "@manga/domain": "workspace:*"
+    },
+    "devDependencies": {
+        "prisma": "^6.0.0",
+        "@types/node": "^20.0.0",
+        "typescript": "^5.0.0"
+    }
+}

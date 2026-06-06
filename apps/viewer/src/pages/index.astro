@@ -1,0 +1,365 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import OfficialHome from "../components/site/OfficialHome.astro";
+import {
+  getViewerSeriesCards,
+  latestEpisode,
+  lifecycleStatusLabel,
+  primarySeriesActionLabel,
+  primarySeriesHref,
+  publicationTypeLabel,
+} from "../lib/series-cards";
+import { isOfficialSite } from "../lib/site-config";
+
+const series = isOfficialSite ? [] : await getViewerSeriesCards();
+
+const viewerHighlights = [
+  {
+    title: "読みやすい",
+    body: "スマホのページ送り、見開き、ページ scrubber、余計な UI を隠す読書モードを整えています。",
+  },
+  {
+    title: "共有しやすい",
+    body: "ページ、コマ、フキダシ単位の共有や、SNS / URL コピーに向けた導線を Reader に組み込んでいます。",
+  },
+  {
+    title: "翻訳しやすい",
+    body: "原文を正本にし、英語版や注釈は Pack として重ねることで、あとから改善しやすくします。",
+  },
+];
+
+const structureItems = ["Page", "Panel", "Bubble", "Translation Pack", "Feedback"];
+---
+
+{isOfficialSite ? (
+  <OfficialHome />
+) : (
+  <BaseLayout title="Manga Viewer" description="読みやすく、共有しやすく、翻訳しやすいマンガビューアー">
+    <section class="home-hero container">
+      <p class="hero-kicker">Manga Viewer</p>
+      <h1>マンガを、あまねく届けるためのしくみ。</h1>
+      <p class="hero-copy">
+        読みやすく、共有しやすく、翻訳しやすい。<br />
+        あたらしいマンガビューアーです。
+      </p>
+      <a href="/works" class="hero-link">作品を見る</a>
+    </section>
+
+    <section class="viewer-info-section container" aria-labelledby="viewer-info-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">What this viewer does</p>
+          <h2 id="viewer-info-title">読むだけで終わらないビューアー</h2>
+        </div>
+      </div>
+      <div class="viewer-highlight-grid">
+        {viewerHighlights.map((item) => (
+          <article class="viewer-highlight-card">
+            <h3>{item.title}</h3>
+            <p>{item.body}</p>
+          </article>
+        ))}
+      </div>
+      <div class="viewer-structure-strip" aria-label="structured manga units">
+        {structureItems.map((item) => <span>{item}</span>)}
+      </div>
+    </section>
+
+    <section class="works-section container" aria-labelledby="home-works-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Works</p>
+          <h2 id="home-works-title">作品</h2>
+        </div>
+        {series.length > 0 && <a href="/works" class="section-link">すべて見る</a>}
+      </div>
+
+      {series.length > 0 ? (
+        <div class="work-shelf">
+          {series.map((s) => {
+            const latest = latestEpisode(s.episodes);
+            const primaryHref = primarySeriesHref(s);
+            const primaryLabel = primarySeriesActionLabel(s);
+            return (
+              <article class="work-tile">
+                <a href={primaryHref} class="work-cover-link" aria-label={`${s.title} ${primaryLabel}`}>
+                  <figure class="work-cover-frame">
+                    {s.coverUrl ? (
+                      <img src={s.coverUrl} alt="" class="work-cover" onerror="this.nextElementSibling.hidden=false;this.remove()" />
+                    ) : null}
+                    <span class="cover-fallback" hidden={Boolean(s.coverUrl)}>{s.title.slice(0, 1)}</span>
+                  </figure>
+                </a>
+                <div class="work-info">
+                  <div class="work-title-row">
+                    <h3><a href={primaryHref}>{s.title}</a></h3>
+                    <div class="work-title-badges">
+                      <span class="badge">{publicationTypeLabel(s.publicationType)}</span>
+                      <span class="badge">{lifecycleStatusLabel(s.lifecycleStatus ?? s.status)}</span>
+                    </div>
+                  </div>
+                  <p class="work-description">{s.description || "作品情報を準備中です。"}</p>
+                  <div class="work-meta">
+                    <span>{s.episodes.length} 話</span>
+                    <a href={primaryHref} class="read-link">
+                      {primaryLabel}
+                    </a>
+                    {latest && primaryHref !== `/works/${s.id}/episodes/${latest.id}` ? (
+                      <a href={`/works/${s.id}/episodes/${latest.id}`} class="read-link">最新話を読む</a>
+                    ) : (
+                      !latest && <span>公開準備中</span>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div class="empty-state">
+          <p class="empty-title">公開中の作品はまだありません。</p>
+          <p class="text-muted">作品が追加されると、このページに読みやすい一覧として表示されます。</p>
+        </div>
+      )}
+    </section>
+  </BaseLayout>
+)}
+
+<style>
+  .home-hero {
+    padding: clamp(4rem, 9vw, 7rem) var(--space-lg) clamp(3rem, 7vw, 5rem);
+  }
+
+  .hero-kicker,
+  .section-kicker {
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+  }
+
+  .home-hero h1 {
+    font-size: clamp(2rem, 6vw, 4.25rem);
+    font-weight: 700;
+    line-height: 1.18;
+    margin-bottom: 1.35rem;
+    max-width: 13em;
+  }
+
+  .hero-copy {
+    color: var(--color-text);
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    line-height: 2;
+    margin-bottom: 1.75rem;
+  }
+
+  .hero-link,
+  .section-link,
+  .read-link {
+    color: var(--color-text);
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: var(--color-border);
+    text-underline-offset: 0.25em;
+  }
+
+  .hero-link:hover,
+  .section-link:hover,
+  .read-link:hover {
+    color: var(--color-accent);
+    text-decoration-color: currentColor;
+  }
+
+  .works-section {
+    padding-bottom: clamp(3rem, 7vw, 5rem);
+  }
+
+  .viewer-info-section {
+    padding-bottom: clamp(2.5rem, 6vw, 4rem);
+  }
+
+  .section-heading {
+    align-items: end;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-md);
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+  }
+
+  .section-heading h2 {
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+
+  .work-shelf {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+
+  .viewer-highlight-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .viewer-highlight-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    display: grid;
+    gap: 0.55rem;
+    padding: 1.05rem;
+  }
+
+  .viewer-highlight-card h3 {
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .viewer-highlight-card p {
+    color: var(--color-text-muted);
+    font-size: 0.86rem;
+    line-height: 1.85;
+  }
+
+  .viewer-structure-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 1rem;
+  }
+
+  .viewer-structure-strip span {
+    background: var(--color-accent-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+    font-weight: 800;
+    padding: 0.38rem 0.7rem;
+  }
+
+  .work-tile {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 92px minmax(0, 1fr);
+    padding: 0.85rem;
+  }
+
+  .work-cover-link {
+    color: inherit;
+  }
+
+  .work-cover-frame {
+    align-items: center;
+    aspect-ratio: 2 / 3;
+    background: #f4f4f1;
+    border: 1px solid var(--color-border);
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    overflow: hidden;
+    width: 92px;
+  }
+
+  .work-cover {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .cover-fallback {
+    color: var(--color-text-muted);
+    font-size: 1.75rem;
+    font-weight: 700;
+  }
+
+  .work-info {
+    display: grid;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  .work-title-row {
+    align-items: start;
+    display: flex;
+    gap: 0.6rem;
+    justify-content: space-between;
+  }
+
+  .work-title-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: flex-end;
+  }
+
+  .work-title-row h3 {
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .work-title-row h3 a {
+    color: var(--color-text);
+  }
+
+  .work-description {
+    color: var(--color-text-muted);
+    display: -webkit-box;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .work-meta {
+    align-items: center;
+    color: var(--color-text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+    gap: 0.8rem;
+  }
+
+  .empty-state {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: clamp(2rem, 6vw, 3rem);
+  }
+
+  .empty-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+  }
+
+  @media (max-width: 640px) {
+    .section-heading {
+      align-items: start;
+      flex-direction: column;
+    }
+
+    .work-shelf {
+      grid-template-columns: 1fr;
+    }
+
+    .work-tile {
+      grid-template-columns: 82px minmax(0, 1fr);
+    }
+
+    .work-cover-frame {
+      width: 82px;
+    }
+  }
+</style>

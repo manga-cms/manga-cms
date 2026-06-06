@@ -1,0 +1,251 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { fetchEpisode } from "../../lib/api-client";
+import { siteConfig } from "../../lib/site-config";
+
+const demoSeriesId = "oumaga-dokidoki";
+const demoEpisodeId = "ep01";
+const configuredReaderOrigin = (import.meta.env.SITE_READER_ORIGIN as string | undefined)?.replace(/\/$/, "");
+const readerOrigin =
+  configuredReaderOrigin ||
+  (siteConfig.origin.includes("read") ? siteConfig.origin : "https://read.manga-cms.com");
+const demoReaderUrl = `${readerOrigin}/works/oumaga-dokidoki/episodes/ep01`;
+const contactFormUrl =
+  "https://docs.google.com/forms/d/e/1FAIpQLSfYj8Xb1rX2C2PY0ksWUHr9d0-UwLHVDo63iq-dYXjoXPZpSw/viewform?usp=dialog";
+const fallbackPageImage = "/placeholder-page.svg";
+
+const { data: demoEpisodeData } = await fetchEpisode(demoSeriesId, demoEpisodeId);
+const demoPages = demoEpisodeData?.episode.pages ?? [];
+const demoPage = demoPages[0];
+const structurePage = demoPages[1] ?? demoPage;
+
+const preferredImage = (page: any | undefined) =>
+  page?.images?.ja ?? Object.values(page?.images ?? {}).find((value) => typeof value === "string") ?? fallbackPageImage;
+
+const boxStyle = (bbox: any, page: any | undefined) => {
+  if (!bbox || !page?.width || !page?.height) return "";
+  return [
+    `left:${(bbox.x / page.width) * 100}%`,
+    `top:${(bbox.y / page.height) * 100}%`,
+    `width:${(bbox.width / page.width) * 100}%`,
+    `height:${(bbox.height / page.height) * 100}%`,
+  ].join(";");
+};
+
+const demoPageImageUrl = preferredImage(demoPage);
+const structurePageImageUrl = preferredImage(structurePage);
+const structurePanels = (structurePage?.panels ?? []).slice(0, 4);
+const structureBubbles = structurePanels.flatMap((panel: any) => panel.bubbles ?? []).slice(0, 3);
+
+const structureItems = [
+  {
+    title: "ページ",
+    body: "もとになるのは、普通のマンガの画像で大丈夫です。",
+  },
+  {
+    title: "コマ",
+    body:
+      "「このページの、このコマ」という指定ができます。好きなコマを共有したり、どの場面について話しているのかを分かりやすくしたりできます。",
+  },
+  {
+    title: "フキダシ / セリフ",
+    body:
+      "セリフを、画像とは別のテキストとして扱えます。コピーしたり、検索したり、注釈や読み上げなど、アクセシビリティの改善にもつながります。",
+  },
+];
+
+const capabilities = [
+  {
+    title: "コマやセリフ単位のシェア",
+    body: "ページ全体だけでなく、「ここ！」と思った特定のフキダシやコマを選んで共有できます。",
+    gifUrl: "/features/feature_0648.gif",
+  },
+  {
+    title: "多言語への切り替え",
+    body: "ページ遷移なしで瞬時に他言語へ切り替えられます。翻訳作業や語学の学習にも利用できます。",
+    gifUrl: "/features/feature_0647.gif",
+  },
+  {
+    title: "誤訳の指摘・翻訳の提案",
+    body: "読書中に気になった表現があれば、その場ですぐにより良い翻訳案をコミュニティに提案できます。",
+    gifUrl: "/features/feature_0655.gif",
+  },
+];
+
+const visualCapabilities = capabilities.filter((item) => item.gifUrl);
+const textCapabilities = capabilities.filter((item) => !item.gifUrl);
+
+const audiences = [
+  {
+    title: "作家の皆さんへ",
+    body:
+      "作品をWebで読みやすく公開し、共有や翻訳を通じてより多くの読者へ届けやすくします。共有されたページやコマから作品ページへ戻れるので、作品名、作者名、掲載元を保ったまま読者に届けることを目指します。",
+  },
+  {
+    title: "編集者の皆さんへ",
+    body:
+      "ページ、コマ、フキダシ、セリフを指定できるので、誤字、誤訳、表示崩れ、注釈の確認がしやすくなります。「この画像のこのあたり」ではなく、対象を指定してやりとりできます。",
+  },
+  {
+    title: "開発者の皆さんへ",
+    body:
+      "オープンソースのコード、API、データ形式を使って、マンガの読む画面や管理画面を自分のサイトや運用に合わせて拡張できます。",
+  },
+];
+---
+
+<BaseLayout title={siteConfig.title} description={siteConfig.description}>
+  <div class="official-home official-home-plain">
+    <section class="official-home-hero container">
+      <h1>マンガを、あまねく届けるためのしくみ。</h1>
+      <p class="official-lead">
+        読みやすく、共有しやすく、翻訳しやすい。<br />
+        マンガを、どこにでも届き、どの言語の読者にも開かれたメディアにするための、あたらしいマンガビューアーです。
+      </p>
+
+      <a href={demoReaderUrl} class="official-demo-page-link" aria-label="Oumaga Dokidoki のデモを読む">
+        <span class="official-demo-page-frame">
+          <img
+            src={demoPageImageUrl}
+            alt="Oumaga Dokidoki 第1話 1ページ目"
+            class="official-demo-page"
+            loading="eager"
+            decoding="async"
+          />
+        </span>
+      </a>
+
+      <div class="official-actions official-hero-actions">
+        <a href={demoReaderUrl} class="official-action official-action-primary">デモを読む</a>
+      </div>
+
+      <div class="official-copy-block">
+        <p>
+          Manga CMSは、マンガ作品をWebで公開するためのオープンソースソフトウェアです。
+          読むだけでなく、コマやフキダシを指定できるので、共有したいとき、翻訳したいとき、直したいときに便利です。
+        </p>
+        <p>共有されたコマから、元のページに戻ることもできます。</p>
+      </div>
+    </section>
+
+    <section class="official-section container">
+      <h2>できること</h2>
+      <div class="official-card-grid official-capability-grid official-capability-grid-visual">
+        {visualCapabilities.map((item) => (
+          <article class="official-info-card official-capability-card">
+            <div>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </div>
+            <figure class="official-capability-media">
+              <img src={item.gifUrl} alt="" loading="lazy" decoding="async" />
+            </figure>
+          </article>
+        ))}
+      </div>
+      {
+        textCapabilities.length > 0 && (
+          <div class="official-card-grid official-capability-grid official-capability-grid-text">
+            {textCapabilities.map((item) => (
+              <article class="official-info-card official-capability-card">
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        )
+      }
+    </section>
+
+    <section class="official-section container">
+      <h2>マンガを「ページの画像」だけで終わらせない</h2>
+      <p class="official-section-lead">
+        マンガの一部が共有されたとき、画像だけが拡散され、元のマンガが分からなくなってしまうことがあります。
+        Manga CMSは、共有された場面から元のマンガへ戻れるような工夫をしています。
+      </p>
+      <div class="official-structure-card official-structure-card-embedded">
+        <div class="official-structure-grid">
+          <figure class="official-structure-preview official-structure-preview-page">
+            <img
+              src={structurePageImageUrl}
+              alt="ページ画像にページ、コマ、セリフの範囲を重ねた例"
+              loading="lazy"
+              decoding="async"
+            />
+            <div class="official-structure-box official-structure-box-page">
+              <span>ページ</span>
+            </div>
+            {structurePanels.map((panel: any, index: number) => (
+              <div class="official-structure-box official-structure-box-panel" style={boxStyle(panel.bbox, structurePage)}>
+                {index === 2 && <span>コマ</span>}
+              </div>
+            ))}
+            {structureBubbles.map((bubble: any, index: number) => (
+              <div class="official-structure-box official-structure-box-bubble" style={boxStyle(bubble.bbox, structurePage)}>
+                {index === 0 && <span>セリフ</span>}
+              </div>
+            ))}
+            <figcaption class="official-structure-legend">
+              <span><i></i>ページ</span>
+              <span><i class="official-structure-legend-panel"></i>コマ</span>
+              <span><i class="official-structure-legend-bubble"></i>セリフ</span>
+            </figcaption>
+          </figure>
+
+          <div class="official-structure-nodes">
+            {structureItems.map((item, index) => (
+              <article class:list={[
+                "official-structure-node",
+                index === 1 && "official-structure-node-panel",
+                index === 2 && "official-structure-node-bubble",
+              ]}>
+                <span class="official-structure-dot"></span>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="official-section container">
+      <h2>誰でも使える、オープンソースプロジェクト</h2>
+      <div class="official-card-grid">
+        {audiences.map((item) => (
+          <article class="official-info-card">
+            <h3>{item.title}</h3>
+            <p>{item.body}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+
+    <section class="official-section container">
+      <h2>デモ作品を募集しています</h2>
+      <p class="official-section-lead">
+        Manga CMSは、マンガをWebで読みやすく、共有しやすく、翻訳しやすくするためのオープンソースソフトウェアです。
+        現在、この仕組みを実際の作品で検証するため、権利がクリアになっているマンガ作品を少数募集しています。
+      </p>
+      <div class="official-actions">
+        <a href={contactFormUrl} class="official-action" target="_blank" rel="noreferrer">掲載について相談する →</a>
+      </div>
+      <div class="official-warning">
+        <strong>※ manga-cms.comはOSS公式サイトです。</strong><br />
+        作品を投稿したり、アカウントを作って自動公開したり、決済したりする場所ではありません。
+        作家向けの協力募集は、少数の作品を手動で確認する試験的な取り組みです。
+      </div>
+    </section>
+
+    <section class="official-section container official-contact-section">
+      <h2>詳細と連絡先</h2>
+      <div class="official-contact-links official-contact-buttons">
+        <a href={siteConfig.brand.githubUrl} class="official-action official-action-primary" target="_blank" rel="noreferrer">GitHub →</a>
+        <a href="/license" class="official-action">License →</a>
+        <a href={contactFormUrl} class="official-action" target="_blank" rel="noreferrer">Contact</a>
+      </div>
+    </section>
+  </div>
+</BaseLayout>

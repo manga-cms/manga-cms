@@ -1,0 +1,87 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { isOfficialSite } from "../../lib/site-config";
+
+const slug = Astro.params.slug ?? "";
+const returnTo = slug ? `/works/${slug.split("/")[0]}` : "/works";
+
+if (isOfficialSite) {
+  return Astro.redirect("/");
+}
+---
+
+<BaseLayout
+  title="購入準備中 — Manga Viewer"
+  description="この作品の購入導線は外部決済接続前です。"
+>
+  <section class="container purchase-page">
+    <a href={returnTo} class="breadcrumb text-muted">← 作品ページに戻る</a>
+    <div class="purchase-panel">
+      <span class="badge">Purchase</span>
+      <h1>購入フローは準備中です</h1>
+      <p class="text-muted">
+        将来的にはここから決済または販売ページへ進めます。すでにコードを持っている場合は、コード入力から閲覧権を有効化できます。
+      </p>
+      <div class="purchase-actions">
+        <a href={`/redeem?returnTo=${encodeURIComponent(returnTo)}`} class="purchase-primary">コードを入力する</a>
+        <a href="/works" class="purchase-secondary">作品一覧へ</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .purchase-page {
+    padding-bottom: var(--space-2xl);
+    padding-top: var(--space-xl);
+  }
+
+  .breadcrumb {
+    display: inline-block;
+    font-size: 0.9rem;
+    margin-bottom: var(--space-lg);
+  }
+
+  .purchase-panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    display: grid;
+    gap: var(--space-md);
+    margin: 0 auto;
+    max-width: 640px;
+    padding: var(--space-xl);
+  }
+
+  .purchase-panel h1 {
+    font-size: clamp(1.75rem, 4vw, 2.4rem);
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
+
+  .purchase-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    margin-top: var(--space-sm);
+  }
+
+  .purchase-primary,
+  .purchase-secondary {
+    border-radius: var(--radius);
+    font-weight: 700;
+    min-height: 44px;
+    padding: 0.7rem 1rem;
+    text-align: center;
+  }
+
+  .purchase-primary {
+    background: var(--color-accent);
+    color: #fff;
+  }
+
+  .purchase-secondary {
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+  }
+</style>

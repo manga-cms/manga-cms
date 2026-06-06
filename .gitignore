@@ -1,0 +1,39 @@
+node_modules/
+dist/
+.env
+.pnpm-store/
+tmp/
+coverage/
+*.log
+
+# Turborepo
+.turbo/
+
+# Next.js / Astro
+.next/
+.astro/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+.antigravitycli/
+
+# DB
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+packages/db/prisma/postgres/schema.prisma
+
+# Runtime private storage
+feedback/
+proposals/
+pack-drafts/
+rights/
+
+# Local/private storyboard verification content
+contents/storyboard-ui-check/
+contents/neon-garden/
+contents/rain-world/
+contents/smoke-test-series/

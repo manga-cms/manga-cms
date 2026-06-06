@@ -1,0 +1,149 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { isOfficialSite } from "../lib/site-config";
+
+export const prerender = false;
+
+const apiBase = (import.meta.env.API_BASE ?? "").replace(/\/$/, "") || "/api/v1";
+const returnTo = Astro.url.searchParams.get("returnTo") || "/works";
+
+if (isOfficialSite) {
+  return Astro.redirect("/");
+}
+---
+
+<BaseLayout
+  title="コード入力 — Manga Viewer"
+  description="購入コードや配布コードを入力して閲覧権を有効化します。"
+>
+  <section class="container redeem-page">
+    <a href={returnTo} class="breadcrumb text-muted">← 戻る</a>
+    <div class="redeem-panel">
+      <div>
+        <span class="badge">Redeem</span>
+        <h1>コードを入力</h1>
+        <p class="text-muted">
+          購入コードや配布コードを入力すると、対象の Series / Episode の閲覧権が有効になります。
+        </p>
+      </div>
+      <form class="redeem-form" data-redeem-form data-api-base={apiBase} data-return-to={returnTo}>
+        <label>
+          <span>コード</span>
+          <input name="code" autocomplete="one-time-code" placeholder="XXXX-XXXX-XXXX" required />
+        </label>
+        <button type="submit" class="redeem-submit">有効化する</button>
+        <p class="redeem-status text-muted" data-redeem-status>ログイン済みのユーザーで利用できます。</p>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    const form = document.querySelector("[data-redeem-form]");
+    const status = document.querySelector("[data-redeem-status]");
+
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const formEl = event.currentTarget;
+      if (!(formEl instanceof HTMLFormElement)) return;
+      const submit = formEl.querySelector("button[type='submit']");
+      const code = String(new FormData(formEl).get("code") ?? "").trim();
+      const apiBase = formEl.getAttribute("data-api-base") || "/api/v1";
+      const returnTo = formEl.getAttribute("data-return-to") || "/works";
+      if (!code) return;
+
+      submit?.setAttribute("disabled", "true");
+      if (status) status.textContent = "確認しています...";
+
+      try {
+        const res = await fetch(`${apiBase}/redeem`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error?.message ?? "コードを有効化できませんでした");
+        }
+        if (status) status.textContent = "有効化しました。元のページに戻ります。";
+        window.location.href = returnTo;
+      } catch (error) {
+        if (status) status.textContent = error instanceof Error ? error.message : "コードを有効化できませんでした";
+      } finally {
+        submit?.removeAttribute("disabled");
+      }
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .redeem-page {
+    padding-bottom: var(--space-2xl);
+    padding-top: var(--space-xl);
+  }
+
+  .breadcrumb {
+    display: inline-block;
+    font-size: 0.9rem;
+    margin-bottom: var(--space-lg);
+  }
+
+  .redeem-panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    display: grid;
+    gap: var(--space-lg);
+    margin: 0 auto;
+    max-width: 620px;
+    padding: var(--space-xl);
+  }
+
+  .redeem-panel h1 {
+    font-size: clamp(1.75rem, 4vw, 2.4rem);
+    letter-spacing: 0;
+    line-height: 1.2;
+    margin: var(--space-md) 0 var(--space-sm);
+  }
+
+  .redeem-form {
+    display: grid;
+    gap: var(--space-md);
+  }
+
+  .redeem-form label {
+    display: grid;
+    gap: var(--space-sm);
+    font-weight: 700;
+  }
+
+  .redeem-form input {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    font: inherit;
+    padding: 0.8rem 0.9rem;
+    width: 100%;
+  }
+
+  .redeem-submit {
+    background: var(--color-accent);
+    border: 0;
+    border-radius: var(--radius);
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    min-height: 46px;
+    padding: 0.75rem 1rem;
+  }
+
+  .redeem-submit:disabled {
+    cursor: wait;
+    opacity: 0.65;
+  }
+
+  .redeem-status {
+    min-height: 1.5em;
+  }
+</style>

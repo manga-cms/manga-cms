@@ -1,0 +1,64 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { siteConfig } from "../../lib/site-config";
+
+interface PageAction {
+  label: string;
+  href: string;
+  external?: boolean;
+}
+
+interface PageSection {
+  eyebrow?: string;
+  title: string;
+  body: string;
+}
+
+interface Props {
+  title: string;
+  description: string;
+  eyebrow?: string;
+  intro: string;
+  actions?: PageAction[];
+  sections?: PageSection[];
+}
+
+const { title, description, eyebrow = "manga-cms", intro, actions = [], sections = [] } = Astro.props;
+const pageTitle = `${title} — ${siteConfig.title}`;
+---
+
+<BaseLayout title={pageTitle} description={description}>
+  <section class="official-page container">
+    <header class="official-page-header">
+      <p class="official-kicker">{eyebrow}</p>
+      <h1>{title}</h1>
+      <p>{intro}</p>
+      {actions.length > 0 && (
+        <div class="official-actions">
+          {actions.map((action) => (
+            <a
+              href={action.href}
+              class="official-action"
+              target={action.external ? "_blank" : undefined}
+              rel={action.external ? "noreferrer" : undefined}
+            >
+              {action.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </header>
+
+    {sections.length > 0 && (
+      <div class="official-section-grid">
+        {sections.map((section) => (
+          <article class="official-info-card">
+            {section.eyebrow && <p class="official-kicker official-card-kicker">{section.eyebrow}</p>}
+            <h2>{section.title}</h2>
+            <p>{section.body}</p>
+          </article>
+        ))}
+      </div>
+    )}
+  </section>
+</BaseLayout>

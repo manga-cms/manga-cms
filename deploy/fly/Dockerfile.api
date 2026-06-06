@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+
+FROM node:20-bookworm-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV NODE_ENV="staging"
+ENV PORT="3000"
+ENV DATABASE_URL="file:/data/manga-cms-staging.db"
+ARG PRISMA_PROVIDER="sqlite"
+ENV PRISMA_PROVIDER="${PRISMA_PROVIDER}"
+
+WORKDIR /app
+
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/cms/package.json apps/cms/package.json
+COPY apps/viewer/package.json apps/viewer/package.json
+COPY packages/db/package.json packages/db/package.json
+COPY packages/domain/package.json packages/domain/package.json
+COPY packages/ingestion/package.json packages/ingestion/package.json
+COPY packages/schemas/package.json packages/schemas/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+RUN if [ "$PRISMA_PROVIDER" = "postgresql" ]; then \
+      DATABASE_URL="postgresql://manga:manga@localhost:5432/manga_cms?schema=public" pnpm --filter @manga/db db:generate:postgres; \
+    else \
+      DATABASE_URL="file:/data/manga-cms-staging.db" pnpm --filter @manga/db db:generate:sqlite; \
+    fi
+RUN pnpm --filter @manga/api... build
+
+EXPOSE 3000
+
+CMD ["sh", "-c", "set -eu; mkdir -p /data/contents /data/packs /data/feedback /data/proposals /data/pack-drafts /data/drafts /data/imports /data/draft-assets /data/rights /data/github-handoffs /data/github-identities; if [ \"${PRISMA_PROVIDER:-sqlite}\" = \"postgresql\" ]; then case \"${DATABASE_URL:-}\" in postgresql://*|postgres://*) ;; *) echo 'DATABASE_URL must be a Postgres URL when PRISMA_PROVIDER=postgresql' >&2; exit 1 ;; esac; pnpm --filter @manga/db db:push:postgres; else pnpm --filter @manga/db db:push:sqlite; fi; exec pnpm --filter @manga/api start"]

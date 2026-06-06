@@ -1,0 +1,133 @@
+// Production Prisma schema.
+// PostgreSQL for Fly production runtime state.
+//
+// Keep this model set in sync with schema.prisma. Canonical manga content
+// remains in contents/; this schema is only for runtime state.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Entitlements
+// ---------------------------------------------------------------------------
+
+model Entitlement {
+  id         String   @id @default(cuid())
+  userId     String
+  targetType String   // SERIES | EPISODE | VOLUME | PACK | BUNDLE
+  targetId   String   // e.g. "rain-world" or "rain-world/ep02"
+  source     String   // PURCHASE | ADMIN_GRANT | PROMO | SUBSCRIPTION | REDEEM
+  status     String   @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED
+  grantedAt  DateTime @default(now())
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
+  @@index([targetType, targetId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Ingestion Jobs
+// ---------------------------------------------------------------------------
+
+model IngestionJob {
+  id           String   @id
+  label        String
+  status       String   @default("queued") // queued|draft|waiting_review|confirmed|failed|canceled
+  draftJson    String?  // JSON blob of DraftPayload
+  errorMessage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// API Keys (production auth)
+// ---------------------------------------------------------------------------
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  keyHash    String    @unique // SHA-256 hash of the raw key
+  keyPrefix  String    // first 8 chars for identification
+  userId     String    // owner user ID
+  name       String    // human-readable label
+  role       String    @default("admin") // admin | user
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Purchase Records
+// ---------------------------------------------------------------------------
+
+model PurchaseRecord {
+  id                 String   @id @default(cuid())
+  provider           String   // MANUAL | STRIPE | GUMROAD
+  providerPurchaseId String?  // external provider's ID
+  productId          String   // what was purchased (e.g. "rain-world-full")
+  buyerEmail         String?
+  currency           String?
+  amount             Int?     // smallest unit (e.g. cents)
+  status             String   @default("COMPLETED") // PENDING | COMPLETED | FAILED | REFUNDED
+  createdBy          String?  // admin user ID who created this record
+  metadata           String?  // JSON blob for provider-specific data
+  createdAt          DateTime @default(now())
+  completedAt        DateTime?
+
+  @@unique([provider, providerPurchaseId])
+  @@index([provider, productId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Redeem Codes
+// ---------------------------------------------------------------------------
+
+model RedeemCode {
+  id                 String    @id @default(cuid())
+  code               String    @unique
+  purchaseId         String?   // optional link to PurchaseRecord
+  targetType         String    // SERIES | EPISODE
+  targetId           String    // what the code grants access to
+  maxRedemptions     Int       @default(1)
+  currentRedemptions Int       @default(0)
+  status             String    @default("ACTIVE") // ACTIVE | EXHAUSTED | REVOKED
+  redeemedByUserId   String?   // last redeemer (for single-use)
+  redeemedIp         String?   // IP of the redeemer (abuse tracking)
+  createdAt          DateTime  @default(now())
+  redeemedAt         DateTime?
+  revokedAt          DateTime?
+
+  @@index([code])
+  @@index([purchaseId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Magic Link Tokens (one-time, time-limited auth tokens)
+// ---------------------------------------------------------------------------
+
+model MagicLinkToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique // SHA-256 hash of the raw token
+  email      String
+  userId     String    // derived user ID
+  requestIp  String?   // IP that requested the link (abuse tracking)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}

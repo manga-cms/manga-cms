@@ -1,0 +1,335 @@
+---
+/**
+ * Episode reader page (SSR).
+ *
+ * Data path:
+ *   1. If API_BASE is set → fetch from @manga/api (primary)
+ *   2. If API_BASE is not set → fall back to shared content loader
+ *
+ * Entitlement gating:
+ *   - API returns `gated: true` for locked episodes without entitlement
+ *   - Viewer shows preview + unlock CTA for gated content
+ *   - Ungated content uses delivery URLs (not raw image paths)
+ */
+import BaseLayout from "../../../../layouts/BaseLayout.astro";
+import EpisodeReaderShell from "../../../../components/reader/EpisodeReaderShell.astro";
+import { fetchEpisode, isApiConfigured } from "../../../../lib/api-client";
+import { getSeries, getEpisode, getAdjacentEpisodes } from "../../../../data/content";
+import { siteConfig } from "../../../../lib/site-config";
+import { robotsForLocale } from "../../../../lib/search-indexing";
+import {
+  resolveEpisodeOgImage,
+  safeInlineJson,
+  toViewerReaderPages,
+} from "../../../../lib/episode-reader-data";
+import {
+  descriptionWithTitleAndAuthor,
+  episodeDisplayTitle,
+  joinedSeriesEpisodeTitle,
+  localizedDescription,
+  normalizeViewerLocale,
+  publicAuthorLabel,
+  seriesDisplayTitle,
+} from "../../../../lib/localized-metadata";
+import "../../../../styles/episode-reader.css";
+
+// SSR — not prerendered. Required for entitlement gating.
+export const prerender = false;
+
+const { workId, episodeId } = Astro.params;
+const initialLocale = normalizeViewerLocale(Astro.url.searchParams.get("lang"));
+
+if (!workId || !episodeId) {
+  return Astro.redirect("/works");
+}
+
+if (siteConfig.mode === "official" && !siteConfig.content.demoSeriesIds.includes(workId)) {
+  return Astro.redirect("/");
+}
+
+// --- Data resolution: API-first with loader fallback ---
+let seriesTitle = "";
+let series: any = null;
+let episode: {
+  title: string;
+  episodeNumber: number;
+  publishedAt: string;
+  purchaseUrl?: string;
+  redeemUrl?: string;
+  pages: any[];
+} | null = null;
+let seriesCoverUrl = "";
+let seriesShareImageUrl = "";
+let prev: { id: string; title: string; episodeNumber: number } | null = null;
+let next: { id: string; title: string; episodeNumber: number } | null = null;
+let dataSource: "api" | "loader" | "none" = "none";
+let isGated = false;
+let gatedMessage = "";
+let isUnavailable = false;
+let unavailableMessage = "";
+let apiError = "";
+
+// Forward request cookies for SSR auth propagation
+const requestCookies = Astro.request.headers.get("cookie") ?? undefined;
+
+const apiConfigured = isApiConfigured();
+
+if (apiConfigured) {
+  const result = await fetchEpisode(workId, episodeId, requestCookies);
+  if (result.data) {
+    series = result.data.series;
+    seriesTitle = result.data.series.title;
+    seriesCoverUrl = result.data.series.coverUrl ?? "";
+    seriesShareImageUrl = result.data.series.shareImageUrl ?? "";
+    episode = result.data.episode;
+    prev = result.data.prev;
+    next = result.data.next;
+    dataSource = "api";
+    // Check for gated response from API
+    if ((result.data as any).gated === true) {
+      isGated = true;
+      gatedMessage = (result.data as any).message ?? "このエピソードを読むには購入が必要です";
+    }
+  } else {
+    apiError = result.error ?? "API request failed";
+  }
+}
+
+// Fallback to shared content loader (ONLY for free episodes)
+if (!episode && !apiConfigured) {
+  const work = getSeries(workId);
+  const ep = getEpisode(workId, episodeId);
+  if (work && ep) {
+    series = work;
+    seriesTitle = work.title;
+    seriesCoverUrl = work.coverUrl;
+    seriesShareImageUrl = work.shareImageUrl ?? "";
+    // For loader fallback, only show ep1 (free). Others are gated.
+    if (ep.episodeNumber <= 1) {
+      episode = ep;
+      const adj = getAdjacentEpisodes(workId, episodeId);
+      prev = adj.prev ? { id: adj.prev.id, title: adj.prev.title, episodeNumber: adj.prev.episodeNumber } : null;
+      next = adj.next ? { id: adj.next.id, title: adj.next.title, episodeNumber: adj.next.episodeNumber } : null;
+      dataSource = "loader";
+    } else {
+      // Locked in fallback mode
+      episode = { title: ep.title, episodeNumber: ep.episodeNumber, publishedAt: ep.publishedAt, pages: [] };
+      episode.purchaseUrl = ep.purchaseUrl;
+      episode.redeemUrl = ep.redeemUrl;
+      isGated = true;
+      gatedMessage = "このエピソードを読むにはログインと購入が必要です";
+      dataSource = "loader";
+    }
+  }
+}
+
+if (!episode && apiConfigured) {
+  const fallbackSeriesForUnavailable = getSeries(workId);
+  series ||= fallbackSeriesForUnavailable;
+  seriesTitle ||= fallbackSeriesForUnavailable?.title ?? workId;
+  seriesCoverUrl ||= fallbackSeriesForUnavailable?.coverUrl ?? "";
+  seriesShareImageUrl ||= fallbackSeriesForUnavailable?.shareImageUrl ?? "";
+  episode = {
+    title: "現在公開されていません",
+    episodeNumber: 0,
+    publishedAt: "",
+    pages: [],
+  };
+  isUnavailable = true;
+  unavailableMessage = apiError.startsWith("404")
+    ? "このエピソードは現在公開されていないか、存在しません。"
+    : "APIからエピソードを取得できませんでした。時間をおいて再度お試しください。";
+  dataSource = "api";
+}
+
+// Check first page for gated flag (API response)
+if (episode && !isGated && dataSource === "api") {
+  // We need to check a page endpoint to see if it's gated
+  // For now, we rely on the episode metadata being available
+  // The actual gating happens when rendering pages
+}
+
+if (!episode) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+const viewerPages = toViewerReaderPages(episode.pages, initialLocale);
+const fallbackSeries = getSeries(workId);
+series ||= fallbackSeries;
+seriesCoverUrl ||= fallbackSeries?.coverUrl ?? "";
+seriesShareImageUrl ||= fallbackSeries?.shareImageUrl ?? "";
+const viewerPagesJson = safeInlineJson(viewerPages);
+const feedbackApiBase = (import.meta.env.API_BASE ?? "").replace(/\/$/, "") || "/api/v1";
+const feedbackApiBaseJson = safeInlineJson(feedbackApiBase);
+const isReaderAvailable = !isGated && episode.pages.length > 0;
+const publicationType = series?.publicationType ?? "serial";
+const isSingleEpisode = Array.isArray(series?.episodes) ? series.episodes.length === 1 : !prev && !next;
+const localizedSeriesTitle = seriesDisplayTitle(series, initialLocale) || seriesTitle || workId;
+const localizedEpisodeTitle = episodeDisplayTitle({
+  series,
+  episode,
+  locale: initialLocale,
+  publicationType,
+  isSingleEpisode,
+}) || episode.title;
+const localizedDescriptionText = localizedDescription(episode, initialLocale)
+  || localizedDescription(series, initialLocale)
+  || series?.description
+  || `${localizedSeriesTitle}: ${localizedEpisodeTitle}`;
+const localizedAuthorLabel = publicAuthorLabel(series, initialLocale);
+const localizedPageTitle = joinedSeriesEpisodeTitle({
+  seriesTitle: localizedSeriesTitle,
+  episodeTitle: localizedEpisodeTitle,
+  publicationType,
+  isSingleEpisode,
+});
+const readerCanonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURIComponent(episodeId)}`;
+const readerAlternateUrls = [
+  { locale: "ja", href: readerCanonicalPath },
+  { locale: "en", href: `${readerCanonicalPath}?lang=en` },
+  { locale: "x-default", href: readerCanonicalPath },
+];
+const readerDisplayMetadata = {
+  series: {
+    ja: {
+      title: seriesDisplayTitle(series, "ja") || seriesTitle || workId,
+      description: localizedDescription(series, "ja") || series?.description || "",
+      authorLabel: publicAuthorLabel(series, "ja"),
+    },
+    en: {
+      title: seriesDisplayTitle(series, "en") || seriesDisplayTitle(series, "ja") || seriesTitle || workId,
+      description: localizedDescription(series, "en") || localizedDescription(series, "ja") || series?.description || "",
+      authorLabel: publicAuthorLabel(series, "en") || publicAuthorLabel(series, "ja"),
+    },
+  },
+  episode: {
+    ja: {
+      title: episodeDisplayTitle({ series, episode, locale: "ja", publicationType, isSingleEpisode }) || episode.title,
+      description: localizedDescription(episode, "ja") || localizedDescription(series, "ja") || series?.description || "",
+    },
+    en: {
+      title: episodeDisplayTitle({ series, episode, locale: "en", publicationType, isSingleEpisode })
+        || episodeDisplayTitle({ series, episode, locale: "ja", publicationType, isSingleEpisode })
+        || episode.title,
+      description: localizedDescription(episode, "en") || localizedDescription(series, "en") || localizedDescription(episode, "ja") || series?.description || "",
+    },
+  },
+};
+const readerDisplayMetadataJson = safeInlineJson(readerDisplayMetadata);
+const firstReaderPage = viewerPages[0];
+const pageOgImage = firstReaderPage?.pageNumber
+  ? `/og/${encodeURIComponent(workId)}/${encodeURIComponent(episodeId)}/p/${encodeURIComponent(String(firstReaderPage.pageNumber))}.png${initialLocale === "en" ? "?lang=en" : ""}`
+  : undefined;
+const episodeOgImage = resolveEpisodeOgImage({
+  seriesCoverUrl,
+  seriesShareImageUrl,
+  pageOgImage,
+  firstPageSrc: viewerPages[0]?.src,
+});
+const gatedPurchaseUrl = isGated ? episode.purchaseUrl : undefined;
+const defaultRedeemUrl = `/redeem?returnTo=${encodeURIComponent(Astro.url.pathname)}`;
+const gatedRedeemUrl = isGated ? (episode.redeemUrl ?? defaultRedeemUrl) : undefined;
+---
+
+<BaseLayout
+  title={localizedPageTitle}
+  description={descriptionWithTitleAndAuthor({
+    title: localizedPageTitle,
+    authorLabel: localizedAuthorLabel,
+    description: localizedDescriptionText,
+    locale: initialLocale,
+  })}
+  locale={initialLocale}
+  canonicalUrl={readerCanonicalPath}
+  alternateUrls={readerAlternateUrls}
+  robots={robotsForLocale(initialLocale)}
+  ogImage={episodeOgImage}
+  ogType="article"
+  immersive
+>
+  <section class:list={["container", "page-section", { "is-reader-page": isReaderAvailable }]}>
+    {!isReaderAvailable && (
+      <>
+        <a href={`/works/${workId}`} class="breadcrumb text-muted">
+          ← {seriesTitle}
+        </a>
+
+        {!isUnavailable && (
+          <div class="episode-header">
+            {publicationType !== "oneshot" && <span class="ep-number badge">Episode {episode.episodeNumber}</span>}
+            <h1>{localizedEpisodeTitle}</h1>
+            <p class="text-muted">{episode.publishedAt}</p>
+            {import.meta.env.DEV && dataSource === "loader" && !isGated && (
+              <p class="data-source-hint text-muted">⚠ API未接続 — ローカルデータ表示中（開発モード）</p>
+            )}
+          </div>
+        )}
+      </>
+    )}
+
+    {isUnavailable ? (
+      <div class="placeholder-reader card">
+        <h1>このエピソードは現在公開されていません</h1>
+        <p class="text-muted">{unavailableMessage}</p>
+        <div class="gated-actions">
+          <a href={`/works/${workId}`} class="btn-viewer btn-primary-viewer">作品ページに戻る</a>
+        </div>
+      </div>
+    ) : isGated ? (
+      <div class="gated-overlay card">
+        <div class="gated-icon">🔒</div>
+        <h2>このエピソードはロックされています</h2>
+        <p class="text-muted">{gatedMessage || "このエピソードを読むには購入が必要です"}</p>
+        <div class="gated-actions">
+          {gatedPurchaseUrl && (
+            <a href={gatedPurchaseUrl} class="btn-viewer btn-primary-viewer">購入して読む</a>
+          )}
+          {gatedRedeemUrl && (
+            <a href={gatedRedeemUrl} class="btn-viewer btn-ghost-viewer">コードを持っている方はこちら</a>
+          )}
+          <a href={`/works/${workId}`} class="btn-viewer btn-ghost-viewer">作品ページに戻る</a>
+        </div>
+      </div>
+    ) : episode.pages.length === 0 ? (
+      <div class="placeholder-reader card">
+        <p class="text-muted">このエピソードのページはまだありません。</p>
+      </div>
+    ) : (
+      <EpisodeReaderShell
+        workId={workId}
+        episodeId={episodeId}
+        seriesTitle={seriesTitle}
+        episodeTitle={localizedEpisodeTitle}
+        nextEpisodeId={next?.id}
+        nextEpisodeTitle={next?.title}
+        pageCount={episode.pages.length}
+        viewerPagesJson={viewerPagesJson}
+        feedbackApiBaseJson={feedbackApiBaseJson}
+        readerDisplayMetadataJson={readerDisplayMetadataJson}
+        initialLocale={initialLocale}
+      />
+    )}
+
+    {!isReaderAvailable && (
+      <div class="episode-nav">
+        {prev && (
+          <a href={`/works/${workId}/episodes/${prev.id}`} class="nav-link">
+            ← {prev.title}
+          </a>
+        )}
+        <div class="spacer" />
+        {next && (
+          <a href={`/works/${workId}/episodes/${next.id}`} class="nav-link">
+            {next.title} →
+          </a>
+        )}
+      </div>
+    )}
+  </section>
+</BaseLayout>
+
+
+
+<script>
+  import "../../../../scripts/episode-reader";
+</script>

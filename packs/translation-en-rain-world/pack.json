@@ -1,0 +1,11 @@
+{
+    "id": "translation-en-rain-world",
+    "type": "TRANSLATION",
+    "language": "en",
+    "version": 1,
+    "title": "Rain World English Translation",
+    "authorLabel": "community",
+    "isPublished": false,
+    "targetSeriesId": "rain-world",
+    "entries": []
+}

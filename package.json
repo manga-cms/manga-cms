@@ -1,0 +1,18 @@
+{
+  "name": "manga-cms",
+  "private": true,
+  "description": "Open source infrastructure for publishing structured manga on the web.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0"
+  },
+  "packageManager": "pnpm@9.5.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

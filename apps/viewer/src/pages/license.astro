@@ -1,0 +1,51 @@
+---
+import OfficialPage from "../components/site/OfficialPage.astro";
+
+const sections = [
+  {
+    eyebrow: "Code",
+    title: "コードは Apache License 2.0 を前提にします",
+    body:
+      "Manga CMS のソースコードとプロジェクトドキュメントは、OSS として利用、改変、再配布できる形を前提にしています。ただし、これはソフトウェア部分に関する話であり、マンガ作品そのものの利用許諾ではありません。",
+  },
+  {
+    eyebrow: "Content",
+    title: "マンガ画像、本文、翻訳、レタリングの権利は別です",
+    body:
+      "このリポジトリや manga-cms.com を利用しても、第三者のマンガ作品を使う権利は付与されません。マンガ画像、セリフ本文、翻訳、レタリング、表紙、サンプル作品にはそれぞれ権利者がいます。デモやShowcaseに掲載する場合は、掲載範囲、再配布可否、クレジット、GitHub同梱の可否を個別に確認します。",
+  },
+  {
+    eyebrow: "Demo",
+    title: "manga-cms.com 掲載と GitHub 同梱は別の許諾です",
+    body:
+      "manga-cms.com 上でデモとして読めるようにすることと、作品ファイルを GitHub repository に同梱することは、権利上の重さが違います。GitHubに入れると複製、fork、再配布が起きやすくなるため、サイト掲載とは別に明示的な許諾が必要です。GitHub同梱を希望しない作品でも、デモ掲載やShowcase掲載だけで協力できます。",
+  },
+  {
+    eyebrow: "Showcase",
+    title: "紹介先サイトの作品権利は各運営者に属します",
+    body:
+      "Showcase は Manga CMS を使ったサイトや事例を紹介するページです。そこに載るマンガ作品や画像の権利は、それぞれの運営者や作家に属します。Manga CMS プロジェクトが、それらの作品を自由に再利用できることを意味しません。",
+  },
+  {
+    eyebrow: "Contributions",
+    title: "翻訳や注釈の提案にも権利とクレジットがあります",
+    body:
+      "読者や翻訳者が送る提案、翻訳、注釈、修正案も、運用上は誰が投稿し、どう採用され、どのPackに入るのかを記録する必要があります。匿名、表示名、GitHub連携などの本人性の段階に応じて、クレジットやレビュー優先度を分ける方針です。",
+  },
+  {
+    eyebrow: "Rule",
+    title: "迷ったら、コードと作品を分けて考えます",
+    body:
+      "Manga CMS の基本ルールは、ソフトウェアの自由と、作品の権利を混同しないことです。コードはOSSとして広げる。作品は作家と権利者の許諾に従う。この分離があることで、作家、編集者、読者、開発者が安心して同じ基盤を使えます。",
+  },
+];
+---
+
+<OfficialPage
+  title="ソフトウェアの権利と、マンガ作品の権利は別です"
+  description="manga-cms の code license と content rights の境界"
+  eyebrow="rights boundary"
+  intro="Manga CMS は OSS として公開するコードと、作家が権利を持つマンガ作品を混同しない運用を前提にします。このページでは、コードのライセンス、デモ作品、Showcase、翻訳や注釈の提案をどう分けて考えるかを説明します。"
+  actions={[{ label: "公式トップへ", href: "/" }, { label: "GitHub", href: "https://github.com/manga-cms/manga-cms", external: true }]}
+  sections={sections}
+/>
