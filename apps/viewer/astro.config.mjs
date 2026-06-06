@@ -24,6 +24,7 @@ export default defineConfig({
       "import.meta.env.SITE_ORIGIN": JSON.stringify(siteOrigin),
       "import.meta.env.SITE_MODE": JSON.stringify(siteMode),
       "import.meta.env.SITE_READER_ORIGIN": JSON.stringify(process.env.SITE_READER_ORIGIN ?? ""),
+      "import.meta.env.SITE_ROOT_REDIRECT_ORIGIN": JSON.stringify(process.env.SITE_ROOT_REDIRECT_ORIGIN ?? ""),
       "import.meta.env.SITE_DEMO_SERIES_IDS": JSON.stringify(process.env.SITE_DEMO_SERIES_IDS ?? ""),
       "import.meta.env.SITE_ALLOWED_SERIES_IDS": JSON.stringify(process.env.SITE_ALLOWED_SERIES_IDS ?? ""),
       "import.meta.env.PUBLIC_INDEX_EN_LOCALE": JSON.stringify(process.env.PUBLIC_INDEX_EN_LOCALE ?? ""),
