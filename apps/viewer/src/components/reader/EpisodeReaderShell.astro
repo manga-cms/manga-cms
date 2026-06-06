@@ -13,6 +13,7 @@ interface Props {
   feedbackApiBaseJson: string;
   readerDisplayMetadataJson?: string;
   initialLocale?: string;
+  readerBackHref?: string;
 }
 
 const {
@@ -27,9 +28,10 @@ const {
   feedbackApiBaseJson,
   readerDisplayMetadataJson = "{}",
   initialLocale = "ja",
+  readerBackHref: readerBackHrefProp,
 } = Astro.props;
 
-const readerBackHref = siteConfig.mode === "official" ? "/" : `/works/${workId}`;
+const readerBackHref = readerBackHrefProp || (siteConfig.mode === "official" ? "/" : `/works/${workId}`);
 const normalizedInitialLocale = initialLocale === "en" ? "en" : "ja";
 ---
 

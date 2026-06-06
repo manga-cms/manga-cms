@@ -216,6 +216,9 @@ const readerDisplayMetadata = {
   },
 };
 const readerDisplayMetadataJson = safeInlineJson(readerDisplayMetadata);
+const readerBackHref = siteConfig.mode === "official" || (publicationType === "oneshot" && isSingleEpisode)
+  ? "/"
+  : `/works/${encodeURIComponent(workId)}`;
 const firstReaderPage = viewerPages[0];
 const pageOgImage = firstReaderPage?.pageNumber
   ? `/og/${encodeURIComponent(workId)}/${encodeURIComponent(episodeId)}/p/${encodeURIComponent(String(firstReaderPage.pageNumber))}.png${initialLocale === "en" ? "?lang=en" : ""}`
@@ -307,6 +310,7 @@ const gatedRedeemUrl = isGated ? (episode.redeemUrl ?? defaultRedeemUrl) : undef
         feedbackApiBaseJson={feedbackApiBaseJson}
         readerDisplayMetadataJson={readerDisplayMetadataJson}
         initialLocale={initialLocale}
+        readerBackHref={readerBackHref}
       />
     )}
 
