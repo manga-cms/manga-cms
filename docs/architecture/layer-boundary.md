@@ -51,6 +51,9 @@ Runtime DB boundary:
 - The runtime DB stores operational state.
 - It does not become the canonical manga content store.
 - Backup/restore must distinguish runtime DB backup from content backup.
+- Basic entitlement primitives belong here when they are provider-neutral access
+  control. Payment provider fulfillment, refunds, disputes, purchase recovery,
+  reconciliation, payouts, and revenue sharing belong to Layer 3.
 
 Provider boundary:
 
@@ -68,6 +71,7 @@ Examples:
 - hosted creator registration
 - tenant administration
 - paid checkout and webhook fulfillment
+- refund/dispute automation and reconciliation
 - commercial purchase recovery
 - revenue sharing and payout operations
 - custom domains and hosted routing

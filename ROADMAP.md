@@ -7,8 +7,8 @@ contains the open content format, validation contracts, API, Viewer, CMS,
 runtime-state primitives, ingestion tooling, and public reader functionality.
 
 This roadmap is public-facing. It intentionally separates OSS work from future
-private commercial platform work. See [`docs/oss-boundary.md`](oss-boundary.md)
-and [`docs/architecture/layer-boundary.md`](architecture/layer-boundary.md) for
+private commercial platform work. See [`docs/oss-boundary.md`](docs/oss-boundary.md)
+and [`docs/architecture/layer-boundary.md`](docs/architecture/layer-boundary.md) for
 the architecture boundary.
 
 ## Current Public State
@@ -156,9 +156,9 @@ leak detection, or forensic algorithms in the public roadmap.
 
 ## References
 
-- [`docs/oss-boundary.md`](oss-boundary.md)
-- [`docs/architecture/layer-boundary.md`](architecture/layer-boundary.md)
-- [`docs/production-ops-checklist.md`](production-ops-checklist.md)
-- [`docs/api-contract.md`](api-contract.md)
-- [`docs/CONTENT_GUIDE.md`](CONTENT_GUIDE.md)
-- [`docs/BACKUP-RESTORE.md`](BACKUP-RESTORE.md)
+- [`docs/oss-boundary.md`](docs/oss-boundary.md)
+- [`docs/architecture/layer-boundary.md`](docs/architecture/layer-boundary.md)
+- [`docs/production-ops-checklist.md`](docs/production-ops-checklist.md)
+- [`docs/api-contract.md`](docs/api-contract.md)
+- [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md)
+- [`docs/BACKUP-RESTORE.md`](docs/BACKUP-RESTORE.md)

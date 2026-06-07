@@ -48,12 +48,17 @@ Runtime DB state is for:
 
 - users and sessions
 - API keys
-- purchases and entitlements
+- basic entitlement primitives
 - magic-link tokens
 - ingestion job state
 - feedback/proposal runtime state when file-backed storage is replaced
 - audit records
 - other operational state
+
+Basic entitlement primitives may remain in the OSS self-hosted engine because
+they are useful for generic access control. Stripe integration, paid checkout
+fulfillment, refund/dispute automation, purchase recovery, reconciliation,
+payouts, and revenue sharing remain private/commercial-layer work.
 
 If manga content is ever moved out of `contents/` and `packs/`, that must be an
 explicit migration that updates the API contract, domain interfaces, schemas,
@@ -65,10 +70,11 @@ Generic manifest and published artifact concepts are OSS-safe. For example, the
 public repository may define that a publish step emits immutable page images,
 core JSON, Pack JSON, OGP images, and a manifest that points to those artifacts.
 
+Provider-neutral interfaces and manifest/export contracts are OSS-safe.
 Vendor-specific production deployment code is a separate layer. Cloudflare R2
-adapters, cache rules, custom hostname routing, paid gated delivery, and
-commercial deployment automation should not be added to the public repository as
-part of generic roadmap or format work.
+adapters, cache rules, custom hostname routing, commercial CDN adapters, paid
+gated delivery, and commercial deployment automation should not be added to the
+public repository as part of generic roadmap or format work.
 
 ## Documentation Rules
 

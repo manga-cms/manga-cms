@@ -28,12 +28,12 @@ Still early:
 - Image upload from the CMS is not a complete production workflow.
 - Panel and bubble editing is still minimal.
 - OCR, PSD, and Clip Studio ingestion are PoC-level.
-- Watermark compositing is currently a stub.
-- External commerce webhooks, CDN strategy, monitoring, and multi-instance
-  hardening are not finished.
+- Published-asset strategy, monitoring, and multi-instance hardening are not
+  finished.
+- External commerce integrations are outside the current OSS deliverable.
 
 For the launch checklist and project direction, see [docs/LAUNCH-CHECKLIST.md](docs/LAUNCH-CHECKLIST.md)
-and [docs/ROADMAP.md](docs/ROADMAP.md).
+and [ROADMAP.md](ROADMAP.md).
 
 ## Why This Exists
 
@@ -215,8 +215,10 @@ Supported pack categories include:
 ### Entitlements
 
 Access control is based on entitlements rather than purchase records alone.
-Purchases, promo codes, contributor rewards, admin grants, and subscriptions can
-all grant the same kind of read access.
+The OSS engine includes basic entitlement primitives for self-hosted access
+control. Commercial payment fulfillment, refunds, disputes, purchase recovery,
+reconciliation, payouts, and revenue-sharing operations are private/commercial
+platform work, not part of the public OSS deliverable.
 
 ### Ingestion
 
@@ -235,6 +237,10 @@ Images / PSD / text export
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md)
+- [Roadmap](ROADMAP.md)
+- [OSS boundary](docs/oss-boundary.md)
+- [Architecture layer boundary](docs/architecture/layer-boundary.md)
+- [Production ops checklist](docs/production-ops-checklist.md)
 - [Comic domain specification](comic-domain-spec.md)
 - [Entitlement specification](entitlement-spec.md)
 - [Ingestion specification](ingestion-spec.md)
@@ -245,8 +251,8 @@ Images / PSD / text export
 - [Translation governance spec](docs/translation-governance-spec.md)
 - [Rights and permission spec](docs/rights-permission-spec.md)
 - [Storyboard data import](docs/storyboard-data-import.md)
-- [Next actions](docs/NEXT_ACTIONS.md)
 - [Launch checklist](docs/LAUNCH-CHECKLIST.md)
+- [Production ops checklist](docs/production-ops-checklist.md)
 - [Deployment](docs/DEPLOY.md)
 - [Backup and restore](docs/BACKUP-RESTORE.md)
 

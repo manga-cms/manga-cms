@@ -71,17 +71,18 @@ Runtime DB stores operational state, not canonical manga content.
 
 ## Published Artifact / Manifest Readiness
 
-Generic manifest/export concepts are OSS-safe. Vendor-specific production
-adapters are private/commercial-layer work unless implemented as optional,
-provider-neutral adapters.
+Provider-neutral manifest/export contracts are OSS-safe. Vendor-specific
+production adapters, cache rules, custom hostname routing, paid gated delivery,
+and commercial CDN operations are private/commercial-layer work unless they are
+explicitly accepted as optional examples.
 
 - [ ] Define what a publish/export command emits: core JSON, Pack JSON, images,
       OGP images, and manifest pointers.
 - [ ] Ensure published artifacts are immutable or revisioned.
 - [ ] Keep the manifest as the pointer to the active published revision.
 - [ ] Verify manifest rollback behavior in a disposable environment.
-- [ ] Do not require Cloudflare R2, custom hostname routing, or paid gated
-      delivery to use the public OSS engine.
+- [ ] Do not require Cloudflare R2, custom hostname routing, commercial CDN
+      adapters, or paid gated delivery to use the public OSS engine.
 
 ## Public Beta Exit Criteria
 
