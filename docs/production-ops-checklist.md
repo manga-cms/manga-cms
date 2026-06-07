@@ -14,6 +14,13 @@ platform features.
 - [ ] Release changes are reproducible from a clean checkout.
 - [ ] No secrets, private URLs, or production tokens are committed.
 - [ ] Public history does not contain internal-only implementation notes.
+- [ ] Public OSS work happens in a clean clone or a dedicated public working
+      tree.
+- [ ] `git status` and `git remote -v` are checked before public pushes.
+- [ ] Private/commercial branches are not mixed into the public repository.
+- [ ] If a disposable public working tree must be realigned with `origin/main`,
+      stop first when uncommitted changes exist. Do not use
+      `git reset --hard origin/main` as a routine default workflow.
 
 ## Search And Analytics
 
@@ -32,6 +39,8 @@ from runtime DB state.
 
 - [ ] Backup `contents/` before and after each publish operation.
 - [ ] Backup `packs/` before and after each Pack publish operation.
+- [ ] Backup image assets referenced by canonical content together with the
+      corresponding `contents/` snapshot.
 - [ ] Store backup timestamp, source revision, and operator notes.
 - [ ] Restore `contents/` into a clean environment and verify the API can load
       the restored Series.
@@ -48,6 +57,9 @@ Runtime DB stores operational state, not canonical manga content.
 - [ ] Verify Prisma client generation and schema compatibility.
 - [ ] Verify health checks after restore.
 - [ ] Verify auth/session/API key/entitlement/audit state as applicable.
+- [ ] Verify any derived indexes, caches, references, or operational state can
+      be rebuilt or validated from canonical `contents/` / `packs/` plus the
+      runtime DB backup.
 - [ ] Document the restore command and expected downtime.
 
 ## Deploy And Rollback
@@ -71,9 +83,9 @@ Runtime DB stores operational state, not canonical manga content.
 
 ## Published Artifact / Manifest Readiness
 
-Provider-neutral manifest/export contracts are OSS-safe. Vendor-specific
-production adapters, cache rules, custom hostname routing, paid gated delivery,
-and commercial CDN operations are private/commercial-layer work unless they are
+Provider-neutral manifest/export contracts are OSS-safe. Vendor-specific upload
+implementations, cache rules, custom hostname routing, paid gated delivery, and
+commercial CDN operations are private/commercial-layer work unless they are
 explicitly accepted as optional examples.
 
 - [ ] Define what a publish/export command emits: core JSON, Pack JSON, images,
@@ -81,8 +93,9 @@ explicitly accepted as optional examples.
 - [ ] Ensure published artifacts are immutable or revisioned.
 - [ ] Keep the manifest as the pointer to the active published revision.
 - [ ] Verify manifest rollback behavior in a disposable environment.
-- [ ] Do not require Cloudflare R2, custom hostname routing, commercial CDN
-      adapters, or paid gated delivery to use the public OSS engine.
+- [ ] Do not require a specific object store, custom hostname routing,
+      commercial CDN adapters, or paid gated delivery to use the public OSS
+      engine.
 
 ## Public Beta Exit Criteria
 

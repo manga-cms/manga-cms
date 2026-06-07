@@ -54,7 +54,7 @@ That structure enables:
 - Clip sharing across panel ranges.
 - Reaction search for reusable panels.
 - Translation, commentary, learning, and accessibility packs.
-- Entitlement-based access control for free, paid, promo, and contributor access.
+- Entitlement-based access control primitives for self-hosted access rules.
 - A future ingestion pipeline that turns raw manuscripts into reviewable
   structured drafts.
 
@@ -77,6 +77,10 @@ packs/        translation/commentary/learning/accessibility packs
 docs/         launch, deployment, and operations docs
 scripts/      smoke tests and local runners
 ```
+
+`contents/` and `packs/` are the canonical editorial source for manga content
+and Pack manifests. Runtime database rows may reference or index that content,
+but they are not the canonical manga content store.
 
 ## Quick Start
 

@@ -41,7 +41,8 @@ provider-neutral, OSS-safe abstractions:
 ## Source Of Truth Boundary
 
 `contents/` and `packs/` are the canonical editorial source of truth for manga
-content in this repository.
+content in this repository. Image assets referenced by canonical content must be
+backed up and restored with the corresponding content snapshot.
 
 Postgres or any other runtime database is not the canonical manga content store.
 Runtime DB state is for:
@@ -53,6 +54,7 @@ Runtime DB state is for:
 - ingestion job state
 - feedback/proposal runtime state when file-backed storage is replaced
 - audit records
+- derived indexes, caches, references, or operational state
 - other operational state
 
 Basic entitlement primitives may remain in the OSS self-hosted engine because
@@ -72,9 +74,9 @@ core JSON, Pack JSON, OGP images, and a manifest that points to those artifacts.
 
 Provider-neutral interfaces and manifest/export contracts are OSS-safe.
 Vendor-specific production deployment code is a separate layer. Cloudflare R2
-adapters, cache rules, custom hostname routing, commercial CDN adapters, paid
-gated delivery, and commercial deployment automation should not be added to the
-public repository as part of generic roadmap or format work.
+upload implementations, cache rules, custom hostname routing, commercial CDN
+adapters, paid gated delivery, and commercial deployment automation should not
+be added to the public repository as part of generic roadmap or format work.
 
 ## Documentation Rules
 

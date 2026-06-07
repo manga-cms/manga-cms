@@ -25,6 +25,8 @@ Source of truth:
 
 - `contents/` is canonical for manga content.
 - `packs/` is canonical for Pack manifests.
+- Image assets referenced by canonical content are part of the content backup
+  and restore boundary.
 - Generated manifests, search indexes, runtime DB rows, CDN objects, and viewer
   payloads are derived artifacts unless an explicit content-store migration says
   otherwise.
@@ -51,6 +53,8 @@ Runtime DB boundary:
 - The runtime DB stores operational state.
 - It does not become the canonical manga content store.
 - Backup/restore must distinguish runtime DB backup from content backup.
+- The runtime DB may store derived indexes, caches, references, and operational
+  records, but those rows do not replace canonical `contents/` and `packs/`.
 - Basic entitlement primitives belong here when they are provider-neutral access
   control. Payment provider fulfillment, refunds, disputes, purchase recovery,
   reconciliation, payouts, and revenue sharing belong to Layer 3.
