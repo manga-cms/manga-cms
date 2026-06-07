@@ -7,17 +7,22 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
           node-version: 20
-          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare pnpm
+        run: corepack prepare pnpm@9.5.0 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -25,8 +30,32 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @manga/db db:generate
 
-      - name: Build all packages
-        run: pnpm build
+      - name: Build schemas package
+        run: pnpm --filter @manga/schemas build
+
+      - name: Build domain package
+        run: pnpm --filter @manga/domain build
+
+      - name: Build DB package
+        run: pnpm --filter @manga/db build
+
+      - name: Build ingestion package
+        run: pnpm --filter @manga/ingestion build
+
+      - name: Build API app
+        run: pnpm --filter @manga/api build
+
+      - name: Build Viewer app
+        run: pnpm --filter @manga/viewer build
+
+      - name: Build CMS app
+        run: pnpm --filter @manga/cms build
+
+      - name: Run CMS tests
+        run: pnpm --filter @manga/cms test
+
+      - name: Run ingestion tests
+        run: pnpm --filter @manga/ingestion test
 
       - name: Validate content schemas
         run: |
