@@ -1,11 +1,23 @@
 # Backup and Restore
 
+Manga content and runtime state are separate backup domains.
+
+- `contents/` is the canonical editorial source of truth for Series, Episode,
+  Page, Panel, and Bubble data.
+- `packs/` is the canonical source for Pack manifests.
+- The database stores runtime state such as entitlements, purchases, tokens,
+  ingestion jobs, sessions, audit records, and other operational data.
+- Restoring the database must not be treated as restoring canonical manga
+  content. Restoring manga content requires restoring `contents/` and, when
+  applicable, `packs/`.
+
 ## What to Back Up
 
 | Component | Location | Notes |
 |-----------|----------|-------|
-| Database | `DATABASE_URL` target | All entitlements, purchases, tokens, ingestion jobs |
-| Content | `contents/` directory | Source of truth for manga data |
+| Database | `DATABASE_URL` target | Runtime state: entitlements, purchases, tokens, ingestion jobs, sessions, audit records |
+| Content | `contents/` directory | Canonical source of truth for manga data |
+| Packs | `packs/` directory | Canonical Pack manifests |
 | Drafts | `drafts/` directory | In-progress ingestion drafts |
 | Environment | `.env` file | Secrets and configuration |
 
@@ -60,6 +72,12 @@ fi
 tar czf "$BACKUP_DIR/contents.tar.gz" contents/
 echo "  ✅ Contents"
 
+# 2b. Packs
+if [ -d packs ] && [ "$(ls -A packs 2>/dev/null)" ]; then
+    tar czf "$BACKUP_DIR/packs.tar.gz" packs/
+    echo "  ✅ Packs"
+fi
+
 # 3. Drafts
 if [ -d drafts ] && [ "$(ls -A drafts 2>/dev/null)" ]; then
     tar czf "$BACKUP_DIR/drafts.tar.gz" drafts/
@@ -113,7 +131,13 @@ psql "$DATABASE_URL" < backups/<timestamp>/db.sql
 rm -rf contents/
 tar xzf backups/<timestamp>/contents.tar.gz
 
-# 3. Restart the API server (caches will rebuild)
+# 3. Restore packs if a packs backup exists
+if [ -f backups/<timestamp>/packs.tar.gz ]; then
+  rm -rf packs/
+  tar xzf backups/<timestamp>/packs.tar.gz
+fi
+
+# 4. Restart the API server (caches will rebuild)
 ```
 
 ## Verification After Restore
