@@ -1,7 +1,7 @@
 import type { PageData, PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
 import type { MessageKey } from "../../i18n/messages";
-import { formatBboxSummary, getBubbleCandidates, getBubbleSourceText, getBubbleWarnings } from "../../lib/structure-review/bubbleDraft";
+import { formatBboxSummary, getBubbleCandidates, getBubbleSourceText, getBubbleWarnings, getReviewDisplayState } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf, panelIdOf } from "../../lib/structure-review/ids";
 import { bubbleReviewKey, panelReviewKey } from "../../lib/structure-review/reviewDecisions";
 import type { ReviewDecisions } from "../../lib/structure-review/types";
@@ -22,6 +22,7 @@ type PanelBubbleListsProps = {
 };
 
 const decisionLabelKey = (decision: string | undefined): MessageKey => `decision.${decision ?? "pending"}` as MessageKey;
+const reviewStateLabelKey = (state: string): MessageKey => `structure.reviewState.${state}` as MessageKey;
 
 function bubbleDisplayRef(bubble: PageData["bubbles"][number]) {
     return bubble.displayRef ?? bubble.shortId ?? bubbleIdOf(bubble);
@@ -64,6 +65,12 @@ export function PanelBubbleLists({
                             <div className="structure-list-title">
                                 <strong>{t("structure.sidebar.bubbleCandidateRow", { readingOrder: candidate.readingOrder })}</strong>
                                 <code>{bubbleDisplayRef(candidate.bubble)}</code>
+                            </div>
+                            <div className="structure-review-state-row">
+                                <span className={`badge review-state-${getReviewDisplayState(candidate.decision, candidate.warnings)}`}>
+                                    {t(reviewStateLabelKey(getReviewDisplayState(candidate.decision, candidate.warnings)))}
+                                </span>
+                                <span className="badge badge-muted">{t(decisionLabelKey(candidate.decision))}</span>
                             </div>
                             <div className="structure-source-line">
                                 <span>{t("structure.sidebar.sourceTextLabel")}</span>
@@ -138,6 +145,12 @@ export function PanelBubbleLists({
                                             <div className="structure-list-title">
                                                 <strong>{t("structure.sidebar.bubbleRow", { bubbleNumber: bubble.bubbleNumber })}</strong>
                                                 <code>{bubbleDisplayRef(bubble)}</code>
+                                            </div>
+                                            <div className="structure-review-state-row">
+                                                <span className={`badge review-state-${getReviewDisplayState(reviewDecisions[bubbleReviewKey(bubble)], warnings)}`}>
+                                                    {t(reviewStateLabelKey(getReviewDisplayState(reviewDecisions[bubbleReviewKey(bubble)], warnings)))}
+                                                </span>
+                                                <span className="badge badge-muted">{t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)]))}</span>
                                             </div>
                                             <div className="structure-source-line">
                                                 <span>{t("structure.sidebar.sourceTextLabel")}</span>

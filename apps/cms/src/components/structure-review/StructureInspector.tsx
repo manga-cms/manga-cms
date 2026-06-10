@@ -1,6 +1,6 @@
 import type { BoundingBox, BubbleData, PageData, PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
-import { getBubbleSourceText, getBubbleWarnings } from "../../lib/structure-review/bubbleDraft";
+import { getBubbleSourceText, getBubbleTextComparison, getBubbleWarnings, getReviewDisplayState } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf } from "../../lib/structure-review/ids";
 import type { ReviewDecision } from "../../lib/structure-review/types";
 import type { MessageKey } from "../../i18n/messages";
@@ -8,6 +8,7 @@ import { TranslationWorkspace } from "./TranslationWorkspace";
 
 const DEFAULT_FLAGS: NonNullable<BubbleData["flags"]> = { shareable: true, feedback_enabled: true };
 const decisionLabelKey = (decision: ReviewDecision | null): MessageKey => `decision.${decision ?? "pending"}` as MessageKey;
+const reviewStateLabelKey = (state: string): MessageKey => `structure.reviewState.${state}` as MessageKey;
 
 type StructureInspectorProps = {
     seriesId?: string;
@@ -50,6 +51,7 @@ export function StructureInspector({
 }: StructureInspectorProps) {
     const { t } = useTranslation();
     const bubbleWarnings = selectedBubble ? getBubbleWarnings(page, selectedBubble) : [];
+    const bubbleTextComparison = selectedBubble ? getBubbleTextComparison(selectedBubble) : null;
 
     return (
         <aside className="structure-inspector card">
@@ -103,6 +105,9 @@ export function StructureInspector({
                                 <span className={`badge ${selectedBubbleDecision === "accepted" ? "badge-ok" : "badge-warn"}`}>
                                     {t(decisionLabelKey(selectedBubbleDecision))}
                                 </span>
+                                <span className={`badge review-state-${getReviewDisplayState(selectedBubbleDecision ?? undefined, bubbleWarnings)}`}>
+                                    {t(reviewStateLabelKey(getReviewDisplayState(selectedBubbleDecision ?? undefined, bubbleWarnings)))}
+                                </span>
                                 <button type="button" className="btn btn-outline" onClick={() => onAcceptBubble(selectedBubble)}>{t("structure.inspector.accept")}</button>
                                 <button type="button" className="btn btn-outline danger-lite-inline" onClick={onRejectSelectedBubble}>{t("structure.inspector.reject")}</button>
                             </div>
@@ -138,6 +143,26 @@ export function StructureInspector({
                                         placeholder={t("structure.inspector.sourceTextPlaceholder")}
                                     />
                                 </div>
+                                {bubbleTextComparison && (
+                                    <div className="structure-text-compare">
+                                        <h4>{t("structure.textCompare.title")}</h4>
+                                        <div>
+                                            <span>{t("structure.textCompare.psdSource")}</span>
+                                            <p>{bubbleTextComparison.sourceText ?? t("structure.textCompare.unavailable")}</p>
+                                        </div>
+                                        <div>
+                                            <span>{t("structure.textCompare.ocrText")}</span>
+                                            <p>{bubbleTextComparison.ocrText ?? t("structure.textCompare.unavailable")}</p>
+                                        </div>
+                                        <div>
+                                            <span>{t("structure.textCompare.chosenText")}</span>
+                                            <p>{bubbleTextComparison.chosenText || t("structure.textCompare.unavailable")}</p>
+                                        </div>
+                                        {bubbleTextComparison.confidence !== undefined && (
+                                            <small>{t("structure.textCompare.confidence", { value: bubbleTextComparison.confidence.toFixed(2) })}</small>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="bubble-field-grid">
                                     <div className="form-group">
                                         <label>{t("structure.inspector.speaker")}</label>

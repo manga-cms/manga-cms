@@ -18,7 +18,9 @@ export type BubbleClassification =
 
 export type InputSourceKind =
     | "page_image"
+    | "csp_text_export"
     | "clip_text_export"
+    | "psd_text_layer"
     | "psd_text_export"
     | "ocr"
     | "manual";

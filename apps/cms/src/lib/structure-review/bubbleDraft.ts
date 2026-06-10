@@ -31,6 +31,48 @@ export function getBubbleWarnings(page: PageData | null, bubble: BubbleData) {
     return warnings;
 }
 
+export type ReviewDisplayState = "candidate" | "confirmed" | "rejected" | "needs_review";
+
+export function getReviewDisplayState(decision: ReviewDecision | undefined, warnings: readonly string[] = []): ReviewDisplayState {
+    if (decision === "rejected") return "rejected";
+    if (decision === "accepted") return warnings.length > 0 ? "needs_review" : "confirmed";
+    return warnings.length > 0 ? "needs_review" : "candidate";
+}
+
+function optionalString(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+export function getBubbleTextComparison(bubble: BubbleData) {
+    const candidate = bubble as BubbleData & {
+        sourceText?: unknown;
+        ocrText?: unknown;
+        chosenText?: unknown;
+        confidence?: unknown;
+        ocrConfidence?: unknown;
+        metadata?: Record<string, unknown>;
+    };
+    const metadata = candidate.metadata ?? {};
+    const sourceText = optionalString(candidate.sourceText) ?? optionalString(metadata.sourceText);
+    const ocrText = optionalString(candidate.ocrText) ?? optionalString(metadata.ocrText);
+    const chosenText = optionalString(candidate.chosenText) ?? optionalString(metadata.chosenText) ?? getBubbleSourceText(bubble);
+    const confidence = optionalNumber(candidate.confidence) ??
+        optionalNumber(candidate.ocrConfidence) ??
+        optionalNumber(metadata.confidence) ??
+        optionalNumber(metadata.ocrConfidence);
+
+    return {
+        sourceText,
+        ocrText,
+        chosenText,
+        confidence,
+    };
+}
+
 export function getBubbleCandidates(page: PageData | null, reviewDecisions: ReviewDecisions): BubbleCandidate[] {
     if (!page) return [];
     let readingOrder = 0;
