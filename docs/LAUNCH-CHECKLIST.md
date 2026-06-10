@@ -81,9 +81,10 @@ The target here is simple:
 - [x] Protected reading passes — redeem grants entitlement, gated/ungated works
 - [x] Restore procedure is documented and minimally tested
 
-## Commercial Launch
+## Self-Hosted Production Readiness
 
-The target here is operational maturity, not just feature completeness.
+The target here is operational maturity for a self-hosted Manga CMS deployment,
+not hosted SaaS or commercial platform delivery.
 
 ### 0. Public Domain, Search, And Analytics Readiness
 
@@ -136,17 +137,18 @@ The target here is operational maturity, not just feature completeness.
 - [ ] Decide whether to keep stateless HMAC sessions or move to DB-backed sessions
 - [ ] Document revocation behavior
 
-### 3. External Commerce
+### 3. Provider-Neutral Access Primitives
 
-- [x] Select Stripe Checkout Sessions as the P0 buyout payment provider
-- [x] Document the anonymous buyout access roadmap
-- [ ] Decide anonymous principal/session schema against existing user/auth models
-- [ ] Add provider-neutral payment order/event contract
-- [ ] Add webhook endpoint(s)
-- [ ] Verify provider retry behavior is idempotent
-- [ ] Add checkout claim and anonymous recovery
-- [ ] Add refund/dispute revocation behavior
-- [ ] Add reconciliation procedure for failed or delayed webhooks
+- [ ] Decide which provider-neutral role, rights, and entitlement primitives are
+      needed for self-hosted access control.
+- [ ] Document how self-hosted deployments can enable or disable protected
+      content without requiring a payment provider.
+- [ ] Confirm runtime DB backup/restore includes entitlement and audit state
+      when those primitives are enabled.
+- [ ] Keep paid checkout, provider webhooks, refund/dispute automation,
+      purchase recovery, reconciliation, payouts, revenue sharing, hosted
+      creator accounts, and custom-domain SaaS routing outside the public OSS
+      checklist.
 
 ### 4. Monitoring and Incident Response
 
@@ -158,30 +160,30 @@ The target here is operational maturity, not just feature completeness.
 
 ### 5. Delivery and Edge
 
-- [ ] Adopt the hybrid production architecture in `docs/production-architecture.md`
-- [ ] Move production runtime state to Postgres before real paid sales
+- [ ] Keep published asset planning provider-neutral.
+- [ ] Move production runtime state to Postgres before depending on persistent
+      operational state.
 - [ ] Deploy API with `deploy/fly/api-production.fly.toml` and
   `PRISMA_PROVIDER=postgresql`
-- [ ] Confirm `manga-cms-api-prod` has Fly Postgres `DATABASE_URL` attached
 - [ ] Confirm production `/api/v1/health` reports `checks.db: "healthy"`
-- [ ] Add R2/manifest published asset delivery before traffic-heavy launch
-- [ ] Decide CDN strategy
-- [ ] Document Cloudflare Cache Rules for `manifest.json`, revisioned JSON, and images
-- [ ] Verify cache behavior for free vs gated content
+- [ ] Define a generic manifest/export model for published JSON, images, Pack
+      JSON, OGP images, and active revision pointers.
+- [ ] Verify published artifact rollback behavior in a disposable environment.
+- [ ] Decide whether the self-hosted deployment uses local/static hosting,
+      object storage, or another provider-neutral storage backend.
 - [ ] Add delivery observability
-- [ ] Validate watermark/delivery flow under load
 
 ### 6. Recovery and Audit
 
 - [ ] Run backup/recovery drill
-- [ ] Confirm purchase and redeem audit fields are queryable
 - [ ] Confirm auth audit fields are queryable
+- [ ] Confirm entitlement and proposal audit fields are queryable when enabled
 - [ ] Confirm cleanup/admin actions are documented
 
 ### Exit Criteria
 
 - [ ] Multi-instance assumptions are removed or explicitly accepted
-- [ ] External commerce path is connected
+- [ ] Provider-neutral access primitives are documented or explicitly deferred
 - [ ] Monitoring and recovery drills are complete
 - [ ] Identity strategy is stable enough for real users
 
@@ -193,6 +195,11 @@ The target here is operational maturity, not just feature completeness.
 4. Backup/restore
 5. Multi-instance hardening
 6. Postgres production runtime state
-7. R2/manifest published asset delivery
-8. External commerce
+7. Generic manifest / published artifact export
+8. Provider-neutral access primitives
 9. Monitoring and recovery drills
+
+Hosted creator registration, paid checkout, purchase recovery, reconciliation,
+payouts, revenue sharing, custom-domain SaaS routing, commercial CDN adapters,
+and content-protection systems are private commercial platform work, not public
+OSS launch gates.

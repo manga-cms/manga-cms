@@ -123,10 +123,15 @@ Ingestion は、入力の充実度に応じて複数レベルを許容する。
 Ingestion の最終出力は以下である。
 
 ### 4.1 Git正本用ドラフト
-- `contents/works/...`
+- `contents/{seriesId}/...`
 - `packs/...`
 
 に保存可能な JSON ドラフト
+
+現在の公開OSSアーキテクチャでは、確定後の canonical editorial source of
+truth は `contents/` と `packs/` である。DB は検索・CMS操作・Proposal対象
+解決のための runtime index / operational state であり、漫画本文の正本では
+ない。
 
 ### 4.2 DB索引用ドラフト
 - Page / Panel / Bubble 参照
@@ -318,10 +323,9 @@ Panel と Bubble の階層を決めるために、
 抽出・照合結果から Git正本向けドラフトを生成する。
 
 対象:
-- `episode.json`
-- `pages/*.json`
-- `panels/*.json`
-- `bubbles/*.json`
+- `contents/{seriesId}/series.json`
+- `contents/{seriesId}/{episodeId}/episode.json`
+- 必要に応じた `packs/` 配下の Pack JSON
 
 この時点ではまだ「ドラフト」であり、正本ではない。
 
@@ -389,8 +393,8 @@ confidence に応じて優先順位をつける。
 
 レビュー担当者が確定すると、以下を行う。
 
-1. JSON 正本を確定
-2. Git 正本に書き出す
+1. JSON ドラフトを確定
+2. `contents/` / `packs/` の canonical source に書き出す
 3. DB索引を更新
 4. 再レンダリングが必要ならジョブを発行する
 

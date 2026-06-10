@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-06-07
+Last updated: 2026-06-11
 
 Manga CMS is a public self-hosted manga publishing engine. The public repository
 contains the open content format, validation contracts, API, Viewer, CMS,
@@ -32,127 +32,76 @@ The public repository currently includes:
 
 ## Roadmap Areas
 
-### 1. Public OSS / Open Format
+### 1. Public OSS / Self-Hosted Foundation
 
-Goal: keep the content format and validation layer useful outside the hosted
-Manga CMS site.
-
-Current focus:
-
-- Maintain the `Series -> Episode -> Page -> Panel -> Bubble` contract.
-- Keep `contents/` and `packs/` as the canonical editorial source of truth.
-- Improve schema validation, content loading, Pack validation, and export tools.
-- Continue documenting metadata, text layout, translation, feedback, and share
-  policies as generic OSS-safe contracts.
-- Develop generic manifest/export concepts without binding them to one
-  production vendor.
-
-Not in scope for this layer:
-
-- Hosted creator accounts.
-- Paid checkout and payout operations.
-- Proprietary anti-leak or forensic protection systems.
-- Vendor-specific production adapters as the only implementation path.
-
-### 2. Public Manga Site Launch
-
-Goal: run a reliable public manga site using the OSS engine.
+Goal: Provide a stable, reliable foundation for self-hosted manga publishing.
 
 Current focus:
-
 - Keep GitHub Actions CI green and diagnosable.
-- Verify Search Console ownership and sitemap submission for public hosts.
-- Confirm lightweight analytics on production public hosts without adding a
-  consent burden prematurely.
-- Keep English pages user-visible but `noindex` until translation quality,
-  metadata, and support operations are ready.
-- Keep Share URLs, OGP metadata, and Reader navigation safe for public readers.
-- Make public content restore and re-seeding repeatable.
+- Keep `contents/` and `packs/` as the canonical source of truth.
+- Stabilize schema validation, content loading, and Pack validation contracts.
+- Document and drill backup/restore, monitoring, and rollback procedures for self-hosting.
+- Keep Search Console, sitemap, robots, lightweight analytics, and public
+  Reader smoke checks as operational launch gates rather than commercial
+  platform features.
 
-Launch readiness depends on operations, not on adding commercial features.
+### 2. Creator CMS Operations
 
-### 3. Creator CMS Operations
-
-Goal: make self-hosted editing and review workflows practical for creators and
-editors.
+Goal: Make self-hosted editing and review workflows practical for creators and editors.
 
 Current focus:
+- Polish Page Structure Review as the top priority.
+- Support Panel / Bubble bbox overlays on page images.
+- Enable side-by-side review of source text, OCR text, and chosen text.
+- Allow editors to accept or reject ingestion candidates.
+- Save confirmed results to the canonical draft.
+- Improve text export, translation draft import, feedback triage, and proposal workflows.
 
-- Polish Page Structure Review for Panel/Bubble geometry and source text.
-- Improve text export, translation draft import, feedback triage, and proposal
-  workflows.
-- Keep canonical source text separate from translation and layout metadata.
-- Improve import/review ergonomics while preserving the canonical content
-  contract.
+### 3. Ingestion Workflow
 
-Future OSS-safe improvements:
-
-- Better review status summaries.
-- Safer diff and rollback tools for content edits.
-- More deterministic import/export reports.
-- More complete documentation for self-hosted editorial operations.
-
-### 4. Infrastructure / Production Ops
-
-Goal: make self-hosted production operation repeatable and recoverable.
+Goal: Reduce human effort to structure manuscripts, without requiring full automation.
 
 Current focus:
+- Treat CSP (Clip Studio Paint), PSD, and text exports as priority inputs.
+- Treat OCR as auxiliary information, not the ground truth.
+- Keep LLM/VLM extraction as an optional enhancement, never a mandatory standard.
+- Maintain the flow: automated extraction -> confidence scoring -> human review
+  -> confirm -> save to canonical `contents/` and `packs/` -> runtime DB
+  reindex.
 
-- Document backup/restore for canonical content separately from runtime DB
-  state.
-- Drill Postgres backup/restore for runtime state.
-- Drill content volume backup/restore for `contents/` and `packs/`.
-- Add monitoring and alerting for API health, image delivery, OGP generation,
-  feedback/proposal errors, and deploy failures.
-- Keep production deploy and rollback procedures simple enough for a clean
-  checkout.
-- Keep generic manifest/export design OSS-safe.
+### 4. Provider-Neutral Primitives
 
-Important boundary:
+Goal: Keep the public repository safe for general open-source use.
 
-- `contents/` and `packs/` remain canonical manga content sources.
-- Postgres/runtime DB state is not the canonical manga content store.
-- Vendor-specific published asset adapters can exist later, but the public
-  contract should remain provider-neutral.
+Current focus:
+- Define roles, rights, entitlements, manifests, and exports as generic, OSS-safe abstractions.
+- Ensure the self-hosted engine does not require specific commercial vendors to run.
+- Keep payment provider integrations, tenant SaaS automation, and custom domain routing separated into the private commercial layer.
 
 ### 5. Future Private Commercial Platform
 
-Goal: future hosted/commercial Manga CMS operations. This is not part of the OSS
-deliverable.
+Goal: Hosted/commercial operations for Manga CMS. This is not part of the OSS deliverable.
 
-Examples of private/commercial work:
-
-- Hosted creator registration and account operations.
-- Paid checkout, webhook fulfillment, purchase recovery, and reconciliation.
-- Revenue sharing, payout operations, and commercial support workflows.
+Future private commercial work includes:
+- Hosted creator registration and tenant operations.
+- Paid checkout, purchase recovery, and reconciliation.
+- Payout operations and revenue sharing.
 - Custom domains and hosted tenant routing.
-- Production object-storage/CDN adapters tied to a commercial deployment.
+- Commercial CDN and object-storage adapters tied to specific business deployments.
 
-The public repository may contain generic interfaces or documentation that make
-self-hosting possible, but it should not include private business operations or
-revenue-specific implementation.
-
-### 6. Future Private R&D / IP Protection
-
-Goal: protect commercial content and handle abuse in private deployments without
-turning the OSS roadmap into an anti-leak design document.
-
-This work should remain private unless it is reduced to a generic, safe
-operational checklist. Do not publish detailed fingerprinting, watermarking,
-leak detection, or forensic algorithms in the public roadmap.
+These details will remain outside the public repository. The public repo may contain generic interfaces that allow them, but no specific business implementations.
 
 ## Near-Term Public Priorities
 
 1. Keep CI green after every public change.
-2. Complete production Search Console and sitemap smoke checks.
-3. Confirm production analytics events for public hosts only.
-4. Create repeatable content restore/seed/publish operations for public sample
-   content.
-5. Run Postgres runtime-state backup/restore drills.
-6. Run `contents/` and `packs/` backup/restore drills.
-7. Add production monitoring and rollback documentation.
-8. Continue CMS structure-review and text/translation workflow polish.
-9. Keep generic manifest/export design provider-neutral.
+2. Stabilize schema, validation, and content loading contracts.
+3. Polish CMS Page Structure Review (bbox overlay, accept/reject candidates, save to canonical draft).
+4. Refine Ingestion workflow prioritizing PSD/text-export over OCR/LLM.
+5. Drill backup/restore for both Postgres state and canonical `contents/`/`packs/`.
+6. Refine text export and translation draft import workflows.
+7. Keep Search Console, robots/sitemap, public Reader, Share URL, and OGP smoke
+   checks green for self-hosted public launch.
+8. Keep generic manifest/export and entitlement designs provider-neutral.
 
 ## References
 
