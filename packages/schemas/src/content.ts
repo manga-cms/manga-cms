@@ -272,6 +272,101 @@ export const PageSchema = z.object({
     };
 });
 
+export interface ContentLintWarning {
+    code: string;
+    severity: "warning" | "error";
+    path: Array<string | number>;
+    message: string;
+    pageId?: string;
+    panelId?: string;
+    bubbleId?: string;
+    source?: "schema" | "content-lint" | "ingestion" | "cms";
+}
+
+export function lintPageContent(page: PageData): ContentLintWarning[] {
+    const warnings: ContentLintWarning[] = [];
+    const panelsById = new Map(page.panels.map((panel) => [panel.panelId, panel]));
+
+    for (let i = 0; i < page.bubbles.length; i++) {
+        const bubble = page.bubbles[i];
+        if (bubble.panelId && !panelsById.has(bubble.panelId)) {
+            warnings.push({
+                severity: "error",
+                code: "INVALID_PANEL_REF",
+                message: `Bubble ${bubble.bubbleId} references non-existent panel ${bubble.panelId}`,
+                path: ["bubbles", i, "panelId"],
+                pageId: page.pageId,
+                panelId: bubble.panelId,
+                bubbleId: bubble.bubbleId,
+                source: "content-lint",
+            });
+        }
+    }
+
+    const checkPageBounds = (
+        bbox: { x: number; y: number; width: number; height: number },
+        pathPrefix: Array<string | number>,
+        name: string,
+        ids: Pick<ContentLintWarning, "panelId" | "bubbleId">,
+    ) => {
+        const tolerance = 2;
+        if (bbox.x < -tolerance || bbox.y < -tolerance ||
+            (bbox.x + bbox.width) > page.width + tolerance ||
+            (bbox.y + bbox.height) > page.height + tolerance) {
+            warnings.push({
+                severity: "warning",
+                code: "BBOX_OUT_OF_BOUNDS",
+                message: `${name} bounding box exceeds page dimensions (${page.width}x${page.height}). This may be intentional for bleeding panels.`,
+                path: [...pathPrefix, "bbox"],
+                pageId: page.pageId,
+                ...ids,
+                source: "content-lint",
+            });
+        }
+    };
+
+    const contains = (
+        outer: { x: number; y: number; width: number; height: number },
+        inner: { x: number; y: number; width: number; height: number },
+    ) => {
+        const tolerance = 2;
+        return inner.x >= outer.x - tolerance &&
+            inner.y >= outer.y - tolerance &&
+            inner.x + inner.width <= outer.x + outer.width + tolerance &&
+            inner.y + inner.height <= outer.y + outer.height + tolerance;
+    };
+
+    page.panels.forEach((panel, i) => {
+        checkPageBounds(panel.bbox, ["panels", i], `Panel ${panel.panelId}`, {
+            panelId: panel.panelId,
+        });
+    });
+
+    page.bubbles.forEach((bubble, i) => {
+        checkPageBounds(bubble.bbox, ["bubbles", i], `Bubble ${bubble.bubbleId}`, {
+            panelId: bubble.panelId ?? undefined,
+            bubbleId: bubble.bubbleId,
+        });
+
+        if (!bubble.panelId) return;
+        const panel = panelsById.get(bubble.panelId);
+        if (!panel || contains(panel.bbox, bubble.bbox)) return;
+
+        warnings.push({
+            severity: "warning",
+            code: "BUBBLE_OUTSIDE_PANEL_BBOX",
+            message: `Bubble ${bubble.bubbleId} is linked to panel ${bubble.panelId} but its bbox is not contained by the panel bbox.`,
+            path: ["bubbles", i, "bbox"],
+            pageId: page.pageId,
+            panelId: bubble.panelId,
+            bubbleId: bubble.bubbleId,
+            source: "content-lint",
+        });
+    });
+
+    return warnings;
+}
+
 function validatePublishWindow(
     value: { publishStartAt?: string; publishEndAt?: string },
     ctx: z.RefinementCtx,

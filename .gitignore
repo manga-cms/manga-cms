@@ -5,6 +5,7 @@ dist/
 tmp/
 coverage/
 *.log
+backups/
 
 # Turborepo
 .turbo/

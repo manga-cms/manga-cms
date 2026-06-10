@@ -42,6 +42,22 @@ pg_dump -Fc "$DATABASE_URL" > backups/db-$(date +%Y%m%d-%H%M%S).dump
 
 ## Content Backup
 
+For the canonical manga content source only, use the checked-in helper script:
+
+```bash
+scripts/backup-contents.sh
+```
+
+By default it writes to `backups/contents-<timestamp>/`, which is ignored by
+Git. To write outside the repository:
+
+```bash
+scripts/backup-contents.sh /tmp/manga-cms-content-backup
+```
+
+This script backs up `contents/` and `packs/`. It does not back up the runtime
+database, private drafts, local samples, or environment secrets.
+
 ```bash
 # Archive contents directory
 tar czf backups/contents-$(date +%Y%m%d-%H%M%S).tar.gz contents/
@@ -123,6 +139,15 @@ psql "$DATABASE_URL" < backups/<timestamp>/db.sql
 ```
 
 ### Content
+
+For the canonical manga content source only, use:
+
+```bash
+scripts/restore-contents.sh backups/contents-<timestamp>
+```
+
+The script prompts before replacing `contents/` and `packs/`. It does not
+restore runtime DB state.
 
 ```bash
 # 1. Stop the API server (optional but recommended)
