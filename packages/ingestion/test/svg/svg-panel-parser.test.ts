@@ -62,6 +62,21 @@ describe("SVG Panel Parser", () => {
         assert.deepEqual(panels[1].bbox, { x: 20, y: 200, width: 40, height: 60 });
     });
 
+    test("applies rotate transform around an origin", () => {
+        const svg = `
+        <svg>
+            <rect x="0" y="0" width="10" height="20" transform="rotate(90)" />
+        </svg>
+        `;
+
+        const panels = parseSvgPanelDrafts(svg);
+        assert.equal(panels.length, 1);
+        assert.equal(Math.round(panels[0].bbox.x), -20);
+        assert.equal(Math.round(panels[0].bbox.y), 0);
+        assert.equal(Math.round(panels[0].bbox.width), 20);
+        assert.equal(Math.round(panels[0].bbox.height), 10);
+    });
+
     test("ignores invalid or empty paths", () => {
         const svg = `
         <svg>

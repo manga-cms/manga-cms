@@ -92,6 +92,21 @@ function parseTransform(raw: string | undefined): Matrix {
             const scaleX = args[0] ?? 1;
             const scaleY = args[1] ?? scaleX;
             next = { ...IDENTITY, a: scaleX, d: scaleY };
+        } else if (name === "rotate") {
+            const angle = ((args[0] ?? 0) * Math.PI) / 180;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const rotate: Matrix = { a: cos, b: sin, c: -sin, d: cos, e: 0, f: 0 };
+            if (args.length >= 3) {
+                const cx = args[1];
+                const cy = args[2];
+                next = multiplyMatrix(
+                    multiplyMatrix({ ...IDENTITY, e: cx, f: cy }, rotate),
+                    { ...IDENTITY, e: -cx, f: -cy },
+                );
+            } else {
+                next = rotate;
+            }
         } else if (name === "matrix" && args.length >= 6) {
             next = { a: args[0], b: args[1], c: args[2], d: args[3], e: args[4], f: args[5] };
         }
@@ -269,7 +284,10 @@ export function parseSvgPanelDrafts(svgContent: string): SvgPanelDraft[] {
         if (rectValue) {
             const rects = Array.isArray(rectValue) ? rectValue : [rectValue];
             for (const rect of rects) {
-                if (rect && typeof rect === "object") addPanel(extractRectBbox(rect as SvgNode, matrix));
+                if (rect && typeof rect === "object") {
+                    const rectNode = rect as SvgNode;
+                    addPanel(extractRectBbox(rectNode, multiplyMatrix(matrix, parseTransform(attr(rectNode, "transform")))));
+                }
             }
         }
 
@@ -277,7 +295,10 @@ export function parseSvgPanelDrafts(svgContent: string): SvgPanelDraft[] {
         if (pathValue) {
             const paths = Array.isArray(pathValue) ? pathValue : [pathValue];
             for (const path of paths) {
-                if (path && typeof path === "object") addPanel(extractPathBbox(path as SvgNode, matrix));
+                if (path && typeof path === "object") {
+                    const pathNode = path as SvgNode;
+                    addPanel(extractPathBbox(pathNode, multiplyMatrix(matrix, parseTransform(attr(pathNode, "transform")))));
+                }
             }
         }
 
