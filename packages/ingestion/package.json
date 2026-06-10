@@ -18,6 +18,7 @@
     "dependencies": {
         "@manga/domain": "workspace:*",
         "@manga/schemas": "workspace:*",
+        "fast-xml-parser": "^5.8.0",
         "zod": "^3.23.0"
     },
     "devDependencies": {
