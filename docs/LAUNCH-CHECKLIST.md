@@ -22,7 +22,7 @@ The target here is simple:
 - [x] Start viewer in production mode — `node apps/viewer/dist/server/entry.mjs` → port 4321, 200 OK
 - [x] Start API in DB-backed mode — port 3100, DATABASE_URL + CONTENTS_DIR set
 - [x] Confirm `/api/v1/health` reports expected env + DB status
-- [x] Verify required env vars are set and non-default — fail-fast implemented (production exits if missing)
+- [x] Verify required env vars are set and non-default — fail-fast implemented for required production env; optional email provider can be disabled
 
 > Documented in [DEPLOY.md](DEPLOY.md)
 
@@ -42,13 +42,15 @@ The target here is simple:
 - [x] Implement or confirm panel highlight behavior
 - [x] Implement or confirm zoom behavior
 - [x] Confirm page fragment deep-links work
-- [x] Generate quote OGP metadata
-- [x] Generate clip OGP metadata
+- [x] Generate Page / Panel OGP metadata
+- [ ] Generate quote / Bubble OGP metadata — future work
+- [ ] Generate clip OGP metadata — future work
 
 ### 4. Auth and Commerce Smoke Test
 
 - [x] Dev/admin login works in non-production environments
-- [x] Production magic-link login works end to end
+- [x] Production magic-link login works end to end when email provider is configured
+- [x] Production API starts with magic-link login disabled when email provider is not configured
 - [x] Magic-link token cannot be reused
 - [x] `/auth/login` rate limit returns 429 on abuse
 - [x] Purchase creation is idempotent
