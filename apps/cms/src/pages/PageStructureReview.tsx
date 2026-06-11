@@ -532,22 +532,30 @@ export default function PageStructureReview() {
         setSelectedBubbleIndex(null);
     };
 
+    const reorderPageLevelBubble = (fromIndex: number, toIndex: number) => {
+        if (!page) return;
+        if (fromIndex < 0 || fromIndex >= pageLevelBubbles.length) return;
+        if (toIndex < 0 || toIndex >= pageLevelBubbles.length) return;
+        const pageLevel = [...pageLevelBubbles];
+        const [bubble] = pageLevel.splice(fromIndex, 1);
+        if (!bubble) return;
+        pageLevel.splice(toIndex, 0, bubble);
+        const reorderedPageLevel = pageLevel.map((item, index) => ({
+            ...item,
+            bubbleNumber: index + 1,
+            displayRef: item.displayRef ?? makePageBubbleShortId(page, index + 1),
+            shortId: item.shortId ?? item.displayRef ?? makePageBubbleShortId(page, index + 1),
+        }));
+        const assignedBubbles = (page.bubbles ?? []).filter((item) => item.panelId !== null);
+        updatePage({ ...page, bubbles: [...assignedBubbles, ...reorderedPageLevel] });
+    };
+
     const moveBubble = (fromIndex: number, direction: -1 | 1) => {
         if (!page) return;
         if (!selectedPanel || selectedPanelIndex === null) {
             const toIndex = fromIndex + direction;
             if (toIndex < 0 || toIndex >= pageLevelBubbles.length) return;
-            const pageLevelIds = pageLevelBubbles.map(bubbleIdOf);
-            [pageLevelIds[fromIndex], pageLevelIds[toIndex]] = [pageLevelIds[toIndex], pageLevelIds[fromIndex]];
-            const pageLevelById = new Map(pageLevelBubbles.map((bubble) => [bubbleIdOf(bubble), bubble]));
-            const reorderedPageLevel = pageLevelIds.map((id) => pageLevelById.get(id)!).map((bubble, index) => ({
-                ...bubble,
-                bubbleNumber: index + 1,
-                displayRef: bubble.displayRef ?? makePageBubbleShortId(page, index + 1),
-                shortId: bubble.shortId ?? bubble.displayRef ?? makePageBubbleShortId(page, index + 1),
-            }));
-            const assignedBubbles = (page.bubbles ?? []).filter((bubble) => bubble.panelId !== null);
-            updatePage({ ...page, bubbles: [...assignedBubbles, ...reorderedPageLevel] });
+            reorderPageLevelBubble(fromIndex, toIndex);
             setSelectedBubbleIndex(toIndex);
             return;
         }
@@ -638,7 +646,8 @@ export default function PageStructureReview() {
         if (!selectedPanel || selectedPanelIndex === null) {
             const toIndex = Math.max(0, Math.min(pageLevelBubbles.length - 1, Math.round(readingOrder) - 1));
             if (toIndex === selectedBubbleIndex) return;
-            moveBubble(selectedBubbleIndex, toIndex > selectedBubbleIndex ? 1 : -1);
+            reorderPageLevelBubble(selectedBubbleIndex, toIndex);
+            setSelectedBubbleIndex(toIndex);
             return;
         }
         const toIndex = Math.max(0, Math.min(selectedPanel.bubbles.length - 1, Math.round(readingOrder) - 1));
