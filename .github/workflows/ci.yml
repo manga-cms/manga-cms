@@ -58,11 +58,4 @@ jobs:
         run: pnpm --filter @manga/ingestion test
 
       - name: Validate content schemas
-        run: |
-          node --input-type=module -e "
-            import { FileContentRepository } from './packages/domain/dist/index.js';
-            const repo = new FileContentRepository('./contents');
-            const series = repo.listSeries();
-            console.log('Content validation passed:', series.length, 'series');
-            if (series.length === 0) { console.log('No content to validate, skipping.'); process.exit(0); }
-          "
+        run: pnpm validate:content
