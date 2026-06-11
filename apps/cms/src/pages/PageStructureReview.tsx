@@ -664,6 +664,49 @@ export default function PageStructureReview() {
         updateSelectedBubble({ bbox: clampBox({ ...selectedBubble.bbox, [field]: value }, page) });
     };
 
+    const assignSelectedBubblePanel = (targetPanelIndex: number | null) => {
+        if (!page || !selectedBubble || selectedBubbleIndex === null) return;
+        if (targetPanelIndex === selectedPanelIndex) return;
+        const bubbleId = bubbleIdOf(selectedBubble);
+        const panels = page.panels.map((panel) => ({
+            ...panel,
+            bubbles: panel.bubbles.filter((bubble) => bubbleIdOf(bubble) !== bubbleId),
+        }));
+        const pageLevelBubblesWithoutSelected = (page.bubbles ?? [])
+            .filter((bubble) => bubble.panelId === null && bubbleIdOf(bubble) !== bubbleId);
+
+        if (targetPanelIndex === null) {
+            const displayRef = makePageBubbleShortId(page, pageLevelBubblesWithoutSelected.length + 1);
+            const nextBubble: BubbleData = {
+                ...selectedBubble,
+                panelId: null,
+                displayRef,
+                shortId: displayRef,
+            };
+            updatePage({ ...page, panels, bubbles: [...pageLevelBubblesWithoutSelected, nextBubble] });
+            setSelectedPanelIndex(null);
+            setSelectedBubbleIndex(pageLevelBubblesWithoutSelected.length);
+            return;
+        }
+
+        const targetPanel = panels[targetPanelIndex];
+        if (!targetPanel) return;
+        const displayRef = makeBubbleShortId(page, targetPanel, targetPanel.bubbles.length + 1);
+        const nextBubble: BubbleData = {
+            ...selectedBubble,
+            panelId: panelIdOf(targetPanel),
+            displayRef,
+            shortId: displayRef,
+        };
+        panels[targetPanelIndex] = {
+            ...targetPanel,
+            bubbles: [...targetPanel.bubbles, nextBubble],
+        };
+        updatePage({ ...page, panels, bubbles: pageLevelBubblesWithoutSelected });
+        setSelectedPanelIndex(targetPanelIndex);
+        setSelectedBubbleIndex(targetPanel.bubbles.length);
+    };
+
     const updatePageDisplayRef = (displayRef: string) => {
         if (!page) return;
         updatePage({ ...page, displayRef: displayRef.trim() || undefined });
@@ -863,6 +906,7 @@ export default function PageStructureReview() {
                     onUpdateSelectedBubble={updateSelectedBubble}
                     onUpdateSelectedBubbleReadingOrder={updateSelectedBubbleReadingOrder}
                     onUpdateSelectedBubbleBox={updateSelectedBubbleBox}
+                    onAssignSelectedBubblePanel={assignSelectedBubblePanel}
                     onAcceptPanel={acceptPanel}
                     onRejectSelectedPanel={rejectSelectedPanel}
                     onAcceptBubble={acceptBubble}

@@ -24,6 +24,7 @@ type StructureInspectorProps = {
     onUpdateSelectedBubble: (patch: Partial<BubbleData>) => void;
     onUpdateSelectedBubbleReadingOrder: (readingOrder: number) => void;
     onUpdateSelectedBubbleBox: (field: keyof BoundingBox, value: number) => void;
+    onAssignSelectedBubblePanel: (panelIndex: number | null) => void;
     onAcceptPanel: (panel: PanelData) => void;
     onRejectSelectedPanel: () => void;
     onAcceptBubble: (bubble: BubbleData) => void;
@@ -44,6 +45,7 @@ export function StructureInspector({
     onUpdateSelectedBubble,
     onUpdateSelectedBubbleReadingOrder,
     onUpdateSelectedBubbleBox,
+    onAssignSelectedBubblePanel,
     onAcceptPanel,
     onRejectSelectedPanel,
     onAcceptBubble,
@@ -132,6 +134,23 @@ export function StructureInspector({
                                     onChange={(e) => onUpdateSelectedBubbleReadingOrder(Number(e.target.value))}
                                 />
                             </div>
+                            {page && (
+                                <div className="form-group">
+                                    <label>{t("structure.inspector.panelAssignment")}</label>
+                                    <select
+                                        value={selectedPanelIndex ?? ""}
+                                        onChange={(e) => onAssignSelectedBubblePanel(e.target.value === "" ? null : Number(e.target.value))}
+                                    >
+                                        <option value="">{t("structure.sidebar.pageLevelBubble")}</option>
+                                        {page.panels.map((panel, index) => (
+                                            <option key={panel.panelId ?? panel.id} value={index}>
+                                                {t("structure.sidebar.panelRow", { panelNumber: panel.panelNumber })}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <small>{t("structure.inspector.panelAssignmentHelp")}</small>
+                                </div>
+                            )}
                             <div className="canonical-bubble-editor">
                                 <div className="canonical-bubble-header">
                                     <h3>{t("structure.inspector.canonicalTitle")}</h3>
