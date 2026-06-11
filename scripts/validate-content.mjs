@@ -2,7 +2,14 @@
 
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { FileContentRepository, FilePackRepository } from "../packages/domain/dist/index.js";
+import {
+    bubbleIdOf,
+    FileContentRepository,
+    FilePackRepository,
+    getPanelBubbles,
+    pageIdOf,
+    panelIdOf,
+} from "../packages/domain/dist/index.js";
 import { lintPageContent } from "../packages/schemas/dist/index.js";
 
 function parseArgs(argv) {
@@ -55,7 +62,14 @@ function validateContents(contentsDir, failOnWarnings) {
         for (const error of schemaErrors) {
             console.error(error.message);
         }
-        return { seriesCount: series.length, pageCount: 0, warningCount: 0, errorCount: schemaErrors.length };
+        return {
+            series,
+            contentIndex: buildContentIndex(series),
+            seriesCount: series.length,
+            pageCount: 0,
+            warningCount: 0,
+            errorCount: schemaErrors.length,
+        };
     }
 
     let pageCount = 0;
@@ -77,17 +91,223 @@ function validateContents(contentsDir, failOnWarnings) {
     }
 
     if (failOnWarnings) errorCount += warningCount;
-    return { seriesCount: series.length, pageCount, warningCount, errorCount };
+    return {
+        series,
+        contentIndex: buildContentIndex(series),
+        seriesCount: series.length,
+        pageCount,
+        warningCount,
+        errorCount,
+    };
 }
 
-function validatePacks(packsDir) {
+function key(...segments) {
+    return segments.join("\u0000");
+}
+
+function setHasPrefix(set, ...prefixSegments) {
+    const prefix = `${key(...prefixSegments)}\u0000`;
+    for (const value of set) {
+        if (value.startsWith(prefix)) return true;
+    }
+    return false;
+}
+
+function setHasParts(set, predicate) {
+    for (const value of set) {
+        if (predicate(value.split("\u0000"))) return true;
+    }
+    return false;
+}
+
+function buildContentIndex(seriesList) {
+    const index = {
+        seriesCount: seriesList.length,
+        seriesIds: new Set(),
+        episodeKeys: new Set(),
+        pageKeys: new Set(),
+        panelKeys: new Set(),
+        panelKeysByEpisode: new Set(),
+        bubbleKeys: new Set(),
+        bubbleKeysByEpisode: new Set(),
+    };
+
+    for (const series of seriesList) {
+        index.seriesIds.add(series.id);
+        for (const episode of series.episodes ?? []) {
+            index.episodeKeys.add(key(series.id, episode.id));
+            for (const page of episode.pages ?? []) {
+                const pageId = pageIdOf(page);
+                index.pageKeys.add(key(series.id, episode.id, pageId));
+
+                for (const panel of page.panels ?? []) {
+                    const panelId = panelIdOf(panel);
+                    index.panelKeys.add(key(series.id, episode.id, pageId, panelId));
+                    index.panelKeysByEpisode.add(key(series.id, episode.id, panelId));
+                }
+
+                const pageBubbles = page.bubbles ?? [];
+                const legacyPanelBubbles = (page.panels ?? []).flatMap((panel) => getPanelBubbles(page, panel));
+                const bubblesById = new Map();
+                for (const bubble of [...pageBubbles, ...legacyPanelBubbles]) {
+                    bubblesById.set(bubbleIdOf(bubble), bubble);
+                }
+
+                for (const bubble of bubblesById.values()) {
+                    const bubbleId = bubbleIdOf(bubble);
+                    index.bubbleKeys.add(key(series.id, episode.id, pageId, bubbleId));
+                    index.bubbleKeysByEpisode.add(key(series.id, episode.id, bubbleId));
+                }
+            }
+        }
+    }
+
+    return index;
+}
+
+function describePackTarget(target) {
+    return [
+        target.seriesId,
+        target.episodeId,
+        target.pageId,
+        target.panelId && `panel=${target.panelId}`,
+        target.bubbleId && `bubble=${target.bubbleId}`,
+    ].filter(Boolean).join(" ");
+}
+
+function validatePackTargetReference({ pack, entry, target, contentIndex }) {
+    const errors = [];
+    const entryLabel = entry ? ` entry=${entry.id}` : "";
+    const targetLabel = describePackTarget(target);
+
+    if (!contentIndex.seriesIds.has(target.seriesId)) {
+        errors.push(`Pack ${pack.id}${entryLabel} references missing Series: ${target.seriesId}`);
+        return errors;
+    }
+
+    if (pack.targetSeriesId && target.seriesId !== pack.targetSeriesId) {
+        errors.push(
+            `Pack ${pack.id}${entryLabel} targets Series ${target.seriesId}, but pack targetSeriesId is ${pack.targetSeriesId}`,
+        );
+    }
+
+    if (target.episodeId) {
+        if (!contentIndex.episodeKeys.has(key(target.seriesId, target.episodeId))) {
+            errors.push(`Pack ${pack.id}${entryLabel} references missing Episode: ${target.seriesId}/${target.episodeId}`);
+            return errors;
+        }
+        if (pack.targetEpisodeId && target.episodeId !== pack.targetEpisodeId) {
+            errors.push(
+                `Pack ${pack.id}${entryLabel} targets Episode ${target.episodeId}, but pack targetEpisodeId is ${pack.targetEpisodeId}`,
+            );
+        }
+    }
+
+    if (target.pageId) {
+        if (target.episodeId) {
+            if (!contentIndex.pageKeys.has(key(target.seriesId, target.episodeId, target.pageId))) {
+                errors.push(`Pack ${pack.id}${entryLabel} references missing Page: ${targetLabel}`);
+                return errors;
+            }
+        } else if (!setHasParts(contentIndex.pageKeys, ([seriesId, _episodeId, pageId]) => (
+            seriesId === target.seriesId && pageId === target.pageId
+        ))) {
+            errors.push(`Pack ${pack.id}${entryLabel} references missing Page without episode scope: ${targetLabel}`);
+            return errors;
+        }
+    }
+
+    if (target.panelId) {
+        if (target.episodeId && target.pageId) {
+            if (!contentIndex.panelKeys.has(key(target.seriesId, target.episodeId, target.pageId, target.panelId))) {
+                errors.push(`Pack ${pack.id}${entryLabel} references missing Panel: ${targetLabel}`);
+            }
+        } else if (target.episodeId) {
+            if (!contentIndex.panelKeysByEpisode.has(key(target.seriesId, target.episodeId, target.panelId))) {
+                errors.push(`Pack ${pack.id}${entryLabel} references missing Panel without page scope: ${targetLabel}`);
+            }
+        } else if (setHasPrefix(contentIndex.panelKeysByEpisode, target.seriesId)) {
+            if (!setHasParts(contentIndex.panelKeysByEpisode, ([seriesId, _episodeId, panelId]) => (
+                seriesId === target.seriesId && panelId === target.panelId
+            ))) {
+                errors.push(`Pack ${pack.id}${entryLabel} references missing Panel without episode scope: ${targetLabel}`);
+            }
+        } else {
+            errors.push(`Pack ${pack.id}${entryLabel} references Panel without episode scope: ${targetLabel}`);
+        }
+    }
+
+    if (target.bubbleId) {
+        if (target.episodeId && target.pageId) {
+            if (!contentIndex.bubbleKeys.has(key(target.seriesId, target.episodeId, target.pageId, target.bubbleId))) {
+                errors.push(`Pack ${pack.id}${entryLabel} references missing Bubble: ${targetLabel}`);
+            }
+        } else if (target.episodeId) {
+            if (!contentIndex.bubbleKeysByEpisode.has(key(target.seriesId, target.episodeId, target.bubbleId))) {
+                errors.push(`Pack ${pack.id}${entryLabel} references missing Bubble without page scope: ${targetLabel}`);
+            }
+        } else if (setHasPrefix(contentIndex.bubbleKeysByEpisode, target.seriesId)) {
+            if (!setHasParts(contentIndex.bubbleKeysByEpisode, ([seriesId, _episodeId, bubbleId]) => (
+                seriesId === target.seriesId && bubbleId === target.bubbleId
+            ))) {
+                errors.push(`Pack ${pack.id}${entryLabel} references missing Bubble without episode scope: ${targetLabel}`);
+            }
+        } else {
+            errors.push(`Pack ${pack.id}${entryLabel} references Bubble without episode scope: ${targetLabel}`);
+        }
+    }
+
+    return errors;
+}
+
+function validatePackTargets(packs, contentIndex) {
+    if (!contentIndex || contentIndex.seriesCount === 0) {
+        if (packs.length > 0) {
+            console.log("No content Series found; skipping Pack target existence checks.");
+        }
+        return 0;
+    }
+
+    let errorCount = 0;
+    for (const pack of packs) {
+        if (pack.targetSeriesId && !contentIndex.seriesIds.has(pack.targetSeriesId)) {
+            console.error(`Pack ${pack.id} references missing targetSeriesId: ${pack.targetSeriesId}`);
+            errorCount += 1;
+        }
+        if (pack.targetSeriesId && pack.targetEpisodeId) {
+            const episodeKey = key(pack.targetSeriesId, pack.targetEpisodeId);
+            if (!contentIndex.episodeKeys.has(episodeKey)) {
+                console.error(`Pack ${pack.id} references missing targetEpisodeId: ${pack.targetSeriesId}/${pack.targetEpisodeId}`);
+                errorCount += 1;
+            }
+        }
+
+        for (const entry of pack.entries ?? []) {
+            const errors = validatePackTargetReference({
+                pack,
+                entry,
+                target: entry.target,
+                contentIndex,
+            });
+            for (const error of errors) {
+                console.error(error);
+                errorCount += 1;
+            }
+        }
+    }
+
+    return errorCount;
+}
+
+function validatePacks(packsDir, contentIndex) {
     const repo = new FilePackRepository(packsDir);
     const packs = repo.listPacks();
     const schemaErrors = repo.getValidationErrors();
     for (const error of schemaErrors) {
         console.error(error);
     }
-    return { packCount: packs.length, errorCount: schemaErrors.length };
+    const targetErrorCount = validatePackTargets(packs, contentIndex);
+    return { packCount: packs.length, errorCount: schemaErrors.length + targetErrorCount };
 }
 
 function main() {
@@ -103,9 +323,16 @@ function main() {
 
     const contentResult = contentsExists
         ? validateContents(contentsDir, options.failOnWarnings)
-        : { seriesCount: 0, pageCount: 0, warningCount: 0, errorCount: 0 };
+        : {
+            series: [],
+            contentIndex: buildContentIndex([]),
+            seriesCount: 0,
+            pageCount: 0,
+            warningCount: 0,
+            errorCount: 0,
+        };
     const packResult = packsExists
-        ? validatePacks(packsDir)
+        ? validatePacks(packsDir, contentResult.contentIndex)
         : { packCount: 0, errorCount: 0 };
 
     console.log(
