@@ -25,10 +25,10 @@ type PageStructureSidebarProps = {
     onApplyScriptAssist: () => void;
     onSelectPanel: (index: number) => void;
     onSelectBubble: (index: number) => void;
-    onSelectBubbleCandidate: (panelIndex: number, bubbleIndex: number) => void;
+    onSelectBubbleCandidate: (panelIndex: number | null, bubbleIndex: number) => void;
     onMovePanel: (index: number, direction: -1 | 1) => void;
     onMoveBubble: (index: number, direction: -1 | 1) => void;
-    onMoveBubbleCandidate: (panelIndex: number, bubbleIndex: number, direction: -1 | 1) => void;
+    onMoveBubbleCandidate: (panelIndex: number | null, bubbleIndex: number, direction: -1 | 1) => void;
 };
 
 function pageBubblesOf(page: PageData) {

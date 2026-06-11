@@ -63,7 +63,7 @@ export const messages = {
         "structure.changes.field.reviewDecision": "確認状態",
         "structure.episode": "エピソード",
         "structure.workDetail": "作品詳細",
-        "structure.pendingSaveGuard": "{count} 件の未確認コマ / フキダシ候補があります。承認または却下してから保存してください。",
+        "structure.pendingSaveWarning": "{count} 件の未確認コマ / フキダシ候補があります。保存はできますが、公開前に確認してください。",
         "structure.replaceConfirm": "このページの既存コマ / フキダシ構造をテンプレートで置き換えます。続行しますか？",
         "structure.clearConfirm": "このページのコマ / フキダシ構造をすべて削除します。続行しますか？",
 
@@ -261,7 +261,7 @@ export const messages = {
         "structure.changes.field.reviewDecision": "Review decision",
         "structure.episode": "Episode",
         "structure.workDetail": "Work detail",
-        "structure.pendingSaveGuard": "{count} pending Panel / Bubble candidates remain. Accept or reject them before saving.",
+        "structure.pendingSaveWarning": "{count} pending Panel / Bubble candidates remain. Saving is allowed, but review them before publishing.",
         "structure.replaceConfirm": "Replace the existing Panel / Bubble structure on this page with this template?",
         "structure.clearConfirm": "Delete all Panel / Bubble structure on this page?",
 

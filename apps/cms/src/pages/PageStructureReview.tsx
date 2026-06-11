@@ -721,10 +721,6 @@ export default function PageStructureReview() {
 
     const save = async () => {
         if (!seriesId || !episode) return;
-        if (reviewSummary.pending > 0) {
-            setError(t("structure.pendingSaveGuard", { count: reviewSummary.pending }));
-            return;
-        }
         setSaving(true);
         setError("");
         try {
@@ -779,6 +775,11 @@ export default function PageStructureReview() {
             />
 
             {error && <div className="error-msg">{error}</div>}
+            {dirty && reviewSummary.pending > 0 && (
+                <div className="warning-msg">
+                    {t("structure.pendingSaveWarning", { count: reviewSummary.pending })}
+                </div>
+            )}
             {recoveredAt && (
                 <div className="success-msg">
                     {t("structure.recovered", { savedAt: new Date(recoveredAt).toLocaleString() })}
