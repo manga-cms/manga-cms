@@ -78,6 +78,21 @@ test("prepared directory draft keeps source assets outside canonical image path"
     assert.doesNotThrow(() => CanonicalDraftPayloadSchema.parse(draft));
 });
 
+test("prepared directory draft requires explicit or default page dimensions", () => {
+    assert.throws(() => buildPreparedDirectoryDraft({
+        seriesId: "rain-world",
+        seriesTitle: "Rain World",
+        episodeId: "ep01",
+        episodeNumber: 1,
+        episodeTitle: "Rain Ruins",
+        pages: [
+            {
+                imagePath: "pages/p001.png",
+            },
+        ],
+    }), /page width is required/);
+});
+
 test("canonical drafts exclude artifact metadata and confidence while matching DraftPayload", async () => {
     const provider = new GeminiProvider();
     const page = createPageInput();

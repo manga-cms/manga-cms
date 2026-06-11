@@ -1,5 +1,6 @@
 export * from "./artifacts/index.js";
 export * from "./drafts/index.js";
+export * from "./image-dimensions.js";
 export * from "./metrics/index.js";
 export * from "./pipeline/index.js";
 export * from "./prepared-directory.js";

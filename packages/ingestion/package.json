@@ -13,7 +13,7 @@
     },
     "scripts": {
         "build": "tsc",
-        "test": "pnpm build && node --test --experimental-strip-types ./test/**/*.test.ts"
+        "test": "pnpm build && node --test --experimental-strip-types ./test/*.test.ts ./test/**/*.test.ts"
     },
     "dependencies": {
         "@manga/domain": "workspace:*",

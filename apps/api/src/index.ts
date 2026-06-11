@@ -37,7 +37,7 @@ import {
     TranslationPackDraftImportInputSchema,
     type GitHubHandoffSyncDryRunInputData,
 } from "@manga/schemas";
-import { buildPreparedDirectoryDraft } from "@manga/ingestion";
+import { buildPreparedDirectoryDraft, readImageDimensionsFromFile } from "@manga/ingestion";
 import {
     FileContentRepository,
     createFileWriter,
@@ -2176,6 +2176,45 @@ interface PreparedImportPage {
     displayRef?: string;
 }
 
+function hasDimensionInput(value: unknown): boolean {
+    return value !== undefined && value !== null && value !== "";
+}
+
+function validatedDimensions(widthInput: unknown, heightInput: unknown, label: string): { width: number; height: number } {
+    const width = Number(widthInput);
+    const height = Number(heightInput);
+    if (!Number.isFinite(width) || width < 1 || !Number.isFinite(height) || height < 1) {
+        throw new Error(`Invalid dimensions for ${label}`);
+    }
+    return { width, height };
+}
+
+function resolvePreparedImageDimensions(source: string, fileName: string, bodyPage: any, body: any): { width: number; height: number } {
+    const hasPageWidth = hasDimensionInput(bodyPage.width);
+    const hasPageHeight = hasDimensionInput(bodyPage.height);
+    if (hasPageWidth || hasPageHeight) {
+        if (!hasPageWidth || !hasPageHeight) {
+            throw new Error(`Both width and height are required when overriding dimensions for ${fileName}`);
+        }
+        return validatedDimensions(bodyPage.width, bodyPage.height, fileName);
+    }
+
+    try {
+        return readImageDimensionsFromFile(source);
+    } catch (error) {
+        const hasDefaultWidth = hasDimensionInput(body.defaultWidth);
+        const hasDefaultHeight = hasDimensionInput(body.defaultHeight);
+        if (hasDefaultWidth || hasDefaultHeight) {
+            if (!hasDefaultWidth || !hasDefaultHeight) {
+                throw new Error(`Both defaultWidth and defaultHeight are required when image dimensions cannot be read for ${fileName}`);
+            }
+            return validatedDimensions(body.defaultWidth, body.defaultHeight, fileName);
+        }
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`Could not read image dimensions for ${fileName}: ${reason}`);
+    }
+}
+
 // POST /admin/ingestion/import/prepared-directory — Create draft job from local prepared assets.
 app.post("/admin/ingestion/import/prepared-directory", async (c) => {
     const denied = requireAdmin(c); if (denied) return denied;
@@ -2235,11 +2274,7 @@ app.post("/admin/ingestion/import/prepared-directory", async (c) => {
             if (seenCanonicalFileNames.has(canonicalFileName)) {
                 throw new Error(`Duplicate canonical page target: ${canonicalFileName}`);
             }
-            const width = Number(bodyPage.width ?? body.defaultWidth ?? 500);
-            const height = Number(bodyPage.height ?? body.defaultHeight ?? 760);
-            if (!Number.isFinite(width) || width < 1 || !Number.isFinite(height) || height < 1) {
-                throw new Error(`Invalid dimensions for ${fileName}`);
-            }
+            const { width, height } = resolvePreparedImageDimensions(source, fileName, bodyPage, body);
             seenCanonicalFileNames.add(canonicalFileName);
             return {
                 source,
@@ -2279,8 +2314,6 @@ app.post("/admin/ingestion/import/prepared-directory", async (c) => {
             episodeNumber,
             episodeTitle,
             pages: draftPages,
-            defaultWidth: Number(body.defaultWidth ?? 500),
-            defaultHeight: Number(body.defaultHeight ?? 760),
         });
         const update = await ingestion.updateDraft(job.id, draft);
         if (!update.success) {

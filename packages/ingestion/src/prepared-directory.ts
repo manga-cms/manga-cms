@@ -22,6 +22,14 @@ export interface PreparedDirectoryDraftInput {
     defaultHeight?: number;
 }
 
+function resolvePageDimension(pageValue: number | undefined, defaultValue: number | undefined, label: string): number {
+    const value = pageValue ?? defaultValue;
+    if (value === undefined || !Number.isFinite(value) || value < 1) {
+        throw new Error(`Prepared directory page ${label} is required and must be a positive number`);
+    }
+    return value;
+}
+
 export function buildPreparedDirectoryDraft(input: PreparedDirectoryDraftInput): DraftPayload {
     return {
         seriesId: input.seriesId,
@@ -35,8 +43,8 @@ export function buildPreparedDirectoryDraft(input: PreparedDirectoryDraftInput):
             pageNumber: page.pageNumber ?? index + 1,
             imagePath: page.imagePath,
             sourceImagePath: page.sourceImagePath,
-            width: page.width ?? input.defaultWidth ?? 500,
-            height: page.height ?? input.defaultHeight ?? 760,
+            width: resolvePageDimension(page.width, input.defaultWidth, "width"),
+            height: resolvePageDimension(page.height, input.defaultHeight, "height"),
             displayRef: page.displayRef,
             panels: [],
         })),
