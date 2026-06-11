@@ -2624,7 +2624,7 @@ app.get("/deliver/:pageId", (c) => {
         return c.json({ error: { code: "NOT_FOUND", message: "Page image not found" } }, 404);
     }
 
-            const finalRelPath = resolveDeliveredAssetPath(originRelPath, payload.userId);
+    const finalRelPath = resolveDeliveredAssetPath(originRelPath, payload.userId);
 
     // Resolve inside the episode asset directory; content metadata must not
     // be able to escape via "../" or absolute paths.
@@ -2655,7 +2655,6 @@ app.get("/deliver/:pageId", (c) => {
             headers: {
                 "Content-Type": contentType,
                 "Cache-Control": "private, max-age=300",
-                "X-Watermark-Applied": "false",
             },
         });
     }

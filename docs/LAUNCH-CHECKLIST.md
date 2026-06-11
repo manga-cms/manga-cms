@@ -1,6 +1,6 @@
 # Launch Checklist
 
-Last updated: 2026-03-29
+Last updated: 2026-06-12
 
 This checklist turns the roadmap into concrete launch gates.
 
