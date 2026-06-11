@@ -157,8 +157,7 @@ const DRAFT_ASSETS_DIR =
 
 const readRepo = new FileContentRepository(CONTENTS_DIR);
 const writer = createFileWriter(CONTENTS_DIR, () => {
-    (readRepo as any).loaded = false;
-    (readRepo as any).seriesCache = new Map();
+    readRepo.reload();
 });
 const FEEDBACK_DIR = process.env.FEEDBACK_DIR ?? join(__dirname, "../../../feedback");
 const feedbackRepo = createFileFeedbackRepository(FEEDBACK_DIR);
@@ -215,16 +214,11 @@ function makeDeliveryUrl(c: any, pageId: string, token: string, locale: string):
 }
 
 function findPublicFreePageById(pageId: string): { seriesId: string; episodeId: string; page: any } | null {
-    for (const series of readRepo.listSeries()) {
-        if (!isPublicNow(series)) continue;
-        for (const ep of series.episodes) {
-            if (!isPublicNow(ep)) continue;
-            if (!accessPolicy.isEpisodeFree(series.id, ep.id, ep.episodeNumber)) continue;
-            const page = ep.pages.find((candidate: any) => pageIdOf(candidate) === pageId);
-            if (page) return { seriesId: series.id, episodeId: ep.id, page };
-        }
-    }
-    return null;
+    const result = readRepo.findPageById(pageId);
+    if (!result) return null;
+    if (!isPublicNow(result.series) || !isPublicNow(result.episode)) return null;
+    if (!accessPolicy.isEpisodeFree(result.series.id, result.episode.id, result.episode.episodeNumber)) return null;
+    return { seriesId: result.series.id, episodeId: result.episode.id, page: result.page };
 }
 
 function publicSeriesMeta(series: any) {
@@ -2634,26 +2628,13 @@ app.get("/deliver/:pageId", (c) => {
         return c.json({ error: { code: "FORBIDDEN", message: "Token does not match page" } }, 403);
     }
 
-    // Find the page's origin image path in contents
-    let originRelPath: string | null = null;
-    let seriesId: string | null = null;
-    let episodeId: string | null = null;
-    for (const series of readRepo.listSeries()) {
-        if (!isPublicNow(series)) continue;
-        for (const ep of series.episodes) {
-            if (!isPublicNow(ep)) continue;
-            const page = ep.pages.find((p: any) => pageIdOf(p) === pageId);
-            if (page) {
-                originRelPath = (page.images as any)[locale] ?? (page.images as any).ja ?? null;
-                seriesId = series.id;
-                episodeId = ep.id;
-                break;
-            }
-        }
-        if (originRelPath) break;
+    const pageMatch = readRepo.findPageById(pageId);
+    if (!pageMatch || !isPublicNow(pageMatch.series) || !isPublicNow(pageMatch.episode)) {
+        return c.json({ error: { code: "NOT_FOUND", message: "Page image not found" } }, 404);
     }
 
-    if (!originRelPath || !seriesId || !episodeId) {
+    const originRelPath = (pageMatch.page.images as any)[locale] ?? (pageMatch.page.images as any).ja ?? null;
+    if (!originRelPath) {
         return c.json({ error: { code: "NOT_FOUND", message: "Page image not found" } }, 404);
     }
 
@@ -2661,7 +2642,7 @@ app.get("/deliver/:pageId", (c) => {
 
     // Resolve inside the episode asset directory; content metadata must not
     // be able to escape via "../" or absolute paths.
-    const episodeAssetDir = resolve(CONTENTS_DIR, seriesId, episodeId);
+    const episodeAssetDir = resolve(CONTENTS_DIR, pageMatch.series.id, pageMatch.episode.id);
     const absPath = resolve(episodeAssetDir, finalRelPath);
     if (!isPathInside(episodeAssetDir, absPath)) {
         return c.json({ error: { code: "INVALID_IMAGE_PATH", message: "Image path escapes episode directory" } }, 400);

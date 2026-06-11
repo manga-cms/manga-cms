@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { SeriesManifestSchema, EpisodeSchema } from "@manga/schemas";
 import type { Series, Episode, Page, Panel, Bubble } from "./types.js";
 import { isSafePathSegment } from "./path-safety.js";
-import { getPanelBubbles } from "./content-v2.js";
+import { getPanelBubbles, pageIdOf } from "./content-v2.js";
 
 export type PublicationState = "public" | "hidden" | "archived" | "scheduled" | "expired";
 
@@ -83,6 +83,7 @@ export interface ContentRepository {
     listSeries(): Series[];
     getSeries(seriesId: string): Series | undefined;
     getEpisode(seriesId: string, episodeId: string): Episode | undefined;
+    findPageById(pageId: string): { series: Series; episode: Episode; page: Page } | undefined;
     getAdjacentEpisodes(
         seriesId: string,
         episodeId: string,
@@ -115,6 +116,7 @@ export interface ContentRepository {
 
 export class FileContentRepository implements ContentRepository {
     private seriesCache: Map<string, Series> = new Map();
+    private pageIndex: Map<string, { series: Series; episode: Episode; page: Page }> = new Map();
     private loaded = false;
     private validationErrors: ContentValidationError[] = [];
 
@@ -132,6 +134,9 @@ export class FileContentRepository implements ContentRepository {
     }
 
     private loadAll(): void {
+        this.seriesCache.clear();
+        this.pageIndex.clear();
+        this.validationErrors = [];
         if (!existsSync(this.contentsDir)) return;
 
         const dirs = readdirSync(this.contentsDir, { withFileTypes: true })
@@ -224,6 +229,14 @@ export class FileContentRepository implements ContentRepository {
             };
 
             this.seriesCache.set(series.id, series);
+            for (const episode of series.episodes) {
+                for (const page of episode.pages) {
+                    const pageId = pageIdOf(page);
+                    if (!this.pageIndex.has(pageId)) {
+                        this.pageIndex.set(pageId, { series, episode, page });
+                    }
+                }
+            }
         }
 
         // Log validation errors to stderr (visible in dev, doesn't crash)
@@ -249,6 +262,18 @@ export class FileContentRepository implements ContentRepository {
 
     getEpisode(seriesId: string, episodeId: string): Episode | undefined {
         return this.getSeries(seriesId)?.episodes.find((e) => e.id === episodeId);
+    }
+
+    findPageById(pageId: string): { series: Series; episode: Episode; page: Page } | undefined {
+        this.ensureLoaded();
+        return this.pageIndex.get(pageId);
+    }
+
+    reload(): void {
+        this.loaded = false;
+        this.seriesCache.clear();
+        this.pageIndex.clear();
+        this.validationErrors = [];
     }
 
     getAdjacentEpisodes(
