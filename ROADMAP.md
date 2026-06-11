@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-06-11
+Last updated: 2026-06-12
 
 Manga CMS is a public self-hosted manga publishing engine. The public repository
 contains the open content format, validation contracts, API, Viewer, CMS,
@@ -69,7 +69,29 @@ Current focus:
   -> confirm -> save to canonical `contents/` and `packs/` -> runtime DB
   reindex.
 
-### 4. Provider-Neutral Primitives
+### 4. Public Reader Enhancement
+
+Goal: Improve the public Reader while preserving the normal manga reading
+experience.
+
+Current focus:
+- Keep image-first reading stable on mobile and desktop.
+- Keep Share URL, OGP, robots/sitemap, and localized metadata smoke checks
+  green.
+- Explore an opt-in HTML text layer for Bubble text so selected titles can
+  support browser text selection, search, accessibility, and browser
+  translation experiments.
+- Keep the HTML text layer feature-flagged and off by default until content
+  policy, text exposure risk, layout QA, and browser translation behavior are
+  confirmed.
+- Keep `Bubble.textOriginal` as canonical source text; layout hints such as
+  `textLayout.lines` remain optional visual metadata and must not change search,
+  read-aloud, export, or share-description source-of-truth behavior.
+
+See [`docs/reader-text-layer-spec.md`](docs/reader-text-layer-spec.md) for the
+planned staged implementation.
+
+### 5. Provider-Neutral Primitives
 
 Goal: Keep the public repository safe for general open-source use.
 
@@ -78,7 +100,7 @@ Current focus:
 - Ensure the self-hosted engine does not require specific commercial vendors to run.
 - Keep payment provider integrations, tenant SaaS automation, and custom domain routing separated into the private commercial layer.
 
-### 5. Future Private Commercial Platform
+### 6. Future Private Commercial Platform
 
 Goal: Hosted/commercial operations for Manga CMS. This is not part of the OSS deliverable.
 
@@ -99,9 +121,11 @@ These details will remain outside the public repository. The public repo may con
 4. Refine Ingestion workflow prioritizing PSD/text-export over OCR/LLM.
 5. Drill backup/restore for both Postgres state and canonical `contents/`/`packs/`.
 6. Refine text export and translation draft import workflows.
-7. Keep Search Console, robots/sitemap, public Reader, Share URL, and OGP smoke
+7. Design and prototype a feature-flagged HTML text layer for selected Reader
+   content only after the public launch smoke remains green.
+8. Keep Search Console, robots/sitemap, public Reader, Share URL, and OGP smoke
    checks green for self-hosted public launch.
-8. Keep generic manifest/export and entitlement designs provider-neutral.
+9. Keep generic manifest/export and entitlement designs provider-neutral.
 
 ## References
 
@@ -109,5 +133,6 @@ These details will remain outside the public repository. The public repo may con
 - [`docs/architecture/layer-boundary.md`](docs/architecture/layer-boundary.md)
 - [`docs/production-ops-checklist.md`](docs/production-ops-checklist.md)
 - [`docs/api-contract.md`](docs/api-contract.md)
+- [`docs/reader-text-layer-spec.md`](docs/reader-text-layer-spec.md)
 - [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md)
 - [`docs/BACKUP-RESTORE.md`](docs/BACKUP-RESTORE.md)
