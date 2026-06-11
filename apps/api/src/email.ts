@@ -3,7 +3,7 @@
  *
  * - Resend: primary provider, configured via RESEND_API_KEY
  * - Console: dev-only fallback, logs magic link to stdout
- * - Production without RESEND_API_KEY: fail closed (no email, no login)
+ * - Production without RESEND_API_KEY: API starts, magic link login is disabled
  */
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -87,7 +87,8 @@ let _provider: EmailProvider | null = null;
 /**
  * Get the email provider.
  *
- * In production, returns null if RESEND_API_KEY is not set — callers must handle this.
+ * In production, returns null if RESEND_API_KEY is not set. The API server
+ * still starts, but callers must treat magic link login as unavailable.
  * In dev, falls back to ConsoleEmailProvider.
  */
 export function getEmailProvider(): EmailProvider | null {

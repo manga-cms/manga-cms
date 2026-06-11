@@ -113,8 +113,6 @@ function validateProductionConfig(): string[] {
     if (!process.env.DEV_AUTH_SECRET) missing.push("DEV_AUTH_SECRET");
     if (!process.env.DELIVERY_SECRET) missing.push("DELIVERY_SECRET");
     if (!process.env.DATABASE_URL) missing.push("DATABASE_URL");
-    if (!process.env.RESEND_API_KEY) missing.push("RESEND_API_KEY");
-    if (!process.env.EMAIL_FROM) missing.push("EMAIL_FROM");
     if (!process.env.APP_URL) missing.push("APP_URL");
     return missing;
 }
@@ -663,7 +661,7 @@ app.get("/health", async (c) => {
     // --- Granular checks ---
     const checks = {
         db: dbStatus,
-        email: isEmailConfigured() ? "configured" : "not_configured",
+        email: isEmailConfigured() ? "configured" : "disabled",
         secrets: {
             auth: !!process.env.DEV_AUTH_SECRET ? "set" : "missing",
             delivery: !!process.env.DELIVERY_SECRET ? "set" : "missing",
@@ -675,8 +673,7 @@ app.get("/health", async (c) => {
     const secretsOk = !IS_PRODUCTION || (
         checks.secrets.auth === "set" && checks.secrets.delivery === "set"
     );
-    const emailOk = !IS_PRODUCTION || checks.email === "configured";
-    const ready = dbOk && secretsOk && emailOk;
+    const ready = dbOk && secretsOk;
 
     return c.json({
         status: "ok",

@@ -23,22 +23,19 @@ Manga content and runtime state are separate backup domains.
 
 ## Database Backup
 
-### SQLite
+For the runtime database (SQLite or PostgreSQL), use the checked-in helper script:
 
 ```bash
-# Copy the database file
-cp packages/db/prisma/dev.db backups/db-$(date +%Y%m%d-%H%M%S).db
+scripts/backup-db.sh
 ```
 
-### PostgreSQL
+By default it writes to `backups/db-<timestamp>/`. To write outside the repository:
 
 ```bash
-# Dump the database
-pg_dump "$DATABASE_URL" > backups/db-$(date +%Y%m%d-%H%M%S).sql
-
-# Or binary format (faster restore)
-pg_dump -Fc "$DATABASE_URL" > backups/db-$(date +%Y%m%d-%H%M%S).dump
+scripts/backup-db.sh /tmp/manga-cms-db-backup
 ```
+
+This script automatically detects whether `DATABASE_URL` is pointing to SQLite or PostgreSQL and creates the appropriate backup (`dev.db.bak` or `db.dump`/`db.sql`).
 
 ## Content Backup
 
@@ -111,32 +108,20 @@ ls -lh "$BACKUP_DIR"
 
 ## Restore
 
-### SQLite
+### Database
+
+For the runtime database, use the checked-in helper script:
 
 ```bash
 # 1. Stop the API server
 
-# 2. Replace the database file
-cp backups/<timestamp>/db.sqlite packages/db/prisma/dev.db
+# 2. Restore the database
+scripts/restore-db.sh backups/db-<timestamp>
 
 # 3. Restart the API server
 ```
 
-### PostgreSQL
-
-```bash
-# 1. Stop the API server
-
-# 2. Drop and recreate the database
-psql "$DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-
-# 3. Restore from dump
-pg_restore -d "$DATABASE_URL" backups/<timestamp>/db.dump
-# Or from SQL:
-psql "$DATABASE_URL" < backups/<timestamp>/db.sql
-
-# 4. Restart the API server
-```
+The script will automatically detect the database type from `DATABASE_URL` and restore the appropriate file from the backup directory.
 
 ### Content
 
@@ -168,8 +153,11 @@ fi
 ## Verification After Restore
 
 ```bash
-# Run smoke test
+# Run API smoke test
 ./scripts/smoke-test.sh
+
+# Run Viewer smoke test
+./scripts/smoke-test-viewer.sh
 
 # Or manual checks:
 curl http://localhost:3000/api/v1/health

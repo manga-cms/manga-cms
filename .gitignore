@@ -28,13 +28,14 @@ backups/
 packages/db/prisma/postgres/schema.prisma
 
 # Runtime private storage
+entitlements/*
+!entitlements/.gitkeep
 feedback/
 proposals/
 pack-drafts/
 rights/
 
-# Local/private storyboard verification content
-contents/storyboard-ui-check/
-contents/neon-garden/
-contents/rain-world/
-contents/smoke-test-series/
+# Local/private canonical content.
+# Public sample content must be explicitly unignored and licensed before commit.
+contents/*
+!contents/.gitkeep
