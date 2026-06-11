@@ -4,8 +4,8 @@ import type { ReviewDecision, ReviewDecisions } from "./types";
 
 export type BubbleCandidate = {
     bubble: BubbleData;
-    panel: PanelData;
-    panelIndex: number;
+    panel: PanelData | null;
+    panelIndex: number | null;
     bubbleIndex: number;
     readingOrder: number;
     decision: ReviewDecision;
@@ -76,7 +76,7 @@ export function getBubbleTextComparison(bubble: BubbleData) {
 export function getBubbleCandidates(page: PageData | null, reviewDecisions: ReviewDecisions): BubbleCandidate[] {
     if (!page) return [];
     let readingOrder = 0;
-    return page.panels.flatMap((panel, panelIndex) => panel.bubbles.map((bubble, bubbleIndex) => {
+    const panelBubbles = page.panels.flatMap((panel, panelIndex) => panel.bubbles.map((bubble, bubbleIndex) => {
         readingOrder += 1;
         return {
             bubble,
@@ -88,4 +88,19 @@ export function getBubbleCandidates(page: PageData | null, reviewDecisions: Revi
             warnings: getBubbleWarnings(page, bubble),
         };
     }));
+    const pageLevelBubbles = (page.bubbles ?? [])
+        .filter((bubble) => bubble.panelId === null)
+        .map((bubble, bubbleIndex) => {
+            readingOrder += 1;
+            return {
+                bubble,
+                panel: null,
+                panelIndex: null,
+                bubbleIndex,
+                readingOrder,
+                decision: reviewDecisions[bubbleReviewKey(bubble)] ?? "pending",
+                warnings: getBubbleWarnings(page, bubble),
+            };
+        });
+    return [...panelBubbles, ...pageLevelBubbles];
 }

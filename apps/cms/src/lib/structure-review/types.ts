@@ -3,7 +3,7 @@ import type { BoundingBox } from "../../api";
 export type DragState = {
     kind: "panel" | "bubble";
     mode: "move" | "resize";
-    panelIndex: number;
+    panelIndex: number | null;
     bubbleIndex?: number;
     startX: number;
     startY: number;

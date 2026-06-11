@@ -8,7 +8,7 @@ type UseStructureReviewDragInput = {
     canvasRef: RefObject<HTMLDivElement | null>;
     updatePage: (page: PageData) => void;
     onBeforeChange: () => void;
-    setSelectedPanelIndex: (index: number) => void;
+    setSelectedPanelIndex: (index: number | null) => void;
     setSelectedBubbleIndex: (index: number | null) => void;
 };
 
@@ -26,7 +26,7 @@ export function useStructureReviewDrag({
         event: ReactPointerEvent,
         kind: DragState["kind"],
         mode: DragState["mode"],
-        panelIndex: number,
+        panelIndex: number | null,
         bubbleIndex?: number,
     ) => {
         if (!page) return;
@@ -34,8 +34,11 @@ export function useStructureReviewDrag({
         event.stopPropagation();
         onBeforeChange();
         const box = bubbleIndex === undefined
-            ? page.panels[panelIndex].bbox
-            : page.panels[panelIndex].bubbles[bubbleIndex].bbox;
+            ? page.panels[panelIndex ?? -1]?.bbox
+            : panelIndex === null
+                ? (page.bubbles ?? []).filter((bubble) => bubble.panelId === null)[bubbleIndex]?.bbox
+                : page.panels[panelIndex].bubbles[bubbleIndex].bbox;
+        if (!box) return;
         setSelectedPanelIndex(panelIndex);
         setSelectedBubbleIndex(bubbleIndex ?? null);
         setDrag({
@@ -66,8 +69,19 @@ export function useStructureReviewDrag({
 
             const panels = [...page.panels];
             if (drag.kind === "panel") {
+                if (drag.panelIndex === null) return;
                 panels[drag.panelIndex] = { ...panels[drag.panelIndex], bbox: safeBox };
             } else if (drag.bubbleIndex !== undefined) {
+                if (drag.panelIndex === null) {
+                    let pageLevelIndex = -1;
+                    const bubbles = page.bubbles.map((bubble) => {
+                        if (bubble.panelId !== null) return bubble;
+                        pageLevelIndex += 1;
+                        return pageLevelIndex === drag.bubbleIndex ? { ...bubble, bbox: safeBox } : bubble;
+                    });
+                    updatePage({ ...page, panels, bubbles });
+                    return;
+                }
                 const panel = panels[drag.panelIndex];
                 const bubbles = [...panel.bubbles];
                 bubbles[drag.bubbleIndex] = { ...bubbles[drag.bubbleIndex], bbox: safeBox };

@@ -16,12 +16,29 @@ export function makeBubbleShortId(page: PageData, panel: PanelData, bubbleNumber
     return `p${page.pageNumber}-k${panel.panelNumber}-f${bubbleNumber}`;
 }
 
+export function makePageBubbleId(page: PageData, bubbleNumber: number) {
+    return `${pageIdOf(page)}-f${pad(bubbleNumber)}`;
+}
+
+export function makePageBubbleShortId(page: PageData, bubbleNumber: number) {
+    return `p${page.pageNumber}-f${bubbleNumber}`;
+}
+
 export function nextPanelIdNumber(page: PageData) {
     return Math.max(0, ...page.panels.map((panel) => Number(panelIdOf(panel).match(/-k(\d+)$/)?.[1] ?? panel.panelNumber))) + 1;
 }
 
 export function nextBubbleIdNumber(panel: PanelData) {
     return Math.max(0, ...panel.bubbles.map((bubble) => Number(bubbleIdOf(bubble).match(/-f(\d+)$/)?.[1] ?? bubble.bubbleNumber))) + 1;
+}
+
+export function nextPageBubbleIdNumber(page: PageData) {
+    return Math.max(
+        0,
+        ...(page.bubbles ?? [])
+            .filter((bubble) => bubble.panelId === null)
+            .map((bubble) => Number(bubbleIdOf(bubble).match(/-f(\d+)$/)?.[1] ?? bubble.bubbleNumber)),
+    ) + 1;
 }
 
 export function renumberPanels(page: PageData, panels: PanelData[]) {

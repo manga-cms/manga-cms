@@ -28,7 +28,7 @@ import {
     type StructureReviewSnapshot,
 } from "../lib/structure-review/editSafety";
 import { clampBox } from "../lib/structure-review/geometry";
-import { makeBubbleId, makeBubbleShortId, makePanelId, nextBubbleIdNumber, nextPanelIdNumber, panelIdOf, renumberPanelBubbles, renumberPanels } from "../lib/structure-review/ids";
+import { bubbleIdOf, makeBubbleId, makeBubbleShortId, makePageBubbleId, makePageBubbleShortId, makePanelId, nextBubbleIdNumber, nextPageBubbleIdNumber, nextPanelIdNumber, panelIdOf, renumberPanelBubbles, renumberPanels } from "../lib/structure-review/ids";
 import { syncPageBubbles } from "../lib/structure-review/pageBubbles";
 import { buildTemplatePanels } from "../lib/structure-review/panelTemplates";
 import { bubbleReviewKey, markPanels, panelReviewKey, seedAcceptedDecisions, summarizeReview } from "../lib/structure-review/reviewDecisions";
@@ -196,7 +196,12 @@ export default function PageStructureReview() {
 
     const page = episode?.pages[pageIndex] ?? null;
     const selectedPanel = page && selectedPanelIndex !== null ? page.panels[selectedPanelIndex] : null;
-    const selectedBubble = selectedPanel && selectedBubbleIndex !== null ? selectedPanel.bubbles[selectedBubbleIndex] : null;
+    const pageLevelBubbles = page ? (page.bubbles ?? []).filter((bubble) => bubble.panelId === null) : [];
+    const selectedBubble = selectedPanel && selectedBubbleIndex !== null
+        ? selectedPanel.bubbles[selectedBubbleIndex]
+        : selectedPanelIndex === null && selectedBubbleIndex !== null
+            ? pageLevelBubbles[selectedBubbleIndex]
+            : null;
     const selectedPanelDecision = selectedPanel ? reviewDecisions[panelReviewKey(selectedPanel)] ?? "pending" : null;
     const selectedBubbleDecision = selectedBubble ? reviewDecisions[bubbleReviewKey(selectedBubble)] ?? "pending" : null;
 
@@ -431,22 +436,41 @@ export default function PageStructureReview() {
 
     const addBubble = () => {
         if (!page) return;
-        const panelIndex = selectedPanel && selectedPanelIndex !== null ? selectedPanelIndex : page.panels.length;
-        const panelId = makePanelId(page, nextPanelIdNumber(page));
-        const panel: PanelData = selectedPanel && selectedPanelIndex !== null ? selectedPanel : {
-            id: panelId,
-            panelId,
-            stableRef: panelId,
-            panelNumber: page.panels.length + 1,
-            bbox: {
-                x: 0,
-                y: 0,
-                width: page.width,
-                height: page.height,
-            },
-            reactionTags: [],
-            bubbles: [],
-        };
+        if (!selectedPanel || selectedPanelIndex === null) {
+            const pageBubbleNumber = pageLevelBubbles.length + 1;
+            const bubbleNumber = (page.bubbles ?? []).length + 1;
+            const bubbleId = makePageBubbleId(page, nextPageBubbleIdNumber(page));
+            const displayRef = makePageBubbleShortId(page, pageBubbleNumber);
+            const width = Math.max(72, Math.round(page.width * 0.22));
+            const height = Math.max(52, Math.round(page.height * 0.08));
+            const bubble: BubbleData = {
+                id: bubbleId,
+                bubbleId,
+                panelId: null,
+                stableRef: bubbleId,
+                displayRef,
+                bubbleNumber,
+                shortId: displayRef,
+                bubbleType: "speech",
+                textOriginal: "",
+                bbox: clampBox({
+                    x: Math.round(page.width - width - 24),
+                    y: 24,
+                    width,
+                    height,
+                }, page),
+            };
+            updatePage({ ...page, bubbles: [...(page.bubbles ?? []), bubble] });
+            setReviewDecisions((current) => ({
+                ...current,
+                [bubbleReviewKey(bubble)]: "pending",
+            }));
+            setSelectedPanelIndex(null);
+            setSelectedBubbleIndex(pageBubbleNumber - 1);
+            return;
+        }
+        const panelIndex = selectedPanelIndex;
+        const panel: PanelData = selectedPanel;
         const localBubbleNumber = panel.bubbles.length + 1;
         const bubbleNumber = (page.bubbles ?? []).length + 1;
         const bubbleId = makeBubbleId(panel, nextBubbleIdNumber(panel));
@@ -471,11 +495,7 @@ export default function PageStructureReview() {
             }, page),
         };
         const nextPanel = { ...panel, bubbles: [...panel.bubbles, bubble] };
-        if (selectedPanel && selectedPanelIndex !== null) {
-            updatePanel(selectedPanelIndex, nextPanel);
-        } else {
-            updatePage({ ...page, panels: [...page.panels, nextPanel] });
-        }
+        updatePanel(selectedPanelIndex, nextPanel);
         setReviewDecisions((current) => ({
             ...current,
             [panelReviewKey(nextPanel)]: current[panelReviewKey(nextPanel)] ?? "accepted",
@@ -486,7 +506,15 @@ export default function PageStructureReview() {
     };
 
     const deleteBubble = (options: { recordHistory?: boolean } = {}) => {
-        if (!selectedPanel || selectedPanelIndex === null || selectedBubbleIndex === null) return;
+        if (!page || selectedBubbleIndex === null) return;
+        if (!selectedPanel || selectedPanelIndex === null) {
+            const selected = pageLevelBubbles[selectedBubbleIndex];
+            if (!selected) return;
+            const bubbles = (page.bubbles ?? []).filter((bubble) => bubbleIdOf(bubble) !== bubbleIdOf(selected));
+            updatePage({ ...page, bubbles }, options);
+            setSelectedBubbleIndex(pageLevelBubbles.length > 1 ? Math.min(selectedBubbleIndex, pageLevelBubbles.length - 2) : null);
+            return;
+        }
         const bubbles = selectedPanel.bubbles.filter((_, i) => i !== selectedBubbleIndex);
         const nextPanel = renumberPanelBubbles(page!, { ...selectedPanel, bubbles });
         updatePanel(selectedPanelIndex, nextPanel, options);
@@ -505,7 +533,24 @@ export default function PageStructureReview() {
     };
 
     const moveBubble = (fromIndex: number, direction: -1 | 1) => {
-        if (!page || !selectedPanel || selectedPanelIndex === null) return;
+        if (!page) return;
+        if (!selectedPanel || selectedPanelIndex === null) {
+            const toIndex = fromIndex + direction;
+            if (toIndex < 0 || toIndex >= pageLevelBubbles.length) return;
+            const pageLevelIds = pageLevelBubbles.map(bubbleIdOf);
+            [pageLevelIds[fromIndex], pageLevelIds[toIndex]] = [pageLevelIds[toIndex], pageLevelIds[fromIndex]];
+            const pageLevelById = new Map(pageLevelBubbles.map((bubble) => [bubbleIdOf(bubble), bubble]));
+            const reorderedPageLevel = pageLevelIds.map((id) => pageLevelById.get(id)!).map((bubble, index) => ({
+                ...bubble,
+                bubbleNumber: index + 1,
+                displayRef: bubble.displayRef ?? makePageBubbleShortId(page, index + 1),
+                shortId: bubble.shortId ?? bubble.displayRef ?? makePageBubbleShortId(page, index + 1),
+            }));
+            const assignedBubbles = (page.bubbles ?? []).filter((bubble) => bubble.panelId !== null);
+            updatePage({ ...page, bubbles: [...assignedBubbles, ...reorderedPageLevel] });
+            setSelectedBubbleIndex(toIndex);
+            return;
+        }
         const toIndex = fromIndex + direction;
         if (toIndex < 0 || toIndex >= selectedPanel.bubbles.length) return;
         const bubbles = [...selectedPanel.bubbles];
@@ -515,13 +560,18 @@ export default function PageStructureReview() {
         setSelectedBubbleIndex(toIndex);
     };
 
-    const selectBubbleCandidate = (panelIndex: number, bubbleIndex: number) => {
+    const selectBubbleCandidate = (panelIndex: number | null, bubbleIndex: number) => {
         setSelectedPanelIndex(panelIndex);
         setSelectedBubbleIndex(bubbleIndex);
     };
 
-    const moveBubbleCandidate = (panelIndex: number, bubbleIndex: number, direction: -1 | 1) => {
+    const moveBubbleCandidate = (panelIndex: number | null, bubbleIndex: number, direction: -1 | 1) => {
         if (!page) return;
+        if (panelIndex === null) {
+            setSelectedPanelIndex(null);
+            moveBubble(bubbleIndex, direction);
+            return;
+        }
         const panel = page.panels[panelIndex];
         if (!panel) return;
         const toIndex = bubbleIndex + direction;
@@ -568,14 +618,29 @@ export default function PageStructureReview() {
     };
 
     const updateSelectedBubble = (patch: Partial<BubbleData>) => {
-        if (!selectedPanel || selectedPanelIndex === null || selectedBubbleIndex === null) return;
+        if (!page || selectedBubbleIndex === null) return;
+        if (!selectedPanel || selectedPanelIndex === null) {
+            const selected = pageLevelBubbles[selectedBubbleIndex];
+            if (!selected) return;
+            const bubbles = (page.bubbles ?? []).map((bubble) =>
+                bubbleIdOf(bubble) === bubbleIdOf(selected) ? applyBubblePatch(bubble, patch) : bubble,
+            );
+            updatePage({ ...page, bubbles });
+            return;
+        }
         const bubbles = [...selectedPanel.bubbles];
         bubbles[selectedBubbleIndex] = applyBubblePatch(bubbles[selectedBubbleIndex], patch);
         updatePanel(selectedPanelIndex, { ...selectedPanel, bubbles });
     };
 
     const updateSelectedBubbleReadingOrder = (readingOrder: number) => {
-        if (!selectedPanel || selectedPanelIndex === null || selectedBubbleIndex === null) return;
+        if (!page || selectedBubbleIndex === null) return;
+        if (!selectedPanel || selectedPanelIndex === null) {
+            const toIndex = Math.max(0, Math.min(pageLevelBubbles.length - 1, Math.round(readingOrder) - 1));
+            if (toIndex === selectedBubbleIndex) return;
+            moveBubble(selectedBubbleIndex, toIndex > selectedBubbleIndex ? 1 : -1);
+            return;
+        }
         const toIndex = Math.max(0, Math.min(selectedPanel.bubbles.length - 1, Math.round(readingOrder) - 1));
         if (toIndex === selectedBubbleIndex) return;
         const bubbles = [...selectedPanel.bubbles];

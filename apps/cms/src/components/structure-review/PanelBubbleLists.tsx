@@ -15,10 +15,10 @@ type PanelBubbleListsProps = {
     reviewDecisions: ReviewDecisions;
     onSelectPanel: (index: number) => void;
     onSelectBubble: (index: number) => void;
-    onSelectBubbleCandidate: (panelIndex: number, bubbleIndex: number) => void;
+    onSelectBubbleCandidate: (panelIndex: number | null, bubbleIndex: number) => void;
     onMovePanel: (index: number, direction: -1 | 1) => void;
     onMoveBubble: (index: number, direction: -1 | 1) => void;
-    onMoveBubbleCandidate: (panelIndex: number, bubbleIndex: number, direction: -1 | 1) => void;
+    onMoveBubbleCandidate: (panelIndex: number | null, bubbleIndex: number, direction: -1 | 1) => void;
 };
 
 const decisionLabelKey = (decision: string | undefined): MessageKey => `decision.${decision ?? "pending"}` as MessageKey;
@@ -44,6 +44,7 @@ export function PanelBubbleLists({
 }: PanelBubbleListsProps) {
     const { t } = useTranslation();
     const bubbleCandidates = getBubbleCandidates(page, reviewDecisions);
+    const pageLevelCandidateCount = bubbleCandidates.filter((candidate) => candidate.panelIndex === null).length;
 
     return (
         <>
@@ -77,7 +78,11 @@ export function PanelBubbleLists({
                                 <p>{getBubbleSourceText(candidate.bubble) || t("structure.sidebar.noText")}</p>
                             </div>
                             <small className="structure-list-meta">
-                                {t("structure.sidebar.panelRow", { panelNumber: candidate.panel.panelNumber })} · {candidate.bubble.bubbleType} · {t(decisionLabelKey(candidate.decision))}
+                                {candidate.panel
+                                    ? t("structure.sidebar.panelRow", { panelNumber: candidate.panel.panelNumber })
+                                    : t("structure.sidebar.pageLevelBubble")}
+                                {" · "}
+                                {candidate.bubble.bubbleType} · {t(decisionLabelKey(candidate.decision))}
                                 {" · "}
                                 <span className="bbox-summary">{formatBboxSummary(candidate.bubble.bbox)}</span>
                                 {candidate.warnings.length > 0 ? ` · ${t("structure.sidebar.warningCount", { count: candidate.warnings.length })}` : ""}
@@ -92,7 +97,7 @@ export function PanelBubbleLists({
                         </button>
                         <div className="order-controls">
                             <button type="button" onClick={() => onMoveBubbleCandidate(candidate.panelIndex, candidate.bubbleIndex, -1)} disabled={candidate.bubbleIndex === 0} aria-label={t("structure.sidebar.moveBubbleEarlier")}>↑</button>
-                            <button type="button" onClick={() => onMoveBubbleCandidate(candidate.panelIndex, candidate.bubbleIndex, 1)} disabled={candidate.bubbleIndex === candidate.panel.bubbles.length - 1} aria-label={t("structure.sidebar.moveBubbleLater")}>↓</button>
+                            <button type="button" onClick={() => onMoveBubbleCandidate(candidate.panelIndex, candidate.bubbleIndex, 1)} disabled={candidate.panel ? candidate.bubbleIndex === candidate.panel.bubbles.length - 1 : candidate.bubbleIndex === pageLevelCandidateCount - 1} aria-label={t("structure.sidebar.moveBubbleLater")}>↓</button>
                         </div>
                     </div>
                 ))}

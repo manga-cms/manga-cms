@@ -19,6 +19,11 @@ export function seedAcceptedDecisions(episode: EpisodeData): ReviewDecisions {
                 decisions[bubbleReviewKey(bubble)] = "accepted";
             });
         });
+        (page.bubbles ?? [])
+            .filter((bubble) => bubble.panelId === null)
+            .forEach((bubble) => {
+                decisions[bubbleReviewKey(bubble)] = "accepted";
+            });
     });
     return decisions;
 }
@@ -36,11 +41,17 @@ export function markPanels(decisions: ReviewDecisions, panels: PanelData[], deci
 
 export function summarizeReview(page: PageData | null, reviewDecisions: ReviewDecisions): ReviewSummary {
     if (!page) return { pending: 0, accepted: 0, rejected: 0 };
-    return page.panels.reduce((acc, panel) => {
+    const summary = page.panels.reduce((acc, panel) => {
         acc[reviewDecisions[panelReviewKey(panel)] ?? "pending"] += 1;
         panel.bubbles.forEach((bubble) => {
             acc[reviewDecisions[bubbleReviewKey(bubble)] ?? "pending"] += 1;
         });
         return acc;
     }, { pending: 0, accepted: 0, rejected: 0 } as ReviewSummary);
+    (page.bubbles ?? [])
+        .filter((bubble) => bubble.panelId === null)
+        .forEach((bubble) => {
+            summary[reviewDecisions[bubbleReviewKey(bubble)] ?? "pending"] += 1;
+        });
+    return summary;
 }

@@ -64,7 +64,7 @@ export function StructureInspector({
                     ))}
                 </div>
             )}
-            {page && selectedPanel && selectedPanelIndex !== null ? (
+            {page && selectedPanel && selectedPanelIndex !== null && (
                 <>
                     <div className="section-actions" style={{ marginTop: 0 }}>
                         <span className="badge">{t("structure.inspector.panelBadge", { panelNumber: selectedPanel.panelNumber })}</span>
@@ -97,9 +97,11 @@ export function StructureInspector({
                             </div>
                         ))}
                     </div>
+                </>
+            )}
 
-                    {selectedBubble ? (
-                        <>
+            {selectedBubble ? (
+                <>
                             <div className="section-actions">
                                 <span className="badge badge-ok">{t("structure.inspector.bubbleBadge", { bubbleNumber: selectedBubble.bubbleNumber })}</span>
                                 <span className={`badge ${selectedBubbleDecision === "accepted" ? "badge-ok" : "badge-warn"}`}>
@@ -220,13 +222,15 @@ export function StructureInspector({
                                     </div>
                                 </div>
                             </div>
-                            <TranslationWorkspace
-                                seriesId={seriesId}
-                                episodeId={episodeId}
-                                page={page}
-                                selectedPanel={selectedPanel}
-                                selectedBubble={selectedBubble}
-                            />
+                            {page && selectedPanel && (
+                                <TranslationWorkspace
+                                    seriesId={seriesId}
+                                    episodeId={episodeId}
+                                    page={page}
+                                    selectedPanel={selectedPanel}
+                                    selectedBubble={selectedBubble}
+                                />
+                            )}
                             <div className="flag-row">
                                 {([
                                     ["shareable", t("structure.inspector.shareable")],
@@ -260,13 +264,9 @@ export function StructureInspector({
                                     </div>
                                 ))}
                             </div>
-                        </>
-                    ) : (
-                        <p className="card-meta">{t("structure.inspector.selectBubble")}</p>
-                    )}
                 </>
             ) : (
-                <p className="card-meta">{t("structure.inspector.selectPanel")}</p>
+                <p className="card-meta">{t(page && selectedPanel ? "structure.inspector.selectBubble" : "structure.inspector.selectPanel")}</p>
             )}
         </aside>
     );

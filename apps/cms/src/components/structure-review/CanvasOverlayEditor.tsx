@@ -26,7 +26,7 @@ type CanvasOverlayEditorProps = {
         event: ReactPointerEvent,
         kind: DragState["kind"],
         mode: DragState["mode"],
-        panelIndex: number,
+        panelIndex: number | null,
         bubbleIndex?: number,
     ) => void;
 };
@@ -54,8 +54,12 @@ export function CanvasOverlayEditor({
     const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
     const baseCanvasWidth = stageRef.current ? Math.min(Math.max(320, stageRef.current.clientWidth - 32), 736) : null;
     const bubbleOverlays = page
-        ? page.panels
-            .flatMap((panel, panelIndex) => panel.bubbles.map((bubble, bubbleIndex) => ({ bubble, panelIndex, bubbleIndex })))
+        ? [
+            ...page.panels.flatMap((panel, panelIndex) => panel.bubbles.map((bubble, bubbleIndex) => ({ bubble, panelIndex: panelIndex as number | null, bubbleIndex }))),
+            ...(page.bubbles ?? [])
+                .filter((bubble) => bubble.panelId === null)
+                .map((bubble, bubbleIndex) => ({ bubble, panelIndex: null, bubbleIndex })),
+        ]
             .map((item, index) => ({ ...item, readingOrder: index + 1 }))
         : [];
 
@@ -92,7 +96,7 @@ export function CanvasOverlayEditor({
         event: ReactPointerEvent,
         kind: DragState["kind"],
         mode: DragState["mode"],
-        panelIndex: number,
+        panelIndex: number | null,
         bubbleIndex?: number,
     ) => {
         if (viewport.panMode) return;
