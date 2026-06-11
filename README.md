@@ -240,13 +240,12 @@ Images / PSD / text export
 
 ## Documentation
 
-- [Architecture](ARCHITECTURE.md)
 - [Roadmap](ROADMAP.md)
 - [OSS boundary](docs/oss-boundary.md)
 - [Architecture layer boundary](docs/architecture/layer-boundary.md)
 - [Production ops checklist](docs/production-ops-checklist.md)
-- [Comic domain specification](comic-domain-spec.md)
-- [Entitlement specification](entitlement-spec.md)
+- [API contract](docs/api-contract.md)
+- [Rights and permission spec](docs/rights-permission-spec.md)
 - [Ingestion specification](ingestion-spec.md)
 - [Content guide](docs/CONTENT_GUIDE.md)
 - [Reader UX spec](docs/reader-ux-spec.md)

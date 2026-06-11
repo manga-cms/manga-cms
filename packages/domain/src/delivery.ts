@@ -60,16 +60,17 @@ export function verifyDeliveryToken(token: string): DeliveryTokenPayload | null 
 }
 
 // ---------------------------------------------------------------------------
-// Watermark stub
+// Delivery asset hook
 // ---------------------------------------------------------------------------
 
 /**
- * Placeholder for watermark injection.
- * In production: composite userId into image data for forensic tracing.
- * Currently: returns the original file path unchanged.
+ * Placeholder for deployment-specific delivery transforms.
+ *
+ * Public OSS behavior returns the original file path unchanged. Hosted or
+ * commercial deployments may adapt delivery privately, but those concerns are
+ * outside this self-hosted engine.
  */
-export function applyWatermark(filePath: string, _userId: string): string {
-    // TODO: Implement actual watermark compositing
+export function resolveDeliveredAssetPath(filePath: string, _userId: string): string {
     return filePath;
 }
 

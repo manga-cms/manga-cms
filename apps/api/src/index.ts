@@ -57,7 +57,7 @@ import {
     DefaultAccessPolicy,
     generateDeliveryToken,
     verifyDeliveryToken,
-    applyWatermark,
+    resolveDeliveredAssetPath,
     generateAuthToken,
     verifyAuthToken,
     attachEpisodePanelBubbles,
@@ -2624,8 +2624,7 @@ app.get("/deliver/:pageId", (c) => {
         return c.json({ error: { code: "NOT_FOUND", message: "Page image not found" } }, 404);
     }
 
-    // Apply watermark stub (returns path unchanged for now)
-    const finalRelPath = applyWatermark(originRelPath, payload.userId);
+            const finalRelPath = resolveDeliveredAssetPath(originRelPath, payload.userId);
 
     // Resolve inside the episode asset directory; content metadata must not
     // be able to escape via "../" or absolute paths.

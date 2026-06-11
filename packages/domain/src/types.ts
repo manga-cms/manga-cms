@@ -4,7 +4,8 @@
  * These types represent the canonical content hierarchy:
  *   Series → Episode → Page → Panel → Bubble
  *
- * Source of truth: ARCHITECTURE.md §4, comic-domain-spec.md, schema.prisma
+ * Source of truth: docs/api-contract.md, docs/architecture/layer-boundary.md,
+ * packages/schemas/src/content.ts, and packages/db/prisma/schema.prisma.
  *
  * Used by:
  *   - apps/viewer (public reader)
@@ -229,7 +230,7 @@ export interface Series {
 }
 
 // ---------------------------------------------------------------------------
-// Shareable units (ARCHITECTURE.md §4.2)
+// Shareable units
 // ---------------------------------------------------------------------------
 
 /** A reference to a single bubble for quote sharing. */
@@ -251,7 +252,7 @@ export interface ClipRef {
 }
 
 // ---------------------------------------------------------------------------
-// Entitlement (entitlement-spec.md §3)
+// Entitlement primitives
 // ---------------------------------------------------------------------------
 
 export type EntitlementTargetType =
@@ -271,7 +272,7 @@ export type EntitlementSource =
 export type EntitlementStatus = "ACTIVE" | "EXPIRED" | "REVOKED";
 
 // ---------------------------------------------------------------------------
-// Pack (ARCHITECTURE.md §8)
+// Pack
 // ---------------------------------------------------------------------------
 
 export type PackType =
