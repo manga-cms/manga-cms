@@ -28,6 +28,9 @@ Before launch:
   DNS record shape returned by `fly certs show manga-cms.com`.
 - [ ] Configure `www.manga-cms.com` as a Cloudflare Redirect Rule or Page Rule
   that returns a permanent redirect to `https://manga-cms.com/$1`.
+  This redirect must work before Cloudflare tries to connect to an origin;
+  otherwise `www` can fail with SSL 525 if it is proxied without an origin
+  certificate.
 - [ ] Point `read.manga-cms.com` to the production Reader Fly app using the DNS
   record shape returned by `fly certs show read.manga-cms.com`.
 - [ ] Keep new Fly custom-domain DNS records DNS-only until Fly certificate
@@ -75,6 +78,19 @@ also add and verify:
 fly certs add www.manga-cms.com --app manga-cms-official-prod
 fly certs show www.manga-cms.com --app manga-cms-official-prod
 ```
+
+If `www.manga-cms.com` is proxied through Cloudflare and Fly reports DNS
+mismatch for the `www` certificate, use one of these options before public
+launch:
+
+1. Keep `www` redirect-only in Cloudflare and ensure the redirect rule executes
+   without contacting the origin.
+2. Or point `www.manga-cms.com` at the official Fly app as DNS-only until
+   `fly certs show www.manga-cms.com --app manga-cms-official-prod` reports the
+   certificate as issued, then decide whether to enable Cloudflare proxy.
+
+Do not leave `www.manga-cms.com` proxied to an origin without a valid `www`
+origin certificate.
 
 Before DNS cutover:
 

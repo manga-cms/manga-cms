@@ -92,11 +92,11 @@ not hosted SaaS or commercial platform delivery.
 
 - [ ] Complete the production domain checklist in
   [PRODUCTION-DEPLOY.md](PRODUCTION-DEPLOY.md)
-- [ ] Confirm `manga-cms.com` is attached to the production official-site Fly
+- [x] Confirm `manga-cms.com` is attached to the production official-site Fly
   app and the certificate is ready
 - [ ] Confirm `www.manga-cms.com` redirects permanently to
   `https://manga-cms.com/`
-- [ ] Confirm `read.manga-cms.com` is attached to the production Reader Fly app
+- [x] Confirm `read.manga-cms.com` is attached to the production Reader Fly app
   and the certificate is ready
 - [ ] Confirm Search Console uses a Domain property for `manga-cms.com`
 - [ ] Verify Search Console ownership with a Cloudflare DNS TXT record and keep
@@ -116,9 +116,9 @@ not hosted SaaS or commercial platform delivery.
 - [ ] Confirm `/s/...` Share facade URLs are excluded from sitemap output *(implemented on main, pending production smoke)*
 - [ ] Confirm `/og/...` image routes are disallowed in `robots.txt` and excluded
   from sitemap output *(implemented on main, pending production smoke)*
-- [ ] Confirm `https://manga-cms.com/robots.txt` returns the official-site
+- [x] Confirm `https://manga-cms.com/robots.txt` returns the official-site
   robots policy
-- [ ] Confirm `https://read.manga-cms.com/robots.txt` returns the Reader robots
+- [x] Confirm `https://read.manga-cms.com/robots.txt` returns the Reader robots
   policy
 - [ ] Submit `https://manga-cms.com/sitemap.xml` in Search Console
 - [ ] Submit `https://read.manga-cms.com/sitemap.xml` in Search Console
@@ -167,7 +167,7 @@ not hosted SaaS or commercial platform delivery.
       operational state.
 - [ ] Deploy API with `deploy/fly/api-production.fly.toml` and
   `PRISMA_PROVIDER=postgresql`
-- [ ] Confirm production `/api/v1/health` reports `checks.db: "healthy"`
+- [x] Confirm production `/api/v1/health` reports `checks.db: "healthy"`
 - [ ] Define a generic manifest/export model for published JSON, images, Pack
       JSON, OGP images, and active revision pointers.
 - [ ] Verify published artifact rollback behavior in a disposable environment.
