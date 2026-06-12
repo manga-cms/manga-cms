@@ -153,6 +153,9 @@ covered by the Apache-2.0 code license unless they are explicitly marked as
 sample content with their own license. The default policy is to keep real or
 local verification content untracked.
 
+Before adding tracked sample manga content, use
+[docs/SAMPLE-CONTENT-CHECKLIST.md](docs/SAMPLE-CONTENT-CHECKLIST.md).
+
 Minimum required structure:
 
 ```text

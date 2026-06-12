@@ -42,6 +42,10 @@ approving the others.
 Do not merge the tiers in consent text. GitHub repository inclusion is a
 stronger grant because it allows redistribution by repository users.
 
+For repository inclusion, use
+[`SAMPLE-CONTENT-CHECKLIST.md`](SAMPLE-CONTENT-CHECKLIST.md) before committing
+any manga images, story text, translations, or sample Packs.
+
 ## Recommended First Flow
 
 1. Publish a simple collaboration page on `manga-cms.com`.
