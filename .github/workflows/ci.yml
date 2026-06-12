@@ -33,6 +33,9 @@ jobs:
       - name: Run lint
         run: pnpm lint
 
+      - name: Check Docker Compose safety
+        run: pnpm test:compose-safety
+
       - name: Build schemas package
         run: pnpm --filter @manga/schemas build
 
