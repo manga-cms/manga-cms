@@ -30,6 +30,23 @@ The public repository currently includes:
   generation, package builds, app builds, CMS tests, ingestion tests, and
   content validation.
 
+Recently completed public work:
+
+- Content validation now runs `lintPageContent` and validates Pack target
+  references when public sample content exists. Empty public checkouts still
+  pass validation.
+- Prepared-directory ingestion reads real image dimensions instead of silently
+  using fixed placeholder dimensions.
+- Page Structure Review supports page-level Bubbles with `panelId: null`,
+  Bubble reassignment between Panels and page-level state, direct page-level
+  Bubble ordering, and non-blocking warnings for pending review items.
+- Delivery lookup uses indexed Page references instead of linear scans.
+- CMS ingestion comparison badges are intentionally limited to future runtime
+  ingestion overlays; OCR/source/confidence data must not be stored in
+  canonical Bubble data or public metadata.
+- Public sample content preparation is documented in
+  [`docs/SAMPLE-CONTENT-CHECKLIST.md`](docs/SAMPLE-CONTENT-CHECKLIST.md).
+
 ## Roadmap Areas
 
 ### 1. Public OSS / Self-Hosted Foundation
@@ -52,8 +69,11 @@ Goal: Make self-hosted editing and review workflows practical for creators and e
 Current focus:
 - Polish Page Structure Review as the top priority.
 - Support Panel / Bubble bbox overlays on page images.
-- Enable side-by-side review of source text, OCR text, and chosen text.
+- Enable side-by-side review of source text, OCR text, and chosen text from
+  ingestion runtime overlays, not canonical public metadata.
 - Allow editors to accept or reject ingestion candidates.
+- Keep warning states visible without turning review warnings into save
+  blockers.
 - Save confirmed results to the canonical draft.
 - Improve text export, translation draft import, feedback triage, and proposal workflows.
 
@@ -68,6 +88,9 @@ Current focus:
 - Maintain the flow: automated extraction -> confidence scoring -> human review
   -> confirm -> save to canonical `contents/` and `packs/` -> runtime DB
   reindex.
+- Keep detection confidence, OCR text, and candidate comparison data in
+  ingestion job artifacts or CMS review overlays until a human confirms the
+  canonical draft.
 
 ### 4. Public Reader Enhancement
 
@@ -116,16 +139,45 @@ These details will remain outside the public repository. The public repo may con
 ## Near-Term Public Priorities
 
 1. Keep CI green after every public change.
-2. Stabilize schema, validation, and content loading contracts.
-3. Polish CMS Page Structure Review (bbox overlay, accept/reject candidates, save to canonical draft).
-4. Refine Ingestion workflow prioritizing PSD/text-export over OCR/LLM.
-5. Drill backup/restore for both Postgres state and canonical `contents/`/`packs/`.
-6. Refine text export and translation draft import workflows.
-7. Design and prototype a feature-flagged HTML text layer for selected Reader
-   content only after the public launch smoke remains green.
-8. Keep Search Console, robots/sitemap, public Reader, Share URL, and OGP smoke
+2. Keep schema, validation, Pack target validation, and content loading
+   contracts stable.
+3. Finish the next Page Structure Review polish pass:
+   - connect ingestion review-candidate overlays to the existing comparison UI;
+   - keep candidate metadata out of canonical Bubble/public metadata;
+   - refine warning density so editors see actionable items first;
+   - preserve `panelId: null` and page-level Bubble workflows.
+4. Refine Ingestion workflow prioritizing PSD/text-export over OCR/LLM:
+   - run local private sample drills without committing private assets;
+   - document parser limitations from those drills without publishing private
+     text or image details;
+   - keep OCR/LLM as optional candidate generators only.
+5. Prepare the first public sample content package:
+   - finalize sample-specific rights text with the creator;
+   - verify GitHub inclusion, translation permission, OGP/screenshot use, and
+     commercial-sale prohibition;
+   - add only public-safe, licensed sample assets when ready.
+6. Drill backup/restore for both Postgres runtime state and canonical
+   `contents/`/`packs/`, keeping their source-of-truth roles separate.
+7. Refine text export, translation draft import, feedback triage, and proposal
+   workflows after sample content exists.
+8. Design and prototype a feature-flagged HTML text layer for selected Reader
+   content only after public launch smoke and rights checks remain green.
+9. Keep Search Console, robots/sitemap, public Reader, Share URL, and OGP smoke
    checks green for self-hosted public launch.
-9. Keep generic manifest/export and entitlement designs provider-neutral.
+10. Keep generic manifest/export and entitlement designs provider-neutral.
+
+## Review Checkpoints
+
+Use external review when one of these boundaries changes:
+
+- canonical content shape, schema validation, or Pack target validation;
+- Page Structure Review candidate handling or ingestion overlay contracts;
+- sample content rights text before committing content to Git;
+- public Reader sharing, OGP, sitemap, robots, or indexing behavior;
+- backup/restore procedure before relying on it for a live self-hosted install.
+
+Routine UI polish, wording fixes, and docs-only cleanup do not need external
+review unless they touch one of the boundaries above.
 
 ## References
 
