@@ -1,0 +1,292 @@
+---
+import BaseLayout from "../../../../../layouts/BaseLayout.astro";
+import { fetchEpisode, isApiConfigured } from "../../../../../lib/api-client";
+import { getAdjacentEpisodes, getEpisode, getSeries } from "../../../../../data/content";
+import {
+  buildStructuredTextPages,
+  bubbleTypeLabel,
+  isStructuredTextViewEnabled,
+} from "../../../../../lib/episode-structured-text";
+import {
+  descriptionWithTitleAndAuthor,
+  episodeDisplayTitle,
+  joinedSeriesEpisodeTitle,
+  localizedDescription,
+  normalizeViewerLocale,
+  publicAuthorLabel,
+  seriesDisplayTitle,
+} from "../../../../../lib/localized-metadata";
+import { siteConfig } from "../../../../../lib/site-config";
+
+export const prerender = false;
+
+const { workId, episodeId } = Astro.params;
+const initialLocale = normalizeViewerLocale(Astro.url.searchParams.get("lang"));
+
+if (!workId || !episodeId) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+if (siteConfig.mode === "official" && !siteConfig.content.demoSeriesIds.includes(workId)) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+let series: any = null;
+let episode: any = null;
+let prev: { id: string; title: string; episodeNumber: number } | null = null;
+let next: { id: string; title: string; episodeNumber: number } | null = null;
+let isGated = false;
+
+const requestCookies = Astro.request.headers.get("cookie") ?? undefined;
+const apiConfigured = isApiConfigured();
+
+if (apiConfigured) {
+  const result = await fetchEpisode(workId, episodeId, requestCookies);
+  if (!result.data || (result.data as any).gated === true) {
+    return new Response(null, { status: 404, statusText: "Not Found" });
+  }
+  series = result.data.series;
+  episode = result.data.episode;
+  prev = result.data.prev;
+  next = result.data.next;
+} else {
+  const localSeries = getSeries(workId);
+  const localEpisode = getEpisode(workId, episodeId);
+  if (!localSeries || !localEpisode) {
+    return new Response(null, { status: 404, statusText: "Not Found" });
+  }
+  series = localSeries;
+  episode = localEpisode;
+  const adjacent = getAdjacentEpisodes(workId, episodeId);
+  prev = adjacent.prev ? { id: adjacent.prev.id, title: adjacent.prev.title, episodeNumber: adjacent.prev.episodeNumber } : null;
+  next = adjacent.next ? { id: adjacent.next.id, title: adjacent.next.title, episodeNumber: adjacent.next.episodeNumber } : null;
+  isGated = localEpisode.episodeNumber > 1;
+}
+
+if (isGated || !episode?.pages?.length) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+if (!isStructuredTextViewEnabled({ series, episode, seriesId: workId, episodeId })) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+const structuredPages = buildStructuredTextPages(episode.pages);
+if (structuredPages.length === 0) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+const publicationType = series?.publicationType ?? "serial";
+const isSingleEpisode = Array.isArray(series?.episodes) ? series.episodes.length === 1 : !prev && !next;
+const localizedSeriesTitle = seriesDisplayTitle(series, initialLocale) || series?.title || workId;
+const localizedEpisodeTitle = episodeDisplayTitle({
+  series,
+  episode,
+  locale: initialLocale,
+  publicationType,
+  isSingleEpisode,
+}) || episode.title;
+const localizedPageTitle = joinedSeriesEpisodeTitle({
+  seriesTitle: localizedSeriesTitle,
+  episodeTitle: localizedEpisodeTitle,
+  publicationType,
+  isSingleEpisode,
+});
+const localizedAuthorLabel = publicAuthorLabel(series, initialLocale);
+const description = descriptionWithTitleAndAuthor({
+  title: `${localizedPageTitle} テキスト版`,
+  authorLabel: localizedAuthorLabel,
+  description: localizedDescription(episode, initialLocale)
+    || localizedDescription(series, initialLocale)
+    || series?.description
+    || "ページ、コマ、フキダシ順に構造化したアクセシビリティ用テキストです。",
+  locale: initialLocale,
+});
+const readerHref = `/works/${encodeURIComponent(workId)}/episodes/${encodeURIComponent(episodeId)}${initialLocale === "en" ? "?lang=en" : ""}`;
+const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURIComponent(episodeId)}/text`;
+---
+
+<BaseLayout
+  title={`${localizedPageTitle} テキスト版`}
+  description={description}
+  locale={initialLocale}
+  canonicalUrl={canonicalPath}
+  robots="noindex,follow"
+  ogType="article"
+>
+  <main class="structured-text-page container" aria-labelledby="structured-text-title">
+    <nav class="structured-text-nav" aria-label="Reader navigation">
+      <a href={readerHref}>画像Readerへ戻る</a>
+    </nav>
+
+    <header class="structured-text-header">
+      <p class="structured-text-kicker">Accessibility view</p>
+      <h1 id="structured-text-title">{localizedPageTitle} テキスト版</h1>
+      <p>
+        Page → Panel → Bubble の順に、フキダシ本文を読み上げやすい HTML として並べています。
+        このページは初期段階では検索インデックス対象外です。
+      </p>
+    </header>
+
+    <ol class="structured-page-list" aria-label="ページ一覧">
+      {structuredPages.map((page) => (
+        <li class="structured-page-item">
+          <section aria-labelledby={`structured-page-${page.pageNumber}`}>
+            <h2 id={`structured-page-${page.pageNumber}`}>
+              ページ {page.displayRef ? `${page.displayRef} / ` : ""}p{String(page.pageNumber).padStart(2, "0")}
+            </h2>
+
+            {page.panels.length > 0 && (
+              <ol class="structured-panel-list" aria-label={`ページ ${page.pageNumber} のコマ`}>
+                {page.panels.map((panel) => (
+                  <li class="structured-panel-item">
+                    <section aria-labelledby={`structured-page-${page.pageNumber}-panel-${panel.panelNumber}`}>
+                      <h3 id={`structured-page-${page.pageNumber}-panel-${panel.panelNumber}`}>
+                        コマ {panel.displayRef ? `${panel.displayRef} / ` : ""}{panel.panelNumber}
+                      </h3>
+                      <ol class="structured-bubble-list" aria-label={`ページ ${page.pageNumber} コマ ${panel.panelNumber} のフキダシ`}>
+                        {panel.bubbles.map((bubble) => (
+                          <li class="structured-bubble-item">
+                            <p class="structured-bubble-meta">
+                              <span>フキダシ {bubble.displayRef ?? bubble.bubbleNumber}</span>
+                              <span>{bubbleTypeLabel(bubble.bubbleType)}</span>
+                              {bubble.speaker && <span>話者: {bubble.speaker}</span>}
+                            </p>
+                            <p class="structured-bubble-text">{bubble.textOriginal}</p>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {page.pageBubbles.length > 0 && (
+              <section class="structured-page-bubbles" aria-labelledby={`structured-page-${page.pageNumber}-page-text`}>
+                <h3 id={`structured-page-${page.pageNumber}-page-text`}>ページ全体のテキスト</h3>
+                <ol class="structured-bubble-list">
+                  {page.pageBubbles.map((bubble) => (
+                    <li class="structured-bubble-item">
+                      <p class="structured-bubble-meta">
+                        <span>フキダシ {bubble.displayRef ?? bubble.bubbleNumber}</span>
+                        <span>{bubbleTypeLabel(bubble.bubbleType)}</span>
+                        {bubble.speaker && <span>話者: {bubble.speaker}</span>}
+                      </p>
+                      <p class="structured-bubble-text">{bubble.textOriginal}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+          </section>
+        </li>
+      ))}
+    </ol>
+  </main>
+</BaseLayout>
+
+<style>
+  .structured-text-page {
+    max-width: 760px;
+    padding-block: clamp(2.5rem, 7vw, 5rem);
+  }
+
+  .structured-text-nav {
+    margin-bottom: 1.5rem;
+  }
+
+  .structured-text-nav a {
+    color: var(--color-text);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: var(--color-border);
+    text-underline-offset: 0.25em;
+  }
+
+  .structured-text-header {
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .structured-text-kicker {
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+  }
+
+  .structured-text-header h1 {
+    font-size: clamp(1.9rem, 5vw, 3rem);
+    line-height: 1.2;
+    margin-bottom: 0.85rem;
+  }
+
+  .structured-text-header p {
+    color: var(--color-text-muted);
+    line-height: 1.9;
+  }
+
+  .structured-page-list,
+  .structured-panel-list,
+  .structured-bubble-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .structured-page-item {
+    border-bottom: 1px solid var(--color-border);
+    padding-block: 2rem;
+  }
+
+  .structured-page-item h2 {
+    font-size: 1.35rem;
+    line-height: 1.35;
+    margin-bottom: 1rem;
+  }
+
+  .structured-panel-item,
+  .structured-page-bubbles {
+    margin-top: 1.25rem;
+  }
+
+  .structured-panel-item h3,
+  .structured-page-bubbles h3 {
+    font-size: 1rem;
+    line-height: 1.45;
+    margin-bottom: 0.8rem;
+  }
+
+  .structured-bubble-list {
+    display: grid;
+    gap: 0.8rem;
+  }
+
+  .structured-bubble-item {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+
+  .structured-bubble-meta {
+    color: var(--color-text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+    font-weight: 700;
+    gap: 0.4rem 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .structured-bubble-text {
+    font-size: 1.1rem;
+    line-height: 1.9;
+    white-space: pre-wrap;
+  }
+</style>

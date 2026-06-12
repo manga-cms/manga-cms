@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const nextEpisodeHref = nextEpisodeId
       ? `/works/${encodeURIComponent(seriesId)}/episodes/${encodeURIComponent(nextEpisodeId)}`
       : "";
+    const structuredTextHref = shell.getAttribute("data-structured-text-href") || "";
     const noteInput = document.querySelector("[data-note-input]");
     const notePage = document.querySelector("[data-note-page]");
     const noteScope = document.querySelector("[data-note-scope]");
@@ -226,6 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
         endNextEpisode: "次の話へ: {title}",
         endNextEpisodeFallback: "次の話",
         endShare: "この話を共有する",
+        endTextView: "テキスト版で読む",
         endQuotes: "名セリフを見る（準備中）",
         endContribute: "翻訳・修正を提案",
         linkCopied: "リンクをコピーしました",
@@ -384,6 +386,7 @@ document.addEventListener("DOMContentLoaded", () => {
         endNextEpisode: "Next episode: {title}",
         endNextEpisodeFallback: "Next episode",
         endShare: "Share this episode",
+        endTextView: "Read text version",
         endQuotes: "Notable lines (coming soon)",
         endContribute: "Suggest translation / fix",
         linkCopied: "Link copied",
@@ -2499,6 +2502,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 t("endNextEpisode", { title: nextEpisodeTitle || t("endNextEpisodeFallback") }),
               )}</a>`
             : "";
+          const textViewAction = structuredTextHref
+            ? `<a class="btn-viewer btn-ghost-viewer" href="${escapeHtml(hrefWithLanguage(structuredTextHref))}" data-completion-action="text">${escapeHtml(t("endTextView"))}</a>`
+            : "";
           viewEl.innerHTML = `
             <div class="reader-end-card">
               <h2>${t("endTitle")}</h2>
@@ -2506,6 +2512,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="reader-end-actions${nextEpisodeHref ? " has-next-episode" : ""}">
                 ${nextEpisodeAction}
                 <button type="button" class="btn-viewer btn-ghost-viewer" data-completion-action="share">${t("endShare")}</button>
+                ${textViewAction}
                 <button type="button" class="btn-viewer ${nextEpisodeHref ? "btn-ghost-viewer" : "btn-primary-viewer"}" data-completion-action="contribute">${t("endContribute")}</button>
               </div>
             </div>

@@ -15,6 +15,7 @@ import BaseLayout from "../../../../layouts/BaseLayout.astro";
 import EpisodeReaderShell from "../../../../components/reader/EpisodeReaderShell.astro";
 import { fetchEpisode, isApiConfigured } from "../../../../lib/api-client";
 import { getSeries, getEpisode, getAdjacentEpisodes } from "../../../../data/content";
+import { isStructuredTextViewEnabled } from "../../../../lib/episode-structured-text";
 import { siteConfig } from "../../../../lib/site-config";
 import { robotsForLocale } from "../../../../lib/search-indexing";
 import {
@@ -219,6 +220,15 @@ const readerDisplayMetadataJson = safeInlineJson(readerDisplayMetadata);
 const readerBackHref = siteConfig.mode === "official" || (publicationType === "oneshot" && isSingleEpisode)
   ? "/"
   : `/works/${encodeURIComponent(workId)}`;
+const structuredTextEnabled = isReaderAvailable && isStructuredTextViewEnabled({
+  series,
+  episode,
+  seriesId: workId,
+  episodeId,
+});
+const structuredTextHref = structuredTextEnabled
+  ? `/works/${encodeURIComponent(workId)}/episodes/${encodeURIComponent(episodeId)}/text${initialLocale === "en" ? "?lang=en" : ""}`
+  : undefined;
 const firstReaderPage = viewerPages[0];
 const pageOgImage = firstReaderPage?.pageNumber
   ? `/og/${encodeURIComponent(workId)}/${encodeURIComponent(episodeId)}/p/${encodeURIComponent(String(firstReaderPage.pageNumber))}.png${initialLocale === "en" ? "?lang=en" : ""}`
@@ -311,6 +321,7 @@ const gatedRedeemUrl = isGated ? (episode.redeemUrl ?? defaultRedeemUrl) : undef
         readerDisplayMetadataJson={readerDisplayMetadataJson}
         initialLocale={initialLocale}
         readerBackHref={readerBackHref}
+        structuredTextHref={structuredTextHref}
       />
     )}
 

@@ -14,6 +14,7 @@ interface Props {
   readerDisplayMetadataJson?: string;
   initialLocale?: string;
   readerBackHref?: string;
+  structuredTextHref?: string;
 }
 
 const {
@@ -29,6 +30,7 @@ const {
   readerDisplayMetadataJson = "{}",
   initialLocale = "ja",
   readerBackHref: readerBackHrefProp,
+  structuredTextHref,
 } = Astro.props;
 
 const readerBackHref = readerBackHrefProp || (siteConfig.mode === "official" ? "/" : `/works/${workId}`);
@@ -43,6 +45,7 @@ const normalizedInitialLocale = initialLocale === "en" ? "en" : "ja";
   data-episode-title={episodeTitle}
   data-next-episode-id={nextEpisodeId}
   data-next-episode-title={nextEpisodeTitle}
+  data-structured-text-href={structuredTextHref}
   data-ui-locale={normalizedInitialLocale}
   data-content-locale={normalizedInitialLocale}
   data-reader-theme="light"
@@ -55,6 +58,7 @@ const normalizedInitialLocale = initialLocale === "en" ? "en" : "ja";
       <span data-reader-title-text>{episodeTitle}</span>
     </div>
     <div class="reader-header-controls">
+      {structuredTextHref && <a href={structuredTextHref} class="reader-text-link">テキスト版</a>}
       <label class="reader-language-select">
         <span>Language</span>
         <select data-ui-locale-select aria-label="Language">
