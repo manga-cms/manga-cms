@@ -63,6 +63,9 @@ jobs:
       - name: Validate content schemas
         run: pnpm validate:content
 
+      - name: Check documentation links
+        run: pnpm check:docs
+
   api-roundtrip-smoke:
     runs-on: ubuntu-latest
     steps:
