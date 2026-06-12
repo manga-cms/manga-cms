@@ -30,6 +30,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @manga/db db:generate
 
+      - name: Run lint
+        run: pnpm lint
+
       - name: Build schemas package
         run: pnpm --filter @manga/schemas build
 

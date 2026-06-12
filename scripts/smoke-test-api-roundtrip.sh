@@ -178,4 +178,32 @@ if [ "$MISSING_DELIVERY_STATUS" != "404" ]; then
 fi
 echo "✅ /deliver public gate returns 404 for missing page"
 
+curl -fsS -X POST "$API/admin/series/roundtrip-series/episodes" \
+    -H 'Content-Type: application/json' \
+    -b "$COOKIE_JAR" \
+    -d '{
+      "id": "hidden-ep",
+      "episodeNumber": 2,
+      "title": "Hidden Episode",
+      "publishedAt": "2026-06-12",
+      "visibility": "hidden",
+      "pages": [
+        {
+          "pageId": "roundtrip-series-hidden-p01",
+          "pageNumber": 1,
+          "images": { "ja": "pages/hidden.png" },
+          "width": 1200,
+          "height": 1800,
+          "panels": [],
+          "bubbles": []
+        }
+      ]
+    }' >/dev/null
+
+HIDDEN_STATUS="$(curl -sS -o "$TMP_DIR/hidden-response.json" -w '%{http_code}' "$API/series/roundtrip-series/episodes/hidden-ep")"
+if [ "$HIDDEN_STATUS" != "404" ]; then
+    fail "Expected hidden public episode route to return 404, got ${HIDDEN_STATUS}: $(cat "$TMP_DIR/hidden-response.json")"
+fi
+echo "✅ hidden episode is not public"
+
 echo "API roundtrip smoke passed."
