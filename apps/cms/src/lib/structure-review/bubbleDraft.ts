@@ -12,6 +12,13 @@ export type BubbleCandidate = {
     warnings: string[];
 };
 
+export interface BubbleTextComparisonOverlay {
+    sourceText?: string;
+    ocrText?: string;
+    chosenText?: string;
+    confidence?: number;
+}
+
 export function getBubbleSourceText(bubble: BubbleData) {
     return bubble.textOriginal;
 }
@@ -26,7 +33,7 @@ export function formatBboxSummary(box: BoundingBox) {
     return `x:${Math.round(box.x)}, y:${Math.round(box.y)}, w:${Math.round(box.width)}, h:${Math.round(box.height)}`;
 }
 
-export function getBubbleWarnings(page: PageData | null, bubble: BubbleData) {
+export function getBubbleWarnings(page: PageData | null, bubble: BubbleData, textComparison?: BubbleTextComparisonOverlay) {
     const warnings: string[] = [];
     if (!getBubbleSourceText(bubble).trim()) warnings.push("missingText");
     if (bubble.bbox.width < 24 || bubble.bbox.height < 24) warnings.push("smallBbox");
@@ -34,11 +41,13 @@ export function getBubbleWarnings(page: PageData | null, bubble: BubbleData) {
         warnings.push("outsidePage");
     }
     if ((bubble.bubbleType === "speech" || bubble.bubbleType === "thought") && !bubble.speaker?.trim()) warnings.push("missingSpeaker");
-    const comparison = getBubbleTextComparison(bubble);
-    const chosenText = normalizeCandidateText(comparison.chosenText);
-    if (comparison.confidence !== undefined && comparison.confidence < 0.75) warnings.push("lowConfidence");
-    if (comparison.sourceText && normalizeCandidateText(comparison.sourceText) !== chosenText) warnings.push("sourceTextDiffers");
-    if (comparison.ocrText && normalizeCandidateText(comparison.ocrText) !== chosenText) warnings.push("ocrTextDiffers");
+    const comparison = getBubbleTextComparison(bubble, textComparison);
+    if (comparison) {
+        const chosenText = normalizeCandidateText(comparison.chosenText);
+        if (comparison.confidence !== undefined && comparison.confidence < 0.75) warnings.push("lowConfidence");
+        if (comparison.sourceText && normalizeCandidateText(comparison.sourceText) !== chosenText) warnings.push("sourceTextDiffers");
+        if (comparison.ocrText && normalizeCandidateText(comparison.ocrText) !== chosenText) warnings.push("ocrTextDiffers");
+    }
     return warnings;
 }
 
@@ -50,31 +59,17 @@ export function getReviewDisplayState(decision: ReviewDecision | undefined, warn
     return warnings.length > 0 ? "needs_review" : "candidate";
 }
 
-function optionalString(value: unknown): string | undefined {
-    return typeof value === "string" && value.trim() ? value : undefined;
-}
-
-function optionalNumber(value: unknown): number | undefined {
-    return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-export function getBubbleTextComparison(bubble: BubbleData) {
-    const candidate = bubble as BubbleData & {
-        sourceText?: unknown;
-        ocrText?: unknown;
-        chosenText?: unknown;
-        confidence?: unknown;
-        ocrConfidence?: unknown;
-    };
-    const metadata = candidate.metadata ?? {};
-    const sourceText = optionalString(candidate.sourceText) ?? optionalString(metadata.sourceText);
-    const ocrText = optionalString(candidate.ocrText) ?? optionalString(metadata.ocrText);
-    const chosenText = optionalString(candidate.chosenText) ?? optionalString(metadata.chosenText) ?? getBubbleSourceText(bubble);
-    const confidence = optionalNumber(candidate.confidence) ??
-        optionalNumber(candidate.ocrConfidence) ??
-        optionalNumber(metadata.confidence) ??
-        optionalNumber(metadata.ocrConfidence);
-
+// Text comparison data is supplied by ingestion job review-candidates
+// (runtime state) as an explicit bubbleId overlay. Do not write sourceText,
+// ocrText, chosenText, or confidence to canonical Bubble data or
+// ContentPublicMetadata; metadata is public share metadata.
+export function getBubbleTextComparison(bubble: BubbleData, overlay?: BubbleTextComparisonOverlay) {
+    if (!overlay) return null;
+    const sourceText = overlay.sourceText?.trim() ? overlay.sourceText : undefined;
+    const ocrText = overlay.ocrText?.trim() ? overlay.ocrText : undefined;
+    const chosenText = overlay.chosenText?.trim() ? overlay.chosenText : getBubbleSourceText(bubble);
+    const confidence = overlay.confidence !== undefined && Number.isFinite(overlay.confidence) ? overlay.confidence : undefined;
+    if (!sourceText && !ocrText && confidence === undefined) return null;
     return {
         sourceText,
         ocrText,
@@ -83,8 +78,17 @@ export function getBubbleTextComparison(bubble: BubbleData) {
     };
 }
 
-export function getBubbleTextComparisonBadges(bubble: BubbleData) {
-    const comparison = getBubbleTextComparison(bubble);
+export function getBubbleTextComparisonBadges(bubble: BubbleData, overlay?: BubbleTextComparisonOverlay) {
+    const comparison = getBubbleTextComparison(bubble, overlay);
+    if (!comparison) {
+        return {
+            hasSourceText: false,
+            hasOcrText: false,
+            sourceDiffers: false,
+            ocrDiffers: false,
+            confidence: undefined,
+        };
+    }
     const chosenText = normalizeCandidateText(comparison.chosenText);
     return {
         hasSourceText: Boolean(comparison.sourceText),

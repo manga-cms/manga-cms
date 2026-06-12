@@ -14,7 +14,6 @@ export interface LocalizedContentMetadata {
 export interface ContentPublicMetadata {
     authorLabel?: string;
     localized?: Record<string, LocalizedContentMetadata>;
-    [key: string]: unknown;
 }
 
 export interface SeriesItem {
