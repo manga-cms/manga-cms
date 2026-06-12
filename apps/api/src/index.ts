@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { extname, isAbsolute, join, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, existsSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { getEmailProvider, isEmailConfigured } from "./email.js";
 import { RateLimiter } from "./rate-limit.js";
@@ -185,6 +185,34 @@ const RIGHTS_DIR = process.env.RIGHTS_DIR ?? join(__dirname, "../../../rights");
 const rightsRepo = createFileRightsRepository(RIGHTS_DIR);
 
 const accessPolicy = new DefaultAccessPolicy();
+
+function fileCacheHeaders(absPath: string) {
+    const stat = statSync(absPath);
+    const etag = `W/"${stat.size}-${Math.floor(stat.mtimeMs)}"`;
+    const lastModified = stat.mtime.toUTCString();
+    return {
+        etag,
+        lastModified,
+        headers: {
+            ETag: etag,
+            "Last-Modified": lastModified,
+            "Cache-Control": "private, max-age=60, must-revalidate",
+        },
+    };
+}
+
+function isFreshRequest(c: any, etag: string, lastModified: string) {
+    const ifNoneMatch = c.req.header("if-none-match");
+    if (ifNoneMatch?.split(",").map((value: string) => value.trim()).includes(etag)) {
+        return true;
+    }
+
+    const ifModifiedSince = c.req.header("if-modified-since");
+    if (!ifModifiedSince) return false;
+    const since = Date.parse(ifModifiedSince);
+    const modified = Date.parse(lastModified);
+    return Number.isFinite(since) && Number.isFinite(modified) && modified <= since;
+}
 
 // ---------------------------------------------------------------------------
 // Entitlement repository: DB-backed when DATABASE_URL set, else file-backed
@@ -2030,10 +2058,18 @@ app.get("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", (c) => {
         return c.json({ error: { code: "NOT_FOUND", message: "Image file not found" } }, 404);
     }
 
+    const cache = fileCacheHeaders(absPath);
+    if (isFreshRequest(c, cache.etag, cache.lastModified)) {
+        return new Response(null, {
+            status: 304,
+            headers: cache.headers,
+        });
+    }
+
     const fileData = readFileSync(absPath);
     return new Response(fileData, {
         status: 200,
-        headers: { "Content-Type": contentType, "Cache-Control": "private, no-store" },
+        headers: { "Content-Type": contentType, ...cache.headers },
     });
 });
 
