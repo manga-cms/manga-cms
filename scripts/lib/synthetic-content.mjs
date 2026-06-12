@@ -116,7 +116,8 @@ export function buildSyntheticSeries(options = {}) {
                     const gap = Math.max(12, Math.round(pageWidth * 0.02));
                     const panelWidth = Math.floor((pageWidth - gap * (columns + 1)) / columns);
                     const panelHeight = Math.floor((pageHeight - gap * (rows + 1)) / rows);
-                    const column = panelIndex % columns;
+                    const visualColumn = panelIndex % columns;
+                    const column = columns - 1 - visualColumn;
                     const row = Math.floor(panelIndex / columns);
                     return {
                         panelId: `${pageId}-panel-${String(panelNumber).padStart(3, "0")}`,

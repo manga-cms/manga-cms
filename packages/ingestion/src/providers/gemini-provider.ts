@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { estimatePanelReadingOrder } from "@manga/schemas";
 
 import {
     AlignmentArtifactSchema,
@@ -71,6 +72,7 @@ function buildRegionArtifacts(input: DetectRegionsInput): {
 
     const leftPanelWidth = Math.floor(width * 0.48);
     const rightPanelWidth = width - leftPanelWidth - 48;
+    const rightPanelX = leftPanelWidth + 48;
     const topPanelHeight = Math.floor(height * 0.52);
 
     const panelAId = panelCandidateId(pageId, 1);
@@ -85,7 +87,7 @@ function buildRegionArtifacts(input: DetectRegionsInput): {
             artifact_type: "region",
             page_id: pageId,
             region_kind: "panel",
-            bbox: { x: 0, y: 0, width: leftPanelWidth, height: topPanelHeight },
+            bbox: { x: rightPanelX, y: 0, width: rightPanelWidth, height: topPanelHeight },
             confidence: clampConfidence(0.94),
             source: "page_image",
             metadata,
@@ -96,9 +98,9 @@ function buildRegionArtifacts(input: DetectRegionsInput): {
             page_id: pageId,
             region_kind: "panel",
             bbox: {
-                x: leftPanelWidth + 48,
+                x: 0,
                 y: Math.floor(height * 0.18),
-                width: rightPanelWidth,
+                width: leftPanelWidth,
                 height: Math.floor(height * 0.7),
             },
             confidence: clampConfidence(0.9),
@@ -111,9 +113,9 @@ function buildRegionArtifacts(input: DetectRegionsInput): {
             page_id: pageId,
             region_kind: "bubble",
             bbox: {
-                x: 72 + deterministicOffset(pageId, 24),
+                x: rightPanelX + 72 + deterministicOffset(pageId, 24),
                 y: 96 + deterministicOffset(pageId, 18),
-                width: Math.floor(leftPanelWidth * 0.42),
+                width: Math.floor(rightPanelWidth * 0.42),
                 height: 124,
             },
             confidence: clampConfidence(0.88),
@@ -128,9 +130,9 @@ function buildRegionArtifacts(input: DetectRegionsInput): {
             page_id: pageId,
             region_kind: "bubble",
             bbox: {
-                x: leftPanelWidth + 112,
+                x: 112,
                 y: Math.floor(height * 0.34),
-                width: Math.floor(rightPanelWidth * 0.45),
+                width: Math.floor(leftPanelWidth * 0.45),
                 height: 132,
             },
             confidence: clampConfidence(0.84),
@@ -145,9 +147,9 @@ function buildRegionArtifacts(input: DetectRegionsInput): {
             page_id: pageId,
             region_kind: "text_region",
             bbox: {
-                x: leftPanelWidth + 96,
+                x: 96,
                 y: Math.floor(height * 0.72),
-                width: Math.floor(rightPanelWidth * 0.36),
+                width: Math.floor(leftPanelWidth * 0.36),
                 height: 96,
             },
             confidence: clampConfidence(0.63),
@@ -228,9 +230,18 @@ function buildAlignmentArtifacts(input: AlignTextInput): AlignmentArtifact[] {
 
 function buildPageDraftCandidate(input: BuildDraftInput): PageDraft {
     const { page, regionArtifact, alignmentArtifact } = input;
-    const panelRegions = regionArtifact.payload.candidates.filter(
+    const detectedPanelRegions = regionArtifact.payload.candidates.filter(
         (candidate) => candidate.region_kind === "panel",
     );
+    const panelRegionById = new Map(detectedPanelRegions.map((panel) => [panel.artifact_id, panel]));
+    const panelRegions = estimatePanelReadingOrder(
+        detectedPanelRegions.map((panel) => ({
+            panelId: panel.artifact_id,
+            bbox: panel.bbox,
+        })),
+    )
+        .map((panelId) => panelRegionById.get(panelId))
+        .filter((panel): panel is typeof detectedPanelRegions[number] => Boolean(panel));
 
     const panels = panelRegions.map((panelRegion, panelIndex) => {
         const bubbles = alignmentArtifact.payload.alignments
@@ -263,7 +274,8 @@ export class GeminiProvider implements IngestionLLMProvider {
 
     async detectRegions(input: DetectRegionsInput): Promise<RegionDetectionArtifact> {
         // TODO: Replace deterministic fixtures with a Gemini vision call that returns
-        // structured region candidates and OCR hints, then validate them against Zod.
+        // structured region candidates and OCR hints, explicitly prompting for the
+        // RTL manga reading-order rules in docs/reading-order-spec.md before Zod validation.
         const { regions, ocrArtifacts } = buildRegionArtifacts(input);
         const pageId = input.page.page.pageId;
 
@@ -300,7 +312,8 @@ export class GeminiProvider implements IngestionLLMProvider {
 
     async buildDraft(input: BuildDraftInput): Promise<DraftBuildArtifact> {
         // TODO: Replace deterministic fixtures with a Gemini structured-output call
-        // that proposes a reviewable page draft candidate, then validate and wrap it.
+        // that proposes a reviewable page draft candidate using docs/reading-order-spec.md
+        // for initial panel/bubble numbering, then validate and wrap it.
         const pageDraft = buildPageDraftCandidate(input);
         const metadata = fixtureMetadata(input.page.page.pageId, "build-draft");
 

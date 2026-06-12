@@ -72,6 +72,12 @@ The expected provider responsibilities are:
 - align OCR/source text against candidates
 - build reviewable draft candidates
 
+When a provider assigns initial Panel or Bubble order, prompts and post-processing
+must follow `docs/reading-order-spec.md`. For the current default Japanese manga
+profile, this means top-to-bottom tiers and right-to-left ordering within each
+tier. Provider output remains a review candidate; CMS review is still the
+canonical confirmation step.
+
 The initial PoC package includes interfaces and a `NoopIngestionProvider` stub,
 not a production provider integration.
 

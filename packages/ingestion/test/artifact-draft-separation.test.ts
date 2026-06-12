@@ -136,6 +136,89 @@ test("canonical drafts exclude artifact metadata and confidence while matching D
     assert.equal("metadata" in firstBubble, false);
 });
 
+test("canonical draft builder assigns panel numbers by RTL reading order", () => {
+    const page = createPageInput();
+    const episode = createEpisodeInput({ pages: [page] });
+    const leftPanelId = `${page.page.pageId}-k001`;
+    const rightPanelId = `${page.page.pageId}-k002`;
+    const metadata = {
+        artifact_version: "test-v1",
+        provider: "test",
+        model: "fixture",
+        created_at: "2026-01-01T00:00:00.000Z",
+    };
+
+    const canonical = buildCanonicalDraft(episode, [
+        {
+            layer: "artifact",
+            pageId: page.page.pageId,
+            regionDetection: {
+                layer: "artifact",
+                stage: "detect_regions",
+                pageId: page.page.pageId,
+                metadata,
+                diagnostics: [],
+                payload: {
+                    candidates: [
+                        {
+                            artifact_id: leftPanelId,
+                            artifact_type: "region",
+                            page_id: page.page.pageId,
+                            region_kind: "panel",
+                            bbox: { x: 0, y: 0, width: 700, height: 900 },
+                            confidence: 0.9,
+                            source: "page_image",
+                            metadata,
+                        },
+                        {
+                            artifact_id: rightPanelId,
+                            artifact_type: "region",
+                            page_id: page.page.pageId,
+                            region_kind: "panel",
+                            bbox: { x: 850, y: 0, width: 700, height: 900 },
+                            confidence: 0.9,
+                            source: "page_image",
+                            metadata,
+                        },
+                    ],
+                },
+            },
+            draftBuild: {
+                layer: "artifact",
+                stage: "build_draft",
+                pageId: page.page.pageId,
+                metadata,
+                diagnostics: [],
+                payload: {
+                    pageImagePath: page.page.imagePath,
+                    width: page.page.width,
+                    height: page.page.height,
+                    panels: [
+                        {
+                            panelCandidateId: leftPanelId,
+                            panelConfidence: 0.9,
+                            reactionTags: [],
+                            bubbles: [],
+                        },
+                        {
+                            panelCandidateId: rightPanelId,
+                            panelConfidence: 0.9,
+                            reactionTags: [],
+                            bubbles: [],
+                        },
+                    ],
+                },
+            },
+        },
+    ]);
+
+    const panels = canonical.draft.pages[0]?.panels ?? [];
+    assert.equal(panels[0]?.panelNumber, 1);
+    assert.equal(panels[0]?.bbox.x, 850);
+    assert.equal(panels[1]?.panelNumber, 2);
+    assert.equal(panels[1]?.bbox.x, 0);
+});
+
 test("GeminiProvider returns valid artifacts and buildDraft output converts to canonical draft", async () => {
     const provider = new GeminiProvider();
     const page = createPageInput();
@@ -169,6 +252,10 @@ test("GeminiProvider returns valid artifacts and buildDraft output converts to c
     const parsed = CanonicalDraftPayloadSchema.parse(canonical.draft);
     assert.equal(parsed.pages[0]?.pageNumber, 1);
     assert.ok((parsed.pages[0]?.panels.length ?? 0) > 0);
+    assert.ok(
+        (parsed.pages[0]?.panels[0]?.bbox.x ?? 0) > (parsed.pages[0]?.panels[1]?.bbox.x ?? 0),
+        "Gemini fixture should number the right panel first",
+    );
 });
 
 test("malformed artifact and invalid draft are rejected", async () => {

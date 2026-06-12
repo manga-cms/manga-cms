@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+    buildSyntheticSeries,
     buildSyntheticTranslationPack,
     writeSyntheticContents,
     writePlaceholderPng,
@@ -170,6 +171,33 @@ function testLargeSyntheticEpisodePasses() {
     }
 }
 
+async function testSyntheticPanelsFollowReadingOrder() {
+    const modulePath = new URL("../packages/schemas/dist/index.js", import.meta.url);
+    const { estimatePanelReadingOrder } = await import(modulePath.href);
+    const seriesList = buildSyntheticSeries({
+        idPrefix: "series-a",
+        pagesPerEpisode: 2,
+        panelsPerPage: 6,
+        bubblesPerPage: 6,
+        pageWidth: 1200,
+        pageHeight: 1700,
+    });
+    const pages = seriesList[0]?.episodes[0]?.pages ?? [];
+    assert.ok(pages.length > 0, "synthetic series should include pages");
+    for (const page of pages) {
+        const generatedOrder = page.panels.map((panel) => panel.panelId);
+        assert.deepEqual(
+            generatedOrder,
+            estimatePanelReadingOrder(page.panels),
+            `synthetic panels should follow RTL reading order for ${page.pageId}`,
+        );
+        assert.ok(
+            page.panels[0].bbox.x > page.panels[1].bbox.x,
+            "first generated panel should be the rightmost panel in the top tier",
+        );
+    }
+}
+
 async function testPlaceholderPngDimensions() {
     const root = createTempWorkspace();
     try {
@@ -201,6 +229,7 @@ testValidPackTargetPasses();
 testMissingPackBubbleFails();
 testHighResolutionPagePasses();
 testLargeSyntheticEpisodePasses();
+await testSyntheticPanelsFollowReadingOrder();
 await testPlaceholderPngDimensions();
 
 console.log("Content validation script tests passed.");
