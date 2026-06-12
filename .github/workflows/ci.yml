@@ -59,3 +59,44 @@ jobs:
 
       - name: Validate content schemas
         run: pnpm validate:content
+
+  api-roundtrip-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare pnpm
+        run: corepack prepare pnpm@9.5.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @manga/db db:generate
+
+      - name: Build schemas package
+        run: pnpm --filter @manga/schemas build
+
+      - name: Build domain package
+        run: pnpm --filter @manga/domain build
+
+      - name: Build DB package
+        run: pnpm --filter @manga/db build
+
+      - name: Build ingestion package
+        run: pnpm --filter @manga/ingestion build
+
+      - name: Build API app
+        run: pnpm --filter @manga/api build
+
+      - name: Run API roundtrip smoke
+        run: bash scripts/smoke-test-api-roundtrip.sh
