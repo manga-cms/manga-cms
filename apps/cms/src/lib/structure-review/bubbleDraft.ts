@@ -54,14 +54,6 @@ export function getBubbleWarnings(page: PageData | null, bubble: BubbleData, tex
     return warnings;
 }
 
-export type ReviewDisplayState = "candidate" | "confirmed" | "rejected" | "needs_review";
-
-export function getReviewDisplayState(decision: ReviewDecision | undefined, warnings: readonly string[] = []): ReviewDisplayState {
-    if (decision === "rejected") return "rejected";
-    if (decision === "accepted") return warnings.length > 0 ? "needs_review" : "confirmed";
-    return warnings.length > 0 ? "needs_review" : "candidate";
-}
-
 // Text comparison data is supplied by ingestion job review-candidates
 // (runtime state) as an explicit bubbleId overlay. Do not write sourceText,
 // ocrText, chosenText, or confidence to canonical Bubble data or

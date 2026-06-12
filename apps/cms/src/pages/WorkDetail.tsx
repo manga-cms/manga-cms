@@ -22,6 +22,10 @@ import {
     toLocalDateTimeInput,
     type PublicationFormState,
 } from "../publication";
+import { useTranslation } from "../i18n/I18nProvider";
+import type { MessageKey } from "../i18n/messages";
+
+const publicationStateLabelKey = (state: string): MessageKey => `publication.state.${state}` as MessageKey;
 
 interface SeriesMetadataFormState {
     titleJa: string;
@@ -91,6 +95,7 @@ function buildSeriesPublicMetadata(current: ContentPublicMetadata | undefined, f
 }
 
 export default function WorkDetail() {
+    const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const [work, setWork] = useState<SeriesDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -274,7 +279,7 @@ export default function WorkDetail() {
         }
     };
 
-    if (loading) return <p style={{ color: "var(--muted)" }}>Loading…</p>;
+    if (loading) return <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>;
     if (!work) return <div className="error-msg">作品が見つかりません</div>;
     const seriesPublicationState = getPublicationState(work);
     const lifecycleStatus = getSeriesLifecycleStatus(work);
@@ -287,10 +292,10 @@ export default function WorkDetail() {
             <p style={{ color: "var(--muted)", marginBottom: "0.35rem" }}>{work.description}</p>
             {authorLabel && <p className="card-meta" style={{ marginBottom: "1rem" }}>作者: {authorLabel}</p>}
             <p style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
-                <span className="badge">{formatSeriesPublicationType(publicationType)}</span>{" "}
+                {publicationType === "oneshot" && <><span className="badge">{formatSeriesPublicationType(publicationType)}</span>{" "}</>}
                 <span className="badge">{formatSeriesLifecycleStatus(lifecycleStatus)}</span>{" "}
-                <span className={`badge publication-${seriesPublicationState}`}>{seriesPublicationState}</span>{" "}
-                ID: {work.id} — {work.episodes.length} episode(s)
+                <span className={`badge publication-${seriesPublicationState}`}>{t(publicationStateLabelKey(seriesPublicationState))}</span>{" "}
+                ID: {work.id} — {t("common.episodeCount", { count: work.episodes.length })}
             </p>
             {error && <div className="error-msg">{error}</div>}
 
@@ -376,7 +381,7 @@ export default function WorkDetail() {
                             <input
                                 value={seriesMetadata.titleEn}
                                 onChange={(e) => setSeriesMetadata((current) => ({ ...current, titleEn: e.target.value }))}
-                                placeholder="Oumaga Dokidoki"
+                                placeholder={t("work.metadata.englishTitlePlaceholder")}
                             />
                         </div>
                         <div className="form-group">
@@ -406,25 +411,25 @@ export default function WorkDetail() {
             <form onSubmit={handleSeriesScheduleSave} className="card publication-card">
                 <div className="section-heading">
                     <div>
-                        <h2>Publication</h2>
-                        <p className="card-meta">Series visibility controls whether the public Reader can discover or open any Episode in this Series.</p>
+                        <h2>{t("work.publication.title")}</h2>
+                        <p className="card-meta">{t("work.publication.description")}</p>
                     </div>
-                    <span className={`badge publication-${seriesPublicationState}`}>{seriesPublicationState}</span>
+                    <span className={`badge publication-${seriesPublicationState}`}>{t(publicationStateLabelKey(seriesPublicationState))}</span>
                 </div>
                 <div className="publication-grid">
                     <div className="form-group">
-                        <label>Visibility</label>
+                        <label>{t("work.publication.visibility")}</label>
                         <select
                             value={seriesSchedule.visibility}
                             onChange={(e) => setSeriesSchedule((current) => ({ ...current, visibility: e.target.value as PublicationVisibility }))}
                         >
-                            <option value="public">Public</option>
-                            <option value="hidden">Hidden</option>
-                            <option value="archived">Archived</option>
+                            <option value="public">{t("publication.state.public")}</option>
+                            <option value="hidden">{t("publication.state.hidden")}</option>
+                            <option value="archived">{t("publication.state.archived")}</option>
                         </select>
                     </div>
                     <div className="form-group">
-                        <label>Publish Start</label>
+                        <label>{t("work.publication.start")}</label>
                         <input
                             type="datetime-local"
                             value={seriesSchedule.publishStartAt}
@@ -432,7 +437,7 @@ export default function WorkDetail() {
                         />
                     </div>
                     <div className="form-group">
-                        <label>Publish End</label>
+                        <label>{t("work.publication.end")}</label>
                         <input
                             type="datetime-local"
                             value={seriesSchedule.publishEndAt}
@@ -441,10 +446,10 @@ export default function WorkDetail() {
                     </div>
                 </div>
                 <div className="publication-summary">
-                    <span>Start: {formatPublicationDate(work.publishStartAt)}</span>
-                    <span>End: {formatPublicationDate(work.publishEndAt)}</span>
+                    <span>{t("work.publication.start")}: {formatPublicationDate(work.publishStartAt)}</span>
+                    <span>{t("work.publication.end")}: {formatPublicationDate(work.publishEndAt)}</span>
                 </div>
-                {scheduleSaved && <div className="success-msg">Publication settings saved.</div>}
+                {scheduleSaved && <div className="success-msg">{t("work.publication.saved")}</div>}
                 <button type="submit" className="btn btn-primary" disabled={saving}>
                     {saving ? "保存中…" : "公開設定を保存"}
                 </button>
@@ -455,7 +460,7 @@ export default function WorkDetail() {
                     {showForm ? "キャンセル" : "+ エピソードを追加"}
                 </button>
                 <Link to={`/works/${id}/publish`} className="btn btn-success">
-                    📦 Review & Publish
+                    {t("work.publish.review")}
                 </Link>
             </div>
 
@@ -485,25 +490,25 @@ export default function WorkDetail() {
                 <form onSubmit={handleBulkEpisodeScheduleSave} className="card publication-card">
                     <div className="section-heading">
                         <div>
-                            <h3>Bulk Episode Publication</h3>
-                            <p className="card-meta">Apply visibility and scheduling fields to selected Episodes. Page, Panel, and Bubble data is preserved.</p>
+                            <h3>{t("work.bulkPublication.title")}</h3>
+                            <p className="card-meta">{t("work.bulkPublication.description")}</p>
                         </div>
-                        <span className="badge">{selectedEpisodeIds.length} selected</span>
+                        <span className="badge">{t("work.bulkPublication.selected", { count: selectedEpisodeIds.length })}</span>
                     </div>
                     <div className="publication-grid">
                         <div className="form-group">
-                            <label>Visibility</label>
+                            <label>{t("work.publication.visibility")}</label>
                             <select
                                 value={episodeBulkSchedule.visibility}
                                 onChange={(e) => setEpisodeBulkSchedule((current) => ({ ...current, visibility: e.target.value as PublicationVisibility }))}
                             >
-                                <option value="public">Public</option>
-                                <option value="hidden">Hidden</option>
-                                <option value="archived">Archived</option>
+                                <option value="public">{t("publication.state.public")}</option>
+                                <option value="hidden">{t("publication.state.hidden")}</option>
+                                <option value="archived">{t("publication.state.archived")}</option>
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>Publish Start</label>
+                            <label>{t("work.publication.start")}</label>
                             <input
                                 type="datetime-local"
                                 value={episodeBulkSchedule.publishStartAt}
@@ -511,7 +516,7 @@ export default function WorkDetail() {
                             />
                         </div>
                         <div className="form-group">
-                            <label>Publish End</label>
+                            <label>{t("work.publication.end")}</label>
                             <input
                                 type="datetime-local"
                                 value={episodeBulkSchedule.publishEndAt}
@@ -519,7 +524,7 @@ export default function WorkDetail() {
                             />
                         </div>
                     </div>
-                    {bulkSaved && <div className="success-msg">Episode publication settings saved.</div>}
+                    {bulkSaved && <div className="success-msg">{t("work.bulkPublication.saved")}</div>}
                     <div className="section-actions" style={{ marginTop: "1rem" }}>
                         <button
                             type="button"
@@ -527,7 +532,7 @@ export default function WorkDetail() {
                             onClick={() => setSelectedEpisodeIds(work.episodes.map((ep) => ep.id))}
                             disabled={saving}
                         >
-                            Select all
+                            {t("common.selectAll")}
                         </button>
                         <button
                             type="button"
@@ -535,7 +540,7 @@ export default function WorkDetail() {
                             onClick={() => setSelectedEpisodeIds([])}
                             disabled={saving || selectedEpisodeIds.length === 0}
                         >
-                            Clear
+                            {t("common.clear")}
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={saving || selectedEpisodeIds.length === 0}>
                             {saving ? "保存中…" : "選択したEpisodeに適用"}
@@ -562,14 +567,14 @@ export default function WorkDetail() {
                                     {publicationType === "oneshot" ? "読切" : `EP${ep.episodeNumber}`}
                                 </span>
                                 <span className={`badge publication-${getPublicationState(ep)}`} style={{ marginRight: "0.5rem" }}>
-                                    {getPublicationState(ep)}
+                                    {t(publicationStateLabelKey(getPublicationState(ep)))}
                                 </span>
                                 {ep.title}
                             </div>
                             <div className="card-meta">
-                                {ep.pageCount} page(s) — {ep.publishedAt}
-                                {ep.publishStartAt && <> — starts {formatPublicationDate(ep.publishStartAt)}</>}
-                                {ep.publishEndAt && <> — ends {formatPublicationDate(ep.publishEndAt)}</>}
+                                {t("common.pageCount", { count: ep.pageCount })} — {ep.publishedAt}
+                                {ep.publishStartAt && <> — {t("work.publication.starts", { value: formatPublicationDate(ep.publishStartAt) })}</>}
+                                {ep.publishEndAt && <> — {t("work.publication.ends", { value: formatPublicationDate(ep.publishEndAt) })}</>}
                             </div>
                             <div className="section-actions">
                                 <Link to={`/works/${id}/episodes/${ep.id}`} className="btn btn-outline">Episode</Link>

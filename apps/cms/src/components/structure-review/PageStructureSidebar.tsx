@@ -184,9 +184,9 @@ export function PageStructureSidebar({
                                     <span>{t("structure.sidebar.pageBubbleCount", { count: stat.bubbleCount })}</span>
                                 </span>
                                 <span className="page-review-badges">
-                                    {stat.candidateCount > 0 && <span className="badge badge-warn">{t("structure.reviewState.candidate")} {stat.candidateCount}</span>}
-                                    {stat.confirmedCount > 0 && <span className="badge badge-ok">{t("structure.reviewState.confirmed")} {stat.confirmedCount}</span>}
-                                    {stat.rejectedCount > 0 && <span className="badge badge-muted">{t("structure.reviewState.rejected")} {stat.rejectedCount}</span>}
+                                    {stat.candidateCount > 0 && <span className="badge badge-warn">{t("decision.pending")} {stat.candidateCount}</span>}
+                                    {stat.confirmedCount > 0 && <span className="badge badge-ok">{t("decision.accepted")} {stat.confirmedCount}</span>}
+                                    {stat.rejectedCount > 0 && <span className="badge badge-muted">{t("decision.rejected")} {stat.rejectedCount}</span>}
                                     {stat.warningCount > 0 && <span className="badge badge-err">{t("structure.sidebar.pageWarningCount", { count: stat.warningCount })}</span>}
                                     {stat.missingSourceText > 0 && <span className="badge badge-warn">{t("structure.sidebar.sourceMissingShort", { count: stat.missingSourceText })}</span>}
                                 </span>

@@ -1,6 +1,6 @@
 import type { BoundingBox, BubbleData, PageData, PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
-import { getBubbleSourceText, getBubbleTextComparison, getBubbleWarnings, getReviewDisplayState, type BubbleTextComparisonOverlay } from "../../lib/structure-review/bubbleDraft";
+import { getBubbleSourceText, getBubbleTextComparison, getBubbleWarnings, type BubbleTextComparisonOverlay } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf } from "../../lib/structure-review/ids";
 import type { ReviewDecision } from "../../lib/structure-review/types";
 import type { MessageKey } from "../../i18n/messages";
@@ -8,7 +8,6 @@ import { TranslationWorkspace } from "./TranslationWorkspace";
 
 const DEFAULT_FLAGS: NonNullable<BubbleData["flags"]> = { shareable: true, feedback_enabled: true };
 const decisionLabelKey = (decision: ReviewDecision | null): MessageKey => `decision.${decision ?? "pending"}` as MessageKey;
-const reviewStateLabelKey = (state: string): MessageKey => `structure.reviewState.${state}` as MessageKey;
 
 type StructureInspectorProps = {
     seriesId?: string;
@@ -111,9 +110,9 @@ export function StructureInspector({
                                 <span className={`badge ${selectedBubbleDecision === "accepted" ? "badge-ok" : "badge-warn"}`}>
                                     {t(decisionLabelKey(selectedBubbleDecision))}
                                 </span>
-                                <span className={`badge review-state-${getReviewDisplayState(selectedBubbleDecision ?? undefined, bubbleWarnings)}`}>
-                                    {t(reviewStateLabelKey(getReviewDisplayState(selectedBubbleDecision ?? undefined, bubbleWarnings)))}
-                                </span>
+                                {bubbleWarnings.length > 0 && (
+                                    <span className="badge badge-err">{t("structure.reviewState.needs_review")}</span>
+                                )}
                                 <button type="button" className="btn btn-outline" onClick={() => onAcceptBubble(selectedBubble)}>{t("structure.inspector.accept")}</button>
                                 <button type="button" className="btn btn-outline danger-lite-inline" onClick={onRejectSelectedBubble}>{t("structure.inspector.reject")}</button>
                             </div>

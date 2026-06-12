@@ -10,12 +10,16 @@ import {
     type FeedbackIdentityFilter,
     type FeedbackTargetKind,
 } from "../lib/feedbackTriage";
+import { useTranslation } from "../i18n/I18nProvider";
+import type { MessageKey } from "../i18n/messages";
 
 const STATUS_CLASS: Record<FeedbackStatus, string> = {
     new: "badge-warn",
     triaged: "",
     closed: "badge-muted",
 };
+
+const feedbackStatusLabelKey = (status: FeedbackStatus): MessageKey => `feedback.status.${status}` as MessageKey;
 
 type FeedbackIssueType = FeedbackRecord["issue_type"];
 
@@ -36,6 +40,7 @@ function shortText(value: string | undefined, fallback = "-") {
 }
 
 export default function FeedbackList() {
+    const { t } = useTranslation();
     const [items, setItems] = useState<FeedbackRecord[]>([]);
     const [status, setStatus] = useState<FeedbackStatus | "all">("new");
     const [seriesId, setSeriesId] = useState("");
@@ -73,34 +78,34 @@ export default function FeedbackList() {
         <div className="feedback-triage-page">
             <div className="section-heading">
                 <div>
-                    <h1>Feedback Triage</h1>
+                    <h1>{t("feedback.list.title")}</h1>
                     <p className="card-meta">Reader feedback を非公開のまま確認し、必要なものだけ Proposal / GitHub handoff に進めます。</p>
                 </div>
                 <div className="feedback-result-count">
-                    <span className="badge">{filteredItems.length} shown</span>
-                    <span className="badge badge-muted">{items.length} loaded</span>
+                    <span className="badge">{t("feedback.list.shown", { count: filteredItems.length })}</span>
+                    <span className="badge badge-muted">{t("feedback.list.loaded", { count: items.length })}</span>
                 </div>
             </div>
 
             <div className="card feedback-filter-card">
                 <div className="feedback-filter-grid">
                     <div className="form-group">
-                        <label>Status（API filter）</label>
+                        <label>{t("feedback.filter.status")}</label>
                         <select value={status} onChange={(e) => setStatus(e.target.value as FeedbackStatus | "all")}>
-                            <option value="new">New</option>
-                            <option value="triaged">Triaged</option>
-                            <option value="closed">Closed</option>
-                            <option value="all">All</option>
+                            <option value="new">{t("feedback.status.new")}</option>
+                            <option value="triaged">{t("feedback.status.triaged")}</option>
+                            <option value="closed">{t("feedback.status.closed")}</option>
+                            <option value="all">{t("common.all")}</option>
                         </select>
                     </div>
                     <div className="form-group">
-                        <label>seriesId（API filter）</label>
+                        <label>{t("feedback.filter.seriesId")}</label>
                         <input value={seriesId} onChange={(e) => setSeriesId(e.target.value)} placeholder="oumaga-dokidoki" />
                     </div>
                     <div className="form-group">
                         <label>issue_type</label>
                         <select value={issueType} onChange={(e) => setIssueType(e.target.value as FeedbackIssueType | "all")}>
-                            <option value="all">All</option>
+                            <option value="all">{t("common.all")}</option>
                             {ISSUE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
                         </select>
                     </div>
@@ -111,17 +116,17 @@ export default function FeedbackList() {
                     <div className="form-group">
                         <label>target</label>
                         <select value={targetKind} onChange={(e) => setTargetKind(e.target.value as FeedbackTargetKind | "all")}>
-                            <option value="all">All</option>
-                            <option value="episode">Episode</option>
-                            <option value="page">Page</option>
-                            <option value="panel">Panel</option>
-                            <option value="bubble">Bubble</option>
+                            <option value="all">{t("common.all")}</option>
+                            <option value="episode">{t("feedback.target.episode")}</option>
+                            <option value="page">{t("feedback.target.page")}</option>
+                            <option value="panel">{t("feedback.target.panel")}</option>
+                            <option value="bubble">{t("feedback.target.bubble")}</option>
                         </select>
                     </div>
                     <div className="form-group">
                         <label>contributor identity</label>
                         <select value={identity} onChange={(e) => setIdentity(e.target.value as FeedbackIdentityFilter)}>
-                            <option value="all">All</option>
+                            <option value="all">{t("common.all")}</option>
                             <option value="anonymous">anonymous</option>
                             <option value="display_name">display_name</option>
                             <option value="github_login">github_login</option>
@@ -134,9 +139,9 @@ export default function FeedbackList() {
             {error && <div className="error-msg">{error}</div>}
 
             {loading ? (
-                <p style={{ color: "var(--muted)" }}>Loading...</p>
+                <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>
             ) : filteredItems.length === 0 ? (
-                <div className="card empty-state">Feedback is empty.</div>
+                <div className="card empty-state">{t("feedback.list.empty")}</div>
             ) : (
                 <div className="feedback-list">
                     {filteredItems.map((item) => (
@@ -151,7 +156,7 @@ export default function FeedbackList() {
                                         {feedbackTargetKind(item)} target · {item.mode} · {feedbackIdentityLabel(item)} · {formatFeedbackDate(item.created_at)}
                                     </div>
                                 </div>
-                                <span className={`badge ${STATUS_CLASS[item.status]}`}>{item.status}</span>
+                                <span className={`badge ${STATUS_CLASS[item.status]}`}>{t(feedbackStatusLabelKey(item.status))}</span>
                             </div>
                             <div className="feedback-list-body">
                                 <div className="feedback-list-text">

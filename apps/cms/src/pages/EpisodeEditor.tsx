@@ -12,6 +12,7 @@ import {
 } from "../api";
 import { TextExportMenu } from "../components/TextExportMenu";
 import { useTranslation } from "../i18n/I18nProvider";
+import type { MessageKey } from "../i18n/messages";
 import {
     getPublicationState,
     publicationInputPayload,
@@ -39,6 +40,8 @@ interface PageInput {
 }
 
 type PageImageLocale = "ja" | "en";
+
+const publicationStateLabelKey = (state: string): MessageKey => `publication.state.${state}` as MessageKey;
 
 function generateId(seriesId: string, epId: string, pageNum: number) {
     return `${seriesId}-${epId}-p${String(pageNum).padStart(2, "0")}`;
@@ -385,25 +388,25 @@ export default function EpisodeEditor() {
                 <div className="card publication-card" style={{ maxWidth: "42rem", marginBottom: "1.5rem" }}>
                     <div className="section-heading">
                         <div>
-                            <h2>Publication</h2>
-                            <p className="card-meta">Episode availability still depends on the parent Series being public.</p>
+                            <h2>{t("work.publication.title")}</h2>
+                            <p className="card-meta">{t("episode.publication.description")}</p>
                         </div>
-                        <span className={`badge publication-${episodePublicationState}`}>{episodePublicationState}</span>
+                        <span className={`badge publication-${episodePublicationState}`}>{t(publicationStateLabelKey(episodePublicationState))}</span>
                     </div>
                     <div className="publication-grid">
                         <div className="form-group">
-                            <label>Visibility</label>
+                            <label>{t("work.publication.visibility")}</label>
                             <select
                                 value={episodeSchedule.visibility}
                                 onChange={(e) => setEpisodeSchedule((current) => ({ ...current, visibility: e.target.value as PublicationVisibility }))}
                             >
-                                <option value="public">Public</option>
-                                <option value="hidden">Hidden</option>
-                                <option value="archived">Archived</option>
+                                <option value="public">{t("publication.state.public")}</option>
+                                <option value="hidden">{t("publication.state.hidden")}</option>
+                                <option value="archived">{t("publication.state.archived")}</option>
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>Publish Start</label>
+                            <label>{t("work.publication.start")}</label>
                             <input
                                 type="datetime-local"
                                 value={episodeSchedule.publishStartAt}
@@ -411,7 +414,7 @@ export default function EpisodeEditor() {
                             />
                         </div>
                         <div className="form-group">
-                            <label>Publish End</label>
+                            <label>{t("work.publication.end")}</label>
                             <input
                                 type="datetime-local"
                                 value={episodeSchedule.publishEndAt}

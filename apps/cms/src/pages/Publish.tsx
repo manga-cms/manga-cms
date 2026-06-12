@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getSeries, publishSeries, type SeriesDetail } from "../api";
+import { useTranslation } from "../i18n/I18nProvider";
 import { getSeriesLifecycleStatus } from "../publication";
 
 export default function Publish() {
+    const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const [work, setWork] = useState<SeriesDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -33,14 +35,14 @@ export default function Publish() {
         }
     };
 
-    if (loading) return <p style={{ color: "var(--muted)" }}>Loading…</p>;
+    if (loading) return <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>;
     if (!work) return <div className="error-msg">作品が見つかりません</div>;
 
     return (
         <div>
-            <h1>📦 Review & Publish</h1>
+            <h1>{t("work.publish.review")}</h1>
             <p style={{ color: "var(--muted)", marginBottom: "1.5rem" }}>
-                {work.title} — {work.episodes.length} episode(s)
+                {work.title} — {t("common.episodeCount", { count: work.episodes.length })}
             </p>
 
             <h2>series.json Preview</h2>

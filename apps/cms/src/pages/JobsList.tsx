@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listJobs, type IngestionJob } from "../api";
+import { useTranslation } from "../i18n/I18nProvider";
+import type { MessageKey } from "../i18n/messages";
 
 const STATUS_COLORS: Record<string, string> = {
     queued: "badge-muted",
@@ -11,7 +13,10 @@ const STATUS_COLORS: Record<string, string> = {
     canceled: "badge-muted",
 };
 
+const jobStatusLabelKey = (status: string): MessageKey => `ingestion.status.${status}` as MessageKey;
+
 export default function JobsList() {
+    const { t } = useTranslation();
     const [jobs, setJobs] = useState<IngestionJob[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -24,12 +29,12 @@ export default function JobsList() {
     return (
         <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h1>Ingestion Jobs</h1>
-                <Link to="/ingestion/new" className="btn btn-primary">+ New Job</Link>
+                <h1>{t("ingestion.jobs.title")}</h1>
+                <Link to="/ingestion/new" className="btn btn-primary">{t("ingestion.jobs.new")}</Link>
             </div>
 
             {loading ? (
-                <p style={{ color: "var(--muted)" }}>Loading…</p>
+                <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>
             ) : jobs.length === 0 ? (
                 <div className="card empty-state">
                     <p>取り込みジョブがありません</p>
@@ -45,12 +50,12 @@ export default function JobsList() {
                                 <div>
                                     <div className="card-title">{j.label}</div>
                                     <div className="card-meta">
-                                        {j.draft ? `${j.draft.seriesId} / ${j.draft.episodeId}` : "No draft"}
+                                        {j.draft ? `${j.draft.seriesId} / ${j.draft.episodeId}` : t("ingestion.jobs.noDraft")}
                                         {" — "}{new Date(j.createdAt).toLocaleString("ja-JP")}
                                     </div>
                                 </div>
                                 <span className={`badge ${STATUS_COLORS[j.status] ?? ""}`}>
-                                    {j.status}
+                                    {t(jobStatusLabelKey(j.status))}
                                 </span>
                             </div>
                         </Link>

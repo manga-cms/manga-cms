@@ -7,8 +7,13 @@ import {
     getPublicationState,
     getSeriesLifecycleStatus,
 } from "../publication";
+import { useTranslation } from "../i18n/I18nProvider";
+import type { MessageKey } from "../i18n/messages";
+
+const publicationStateLabelKey = (state: string): MessageKey => `publication.state.${state}` as MessageKey;
 
 export default function Dashboard() {
+    const { t } = useTranslation();
     const [works, setWorks] = useState<SeriesItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -22,12 +27,12 @@ export default function Dashboard() {
 
     return (
         <div>
-            <h1>Dashboard</h1>
+            <h1>{t("dashboard.title")}</h1>
 
             {error && <div className="error-msg">{error}</div>}
 
             {loading ? (
-                <p style={{ color: "var(--muted)" }}>Loading…</p>
+                <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>
             ) : works.length === 0 ? (
                 <div className="card empty-state">
                     <p>作品がまだありません</p>
@@ -41,18 +46,22 @@ export default function Dashboard() {
                         <Link to={`/works/${w.id}`} key={w.id} className="card card-link">
                             <div className="card-title">{w.title}</div>
                             <div className="card-meta">
-                                <span className="badge">
-                                    {formatSeriesPublicationType(w.publicationType)}
-                                </span>
-                                {" "}
+                                {w.publicationType === "oneshot" && (
+                                    <>
+                                        <span className="badge">
+                                            {formatSeriesPublicationType(w.publicationType)}
+                                        </span>
+                                        {" "}
+                                    </>
+                                )}
                                 <span className={`badge ${getSeriesLifecycleStatus(w) === "ongoing" ? "" : "badge-muted"}`}>
                                     {formatSeriesLifecycleStatus(getSeriesLifecycleStatus(w))}
                                 </span>
                                 {" "}
                                 <span className={`badge publication-${getPublicationState(w)}`}>
-                                    {getPublicationState(w)}
+                                    {t(publicationStateLabelKey(getPublicationState(w)))}
                                 </span>
-                                {" "}{w.episodeCount} episode(s)
+                                {" "}{t("common.episodeCount", { count: w.episodeCount })}
                             </div>
                         </Link>
                     ))}

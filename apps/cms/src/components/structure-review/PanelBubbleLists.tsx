@@ -7,7 +7,6 @@ import {
     getBubbleSourceText,
     getBubbleTextComparisonBadges,
     getBubbleWarnings,
-    getReviewDisplayState,
     type BubbleTextComparisonOverlayMap,
 } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf, panelIdOf } from "../../lib/structure-review/ids";
@@ -31,7 +30,6 @@ type PanelBubbleListsProps = {
 };
 
 const decisionLabelKey = (decision: string | undefined): MessageKey => `decision.${decision ?? "pending"}` as MessageKey;
-const reviewStateLabelKey = (state: string): MessageKey => `structure.reviewState.${state}` as MessageKey;
 
 function bubbleDisplayRef(bubble: PageData["bubbles"][number]) {
     return bubble.displayRef ?? bubble.shortId ?? bubbleIdOf(bubble);
@@ -104,10 +102,12 @@ export function PanelBubbleLists({
                                 <code>{bubbleDisplayRef(candidate.bubble)}</code>
                             </div>
                             <div className="structure-review-state-row">
-                                <span className={`badge review-state-${getReviewDisplayState(candidate.decision, candidate.warnings)}`}>
-                                    {t(reviewStateLabelKey(getReviewDisplayState(candidate.decision, candidate.warnings)))}
+                                <span className={`badge ${candidate.decision === "accepted" ? "badge-ok" : candidate.decision === "rejected" ? "badge-muted" : "badge-warn"}`}>
+                                    {t(decisionLabelKey(candidate.decision))}
                                 </span>
-                                <span className="badge badge-muted">{t(decisionLabelKey(candidate.decision))}</span>
+                                {candidate.warnings.length > 0 && (
+                                    <span className="badge badge-err">{t("structure.reviewState.needs_review")}</span>
+                                )}
                             </div>
                             <CandidateTextBadges bubble={candidate.bubble} textComparisonOverlays={textComparisonOverlays} />
                             <div className="structure-source-line">
@@ -119,7 +119,7 @@ export function PanelBubbleLists({
                                     ? t("structure.sidebar.panelRow", { panelNumber: candidate.panel.panelNumber })
                                     : t("structure.sidebar.pageLevelBubble")}
                                 {" · "}
-                                {candidate.bubble.bubbleType} · {t(decisionLabelKey(candidate.decision))}
+                                {candidate.bubble.bubbleType}
                                 {" · "}
                                 <span className="bbox-summary">{formatBboxSummary(candidate.bubble.bbox)}</span>
                                 {candidate.warnings.length > 0 ? ` · ${t("structure.sidebar.warningCount", { count: candidate.warnings.length })}` : ""}
@@ -190,10 +190,12 @@ export function PanelBubbleLists({
                                                 <code>{bubbleDisplayRef(bubble)}</code>
                                             </div>
                                             <div className="structure-review-state-row">
-                                                <span className={`badge review-state-${getReviewDisplayState(reviewDecisions[bubbleReviewKey(bubble)], warnings)}`}>
-                                                    {t(reviewStateLabelKey(getReviewDisplayState(reviewDecisions[bubbleReviewKey(bubble)], warnings)))}
+                                                <span className={`badge ${reviewDecisions[bubbleReviewKey(bubble)] === "accepted" ? "badge-ok" : reviewDecisions[bubbleReviewKey(bubble)] === "rejected" ? "badge-muted" : "badge-warn"}`}>
+                                                    {t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)]))}
                                                 </span>
-                                                <span className="badge badge-muted">{t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)]))}</span>
+                                                {warnings.length > 0 && (
+                                                    <span className="badge badge-err">{t("structure.reviewState.needs_review")}</span>
+                                                )}
                                             </div>
                                             <CandidateTextBadges bubble={bubble} textComparisonOverlays={textComparisonOverlays} />
                                             <div className="structure-source-line">
@@ -201,8 +203,6 @@ export function PanelBubbleLists({
                                                 <p>{getBubbleSourceText(bubble) || t("structure.sidebar.noText")}</p>
                                             </div>
                                             <small className="structure-list-meta">
-                                                {t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)]))}
-                                                {" · "}
                                                 <span className="bbox-summary">{formatBboxSummary(bubble.bbox)}</span>
                                                 {warnings.length > 0 ? ` · ${t("structure.sidebar.warningCount", { count: warnings.length })}` : ""}
                                             </small>
