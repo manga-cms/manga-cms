@@ -94,35 +94,36 @@ not hosted SaaS or commercial platform delivery.
   [PRODUCTION-DEPLOY.md](PRODUCTION-DEPLOY.md)
 - [x] Confirm `manga-cms.com` is attached to the production official-site Fly
   app and the certificate is ready
-- [ ] Confirm `www.manga-cms.com` redirects permanently to
+- [x] Confirm `www.manga-cms.com` redirects permanently to
   `https://manga-cms.com/`
 - [x] Confirm `read.manga-cms.com` is attached to the production Reader Fly app
   and the certificate is ready
 - [ ] Confirm Search Console uses a Domain property for `manga-cms.com`
 - [ ] Verify Search Console ownership with a Cloudflare DNS TXT record and keep
   the TXT record after verification
-- [ ] Configure the production Cloudflare Web Analytics token only on public
+- [x] Confirm the Search Console DNS TXT record is present on `manga-cms.com`
+- [x] Configure the production Cloudflare Web Analytics token only on public
   production Viewer deployments
-- [ ] Confirm Cloudflare Web Analytics loads only on `manga-cms.com`,
+- [x] Confirm Cloudflare Web Analytics loads only on `manga-cms.com`,
   `www.manga-cms.com`, and `read.manga-cms.com`, and does not load on
   localhost, staging, preview hosts, `/s/...`, or `/og/...`
-- [ ] Keep `PUBLIC_ANALYTICS_ENABLED=false` so GA4 remains disabled in
+- [x] Keep `PUBLIC_ANALYTICS_ENABLED=false` so GA4 remains disabled in
   production
 - [ ] Do not enable GA4 for EU, UK, or Switzerland traffic without Consent Mode
   or a CMP, a consent UI, and updated privacy policy text
-- [ ] Keep `PUBLIC_INDEX_EN_LOCALE=false` or unset for the first launch
-- [ ] Confirm `?lang=en` Reader and Share URLs are noindexed and excluded from
-  sitemap output while English indexing is not approved *(implemented on main, pending production smoke)*
-- [ ] Confirm `/s/...` Share facade URLs are excluded from sitemap output *(implemented on main, pending production smoke)*
-- [ ] Confirm `/og/...` image routes are disallowed in `robots.txt` and excluded
-  from sitemap output *(implemented on main, pending production smoke)*
+- [x] Keep `PUBLIC_INDEX_EN_LOCALE=false` or unset for the first launch
+- [x] Confirm `?lang=en` Reader and Share URLs are noindexed and excluded from
+  sitemap output while English indexing is not approved
+- [x] Confirm `/s/...` Share facade URLs are excluded from sitemap output
+- [x] Confirm `/og/...` image routes are disallowed in `robots.txt` and excluded
+  from sitemap output
 - [x] Confirm `https://manga-cms.com/robots.txt` returns the official-site
   robots policy
 - [x] Confirm `https://read.manga-cms.com/robots.txt` returns the Reader robots
   policy
 - [ ] Submit `https://manga-cms.com/sitemap.xml` in Search Console
 - [ ] Submit `https://read.manga-cms.com/sitemap.xml` in Search Console
-- [ ] Smoke-test the production URLs listed in
+- [x] Smoke-test the production URLs listed in
   [PRODUCTION-DEPLOY.md](PRODUCTION-DEPLOY.md)
 
 ### 1. Multi-Instance Readiness

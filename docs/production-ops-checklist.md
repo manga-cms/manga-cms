@@ -1,6 +1,6 @@
 # Production Ops Checklist
 
-Last updated: 2026-06-07
+Last updated: 2026-06-12
 
 This checklist is for public beta operation of a self-hosted Manga CMS site. It
 is public and provider-neutral where possible. It does not add commercial
@@ -25,12 +25,13 @@ platform features.
 ## Search And Analytics
 
 - [ ] Search Console Domain property is verified for the public domain.
+- [x] Search Console DNS TXT record is present on the public domain.
 - [ ] Public sitemaps are submitted only after production smoke passes.
-- [ ] `/s/...` Share facades and `/og/...` image routes are excluded from
+- [x] `/s/...` Share facades and `/og/...` image routes are excluded from
       sitemap output.
-- [ ] English `?lang=en` URLs remain `noindex` until approved for search.
-- [ ] Lightweight analytics is confirmed only on production public hosts.
-- [ ] GA4 remains disabled unless consent and privacy requirements are ready.
+- [x] English `?lang=en` URLs remain `noindex` until approved for search.
+- [x] Lightweight analytics is confirmed only on production public hosts.
+- [x] GA4 remains disabled unless consent and privacy requirements are ready.
 
 ## Content Source Backup And Restore
 
