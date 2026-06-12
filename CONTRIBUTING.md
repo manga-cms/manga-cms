@@ -117,6 +117,11 @@ For content format details, see [docs/CONTENT_GUIDE.md](docs/CONTENT_GUIDE.md).
 Please do not open a public issue for secrets, auth bypasses, entitlement bypasses,
 or delivery-token vulnerabilities. Follow [SECURITY.md](SECURITY.md).
 
+## Conduct
+
+Be respectful and keep feedback focused on the work. See
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
 ## License
 
 By contributing to this repository, you agree that your contribution is licensed

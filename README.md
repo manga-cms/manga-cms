@@ -340,6 +340,7 @@ Contributions are welcome. The most useful areas right now are:
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 For security-sensitive issues, see [SECURITY.md](SECURITY.md).
+For community expectations, see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## License
 
