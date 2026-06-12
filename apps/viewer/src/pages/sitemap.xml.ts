@@ -19,7 +19,11 @@ const officialSitemapPaths = () => [
 
 const serialSitemapPaths = async () => {
   const series = await getViewerSeriesCards();
-  const paths = new Set<string>(["/", "/works"]);
+  const rootRedirectOrigin = import.meta.env.SITE_ROOT_REDIRECT_ORIGIN as string | undefined;
+  const paths = new Set<string>(["/works"]);
+  if (!rootRedirectOrigin) {
+    paths.add("/");
+  }
 
   for (const item of series) {
     if (!primaryOneshotEpisode(item)) {

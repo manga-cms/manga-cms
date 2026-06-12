@@ -47,6 +47,10 @@ export interface ShareRouteResolution {
 }
 
 const DEFAULT_DESCRIPTION = "Manga CMSで公開されているマンガを読む、共有する、翻訳や修正につなげるための共有ページです。";
+const pageShareDescriptionSuffix = (locale: ShareLocale, pageNumber: unknown) => {
+  const label = `Page ${pageNumber}`;
+  return locale === "en" ? `${label} share page.` : `${label} の共有ページです。`;
+};
 
 const normalizeText = (value: unknown, maxLength = 180) => {
   const text = String(value ?? "")
@@ -249,7 +253,7 @@ const descriptionFor = (kind: ShareTargetKind, input: ShareRouteInput, series: a
     || canonicalDescription(series)
     || DEFAULT_DESCRIPTION;
   if (kind === "episode") return baseDescription;
-  if (kind === "page") return normalizeText(`${baseDescription} Page ${page?.pageNumber} の共有ページです。`);
+  if (kind === "page") return normalizeText(`${baseDescription} ${pageShareDescriptionSuffix(input.locale, page?.pageNumber)}`);
   if (kind === "panel") {
     const panelText = panelTextSummary(panel, page, input.locale);
     if (panelText) return normalizeText(panelText);
