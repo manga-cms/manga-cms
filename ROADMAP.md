@@ -46,6 +46,8 @@ Recently completed public work:
   canonical Bubble data or public metadata.
 - Public sample content preparation is documented in
   [`docs/SAMPLE-CONTENT-CHECKLIST.md`](docs/SAMPLE-CONTENT-CHECKLIST.md).
+- Public release tagging and changelog expectations are documented in
+  [`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## Roadmap Areas
 
@@ -250,7 +252,8 @@ M7. Feature-flagged Reader text layer prototype
 M8. Public adoption basics
 - Add issue templates and contribution labels.
 - Add public screenshots/GIFs from rights-cleared sample content.
-- Add lightweight release tags and a changelog policy.
+- Use the lightweight release tag and changelog policy in
+  [`docs/RELEASE.md`](docs/RELEASE.md).
 - Add a one-command Docker Compose self-host path once the sample package is
   available.
 

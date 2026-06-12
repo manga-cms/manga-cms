@@ -92,6 +92,7 @@ pnpm dev
 - Update [CHANGELOG.md](CHANGELOG.md) when changing public behavior, public
   URLs, content contracts, Pack behavior, setup requirements, or release-facing
   workflows.
+- Follow [docs/RELEASE.md](docs/RELEASE.md) when preparing a tagged release.
 - Preserve the canonical hierarchy: `Series -> Episode -> Page -> Panel -> Bubble`.
 - Keep `contents/` and `packs/` as the canonical manga content source unless an
   explicit migration task says otherwise.

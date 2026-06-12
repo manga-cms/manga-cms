@@ -309,6 +309,7 @@ Images / PSD / text export
 
 - [Roadmap](ROADMAP.md)
 - [Changelog](CHANGELOG.md)
+- [Release process](docs/RELEASE.md)
 - [OSS boundary](docs/oss-boundary.md)
 - [Architecture layer boundary](docs/architecture/layer-boundary.md)
 - [Production ops checklist](docs/production-ops-checklist.md)
