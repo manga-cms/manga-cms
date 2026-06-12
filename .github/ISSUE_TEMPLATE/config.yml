@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/manga-cms/manga-cms/blob/main/docs/CONTENT_GUIDE.md
     about: Read the current content format and publishing workflow.
   - name: Public release checklist
-    url: https://github.com/manga-cms/manga-cms/blob/main/docs/PUBLIC_RELEASE_CHECKLIST.md
+    url: https://github.com/manga-cms/manga-cms/blob/main/docs/LAUNCH-CHECKLIST.md
     about: See the current launch and roadmap priorities.
