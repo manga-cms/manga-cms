@@ -58,9 +58,13 @@ Current focus:
 - Keep `contents/` and `packs/` as the canonical source of truth.
 - Stabilize schema validation, content loading, and Pack validation contracts.
 - Document and drill backup/restore, monitoring, and rollback procedures for self-hosting.
+- Move production runtime state that is still file-backed into `packages/db`
+  before multi-instance or multi-editor operation depends on it.
 - Keep Search Console, sitemap, robots, lightweight analytics, and public
   Reader smoke checks as operational launch gates rather than commercial
   platform features.
+- Define a simple public release discipline: version tags, a concise changelog,
+  and a policy for when schemaVersion changes are required.
 
 ### 2. Creator CMS Operations
 
@@ -75,6 +79,11 @@ Current focus:
 - Keep warning states visible without turning review warnings into save
   blockers.
 - Save confirmed results to the canonical draft.
+- Add Reader preview where editors need to judge reading flow, translation fit,
+  Pack behavior, spoiler behavior, and public Reader presentation.
+- Introduce edit conflict control, such as ETag / If-Match or explicit
+  revision checks, before multiple editors or autosave sessions can overwrite
+  each other.
 - Improve text export, translation draft import, feedback triage, and proposal workflows.
 
 ### 3. Ingestion Workflow
@@ -101,6 +110,9 @@ Current focus:
 - Keep image-first reading stable on mobile and desktop.
 - Keep Share URL, OGP, robots/sitemap, and localized metadata smoke checks
   green.
+- Move dynamically generated OGP images toward generic immutable published
+  artifacts through the provider-neutral manifest/export model before public
+  sharing volume makes crawler cache behavior difficult to reason about.
 - Explore an opt-in HTML text layer for Bubble text so selected titles can
   support browser text selection, search, accessibility, and browser
   translation experiments.
@@ -123,7 +135,35 @@ Current focus:
 - Ensure the self-hosted engine does not require specific commercial vendors to run.
 - Keep payment provider integrations, tenant SaaS automation, and custom domain routing separated into the private commercial layer.
 
-### 6. Future Private Commercial Platform
+### 6. Adoption And Community Readiness
+
+Goal: Make the public repository understandable and useful for people who did
+not watch the project evolve.
+
+Current focus:
+- Add the first rights-cleared public sample content package when the creator
+  approval and sample-specific license text are complete.
+- Keep README, screenshots, and feature GIFs aligned with what a self-hosted
+  user can actually run from a clean checkout.
+- Add issue templates and contribution labels after the sample content and
+  public workflow are stable enough for outside reports.
+- Keep contributor-facing docs in English where they define contracts or
+  developer workflows; creator-facing guidance may be bilingual when helpful.
+
+### 7. Engineering Health
+
+Goal: Keep the codebase maintainable as more AI-assisted and external
+contributions arrive.
+
+Current focus:
+- Keep `pnpm lint` honest: either add useful lint tasks or stop treating it as
+  evidence of lint coverage.
+- Split very large API and Reader implementation files when doing so reduces
+  real maintenance risk.
+- Add a minimal API/CMS round-trip smoke test for creating content with
+  `panelId: null` Bubbles once the public sample and CI runtime are ready.
+
+### 8. Future Private Commercial Platform
 
 Goal: Hosted/commercial operations for Manga CMS. This is not part of the OSS deliverable.
 
@@ -136,35 +176,69 @@ Future private commercial work includes:
 
 These details will remain outside the public repository. The public repo may contain generic interfaces that allow them, but no specific business implementations.
 
-## Near-Term Public Priorities
+## Standing Guardrails
 
-1. Keep CI green after every public change.
-2. Keep schema, validation, Pack target validation, and content loading
-   contracts stable.
-3. Finish the next Page Structure Review polish pass:
-   - connect ingestion review-candidate overlays to the existing comparison UI;
-   - keep candidate metadata out of canonical Bubble/public metadata;
-   - refine warning density so editors see actionable items first;
-   - preserve `panelId: null` and page-level Bubble workflows.
-4. Refine Ingestion workflow prioritizing PSD/text-export over OCR/LLM:
-   - run local private sample drills without committing private assets;
-   - document parser limitations from those drills without publishing private
-     text or image details;
-   - keep OCR/LLM as optional candidate generators only.
-5. Prepare the first public sample content package:
-   - finalize sample-specific rights text with the creator;
-   - verify GitHub inclusion, translation permission, OGP/screenshot use, and
-     commercial-sale prohibition;
-   - add only public-safe, licensed sample assets when ready.
-6. Drill backup/restore for both Postgres runtime state and canonical
-   `contents/`/`packs/`, keeping their source-of-truth roles separate.
-7. Refine text export, translation draft import, feedback triage, and proposal
-   workflows after sample content exists.
-8. Design and prototype a feature-flagged HTML text layer for selected Reader
-   content only after public launch smoke and rights checks remain green.
-9. Keep Search Console, robots/sitemap, public Reader, Share URL, and OGP smoke
-   checks green for self-hosted public launch.
-10. Keep generic manifest/export and entitlement designs provider-neutral.
+These are ongoing constraints, not one-time milestones:
+
+- Keep CI green and failures diagnosable.
+- Keep schema, validation, Pack target validation, and content loading
+  contracts stable.
+- Keep `contents/` and `packs/` as canonical manga content unless an explicit
+  migration changes the architecture.
+- Keep Search Console, robots/sitemap, public Reader, Share URL, and OGP smoke
+  checks green for self-hosted public launch.
+- Keep generic manifest/export, role, rights, and entitlement designs
+  provider-neutral.
+- Keep private commercial platform details out of the public repository.
+
+## Next Public Milestones
+
+M1. Page Structure Review overlay connection
+- Connect ingestion review-candidate overlays to the existing comparison UI.
+- Keep candidate metadata out of canonical Bubble/public metadata.
+- Refine warning density so editors see actionable items first.
+- Preserve `panelId: null` and page-level Bubble workflows.
+
+M2. Private-sample ingestion drill
+- Run local private CSP/PSD/text-export drills without committing private
+  assets.
+- Record parser limitations without publishing private text, coordinates, or
+  image details.
+- Keep OCR/LLM as optional candidate generators only.
+
+M3. First public sample content package
+- Finalize sample-specific rights text with the creator.
+- Verify GitHub inclusion, translation permission, OGP/screenshot use, text
+  export/accessibility use, and commercial-sale prohibition.
+- Add only public-safe, licensed sample assets when ready.
+- This is the critical path for making content lint and Pack target validation
+  meaningful in CI, improving the README first impression, and testing text
+  export / translation import / feedback workflows on public data.
+
+M4. Backup/restore drill
+- Drill canonical `contents/`/`packs/` restore.
+- Drill Postgres runtime-state restore separately.
+- Confirm the two backup domains remain separate.
+
+M5. CMS Reader preview and editorial workflow polish
+- Add or improve Reader preview where editing decisions depend on reading flow.
+- Refine text export, translation draft import, feedback triage, and proposal
+  workflows against the first public sample.
+
+M6. Public sharing artifact hardening
+- Move OGP images toward generic immutable published artifacts in a
+  provider-neutral manifest/export flow.
+- Keep current dynamic OGP routes acceptable for beta while traffic is low.
+
+M7. Feature-flagged Reader text layer prototype
+- Prototype only after public launch smoke, sample rights, and text exposure
+  policy remain green.
+- Keep it opt-in and off by default.
+
+M8. Public adoption basics
+- Add issue templates and contribution labels.
+- Add public screenshots/GIFs from rights-cleared sample content.
+- Add lightweight release tags and a changelog policy.
 
 ## Review Checkpoints
 
@@ -175,6 +249,8 @@ Use external review when one of these boundaries changes:
 - sample content rights text before committing content to Git;
 - public Reader sharing, OGP, sitemap, robots, or indexing behavior;
 - backup/restore procedure before relying on it for a live self-hosted install.
+- production environment variable requirements or startup configuration;
+- delivery token, auth token, or public URL formats.
 
 Routine UI polish, wording fixes, and docs-only cleanup do not need external
 review unless they touch one of the boundaries above.
