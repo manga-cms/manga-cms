@@ -886,6 +886,8 @@ export default function PageStructureReview() {
 
             <div className="structure-layout">
                 <PageStructureSidebar
+                    seriesId={seriesId}
+                    episodeId={episode.id}
                     episode={episode}
                     page={page}
                     pageIndex={pageIndex}

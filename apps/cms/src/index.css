@@ -1952,6 +1952,91 @@ textarea {
     gap: 0.45rem;
 }
 
+.page-review-grid {
+    display: grid;
+    gap: 0.55rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.page-review-card {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-rows: auto 1fr;
+    width: 100%;
+    min-width: 0;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+}
+
+.page-review-card.is-active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent), transparent 28%);
+}
+
+.page-review-thumb {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-subtle);
+}
+
+.page-review-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.page-review-thumb-empty {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.page-review-card-body,
+.page-review-counts,
+.page-review-badges {
+    display: flex;
+    min-width: 0;
+}
+
+.page-review-card-body {
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.page-review-card-body strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.page-review-counts {
+    gap: 0.4rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    flex-wrap: wrap;
+}
+
+.page-review-badges {
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.page-review-badges .badge {
+    font-size: 0.62rem;
+    padding: 1px 6px;
+}
+
 .page-content-row {
     display: grid;
     gap: 0.2rem;

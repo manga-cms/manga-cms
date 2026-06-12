@@ -1,12 +1,15 @@
-import type { EpisodeData, PageData, PanelData } from "../../api";
+import { getAdminPageImageUrl, type EpisodeData, type PageData, type PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
-import type { BubbleTextComparisonOverlayMap } from "../../lib/structure-review/bubbleDraft";
+import { getBubbleWarnings, type BubbleTextComparisonOverlayMap } from "../../lib/structure-review/bubbleDraft";
+import { bubbleIdOf } from "../../lib/structure-review/ids";
 import { bubbleReviewKey, panelReviewKey } from "../../lib/structure-review/reviewDecisions";
-import type { PanelTemplate, ReviewDecisions, ReviewSummary } from "../../lib/structure-review/types";
+import type { PanelTemplate, ReviewDecision, ReviewDecisions, ReviewSummary } from "../../lib/structure-review/types";
 import { PanelBubbleLists } from "./PanelBubbleLists";
 import { ScriptAssist } from "./ScriptAssist";
 
 type PageStructureSidebarProps = {
+    seriesId?: string;
+    episodeId: string;
     episode: EpisodeData;
     page: PageData | null;
     pageIndex: number;
@@ -47,7 +50,31 @@ function hasLocaleImage(page: PageData, locale: "ja" | "en") {
     return Boolean(page.images?.[locale]?.trim());
 }
 
+function increment(summary: ReviewSummary, decision: ReviewDecision) {
+    summary[decision] += 1;
+}
+
+function reviewSummaryOf(page: PageData, reviewDecisions: ReviewDecisions) {
+    const summary: ReviewSummary = { pending: 0, accepted: 0, rejected: 0 };
+    page.panels.forEach((panel) => {
+        increment(summary, reviewDecisions[panelReviewKey(panel)] ?? "pending");
+        panel.bubbles.forEach((bubble) => increment(summary, reviewDecisions[bubbleReviewKey(bubble)] ?? "pending"));
+    });
+    (page.bubbles ?? [])
+        .filter((bubble) => bubble.panelId === null)
+        .forEach((bubble) => increment(summary, reviewDecisions[bubbleReviewKey(bubble)] ?? "pending"));
+    return summary;
+}
+
+function warningCountOf(page: PageData, textComparisonOverlays?: BubbleTextComparisonOverlayMap) {
+    return pageBubblesOf(page).reduce((count, bubble) => (
+        count + getBubbleWarnings(page, bubble, textComparisonOverlays?.get(bubbleIdOf(bubble))).length
+    ), 0);
+}
+
 export function PageStructureSidebar({
+    seriesId,
+    episodeId,
     episode,
     page,
     pageIndex,
@@ -81,7 +108,8 @@ export function PageStructureSidebar({
     const pageContentStats = episode.pages.map((episodePage, index) => {
         const bubbles = pageBubblesOf(episodePage);
         const missingSourceText = bubbles.filter((bubble) => !bubble.textOriginal.trim()).length;
-        const pendingReviewCount = pendingReviewCountOf(episodePage, reviewDecisions);
+        const pageReviewSummary = reviewSummaryOf(episodePage, reviewDecisions);
+        const warningCount = warningCountOf(episodePage, textComparisonOverlays);
         return {
             index,
             pageNumber: episodePage.pageNumber,
@@ -89,7 +117,11 @@ export function PageStructureSidebar({
             panelCount: episodePage.panels.length,
             bubbleCount: bubbles.length,
             missingSourceText,
-            pendingReviewCount,
+            warningCount,
+            candidateCount: pageReviewSummary.pending,
+            confirmedCount: pageReviewSummary.accepted,
+            rejectedCount: pageReviewSummary.rejected,
+            thumbnailUrl: seriesId ? getAdminPageImageUrl(seriesId, episodeId, episodePage.pageNumber) : "",
         };
     });
 
@@ -142,34 +174,39 @@ export function PageStructureSidebar({
                 </div>
             )}
 
-            <details className="page-content-overview" open>
-                <summary>{t("structure.sidebar.pageContentOverview")}</summary>
-                <div className="page-content-list">
+            <details className="page-content-overview page-review-overview" open>
+                <summary>{t("structure.sidebar.pageReviewOverview")}</summary>
+                <div className="page-review-grid">
                     {pageContentStats.map((stat) => (
                         <button
                             key={`${stat.pageNumber}-${stat.index}`}
                             type="button"
-                            className={`page-content-row ${pageIndex === stat.index ? "is-active" : ""}`}
+                            className={`page-review-card ${pageIndex === stat.index ? "is-active" : ""}`}
                             onClick={() => onPageChange(stat.index)}
+                            aria-label={t("structure.sidebar.openPageReview", { pageNumber: stat.pageNumber })}
                         >
-                            <span>
-                                {stat.displayRef ? `${stat.displayRef} · ` : ""}
-                                {t("structure.sidebar.pageContentRow", { pageNumber: stat.pageNumber })}
+                            <span className="page-review-thumb" aria-hidden="true">
+                                {stat.thumbnailUrl
+                                    ? <img src={stat.thumbnailUrl} alt="" loading="lazy" />
+                                    : <span className="page-review-thumb-empty">{t("structure.sidebar.noThumbnail")}</span>}
                             </span>
-                            <small>
-                                {t("structure.sidebar.pagePanelCount", { count: stat.panelCount })} · {t("structure.sidebar.pageBubbleCount", { count: stat.bubbleCount })} · {" "}
-                                {hasLocaleImage(episode.pages[stat.index], "ja") ? t("structure.sidebar.imageJaShort") : t("structure.sidebar.imageJaMissingShort")}
-                                {" / "}
-                                {hasLocaleImage(episode.pages[stat.index], "en") ? t("structure.sidebar.imageEnShort") : t("structure.sidebar.imageEnMissingShort")}
-                                {" · "}
-                                {stat.missingSourceText
-                                    ? t("structure.sidebar.pageMissingSourceText", { count: stat.missingSourceText })
-                                    : t("structure.sidebar.pageSourceTextOk")}
-                                {" · "}
-                                {stat.pendingReviewCount
-                                    ? t("structure.sidebar.pagePendingReview", { count: stat.pendingReviewCount })
-                                    : t("structure.sidebar.pageReviewOk")}
-                            </small>
+                            <span className="page-review-card-body">
+                                <strong>
+                                    {stat.displayRef ? `${stat.displayRef} · ` : ""}
+                                    {t("structure.sidebar.pageContentRow", { pageNumber: stat.pageNumber })}
+                                </strong>
+                                <span className="page-review-counts">
+                                    <span>{t("structure.sidebar.pagePanelCount", { count: stat.panelCount })}</span>
+                                    <span>{t("structure.sidebar.pageBubbleCount", { count: stat.bubbleCount })}</span>
+                                </span>
+                                <span className="page-review-badges">
+                                    {stat.candidateCount > 0 && <span className="badge badge-warn">{t("structure.reviewState.candidate")} {stat.candidateCount}</span>}
+                                    {stat.confirmedCount > 0 && <span className="badge badge-ok">{t("structure.reviewState.confirmed")} {stat.confirmedCount}</span>}
+                                    {stat.rejectedCount > 0 && <span className="badge badge-muted">{t("structure.reviewState.rejected")} {stat.rejectedCount}</span>}
+                                    {stat.warningCount > 0 && <span className="badge badge-err">{t("structure.reviewState.needs_review")} {stat.warningCount}</span>}
+                                    {stat.missingSourceText > 0 && <span className="badge badge-warn">{t("structure.sidebar.sourceMissingShort", { count: stat.missingSourceText })}</span>}
+                                </span>
+                            </span>
                         </button>
                     ))}
                 </div>
