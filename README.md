@@ -75,7 +75,8 @@ Still early:
 - External commerce integrations are outside the current OSS deliverable.
 
 For the launch checklist and project direction, see [docs/LAUNCH-CHECKLIST.md](docs/LAUNCH-CHECKLIST.md)
-and [ROADMAP.md](ROADMAP.md).
+and [ROADMAP.md](ROADMAP.md). Public release notes are tracked in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Why Structured Manga
 
@@ -307,6 +308,7 @@ Images / PSD / text export
 ## Documentation
 
 - [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
 - [OSS boundary](docs/oss-boundary.md)
 - [Architecture layer boundary](docs/architecture/layer-boundary.md)
 - [Production ops checklist](docs/production-ops-checklist.md)

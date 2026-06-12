@@ -89,6 +89,9 @@ pnpm dev
 - Prefer existing package boundaries over new abstractions.
 - Update docs when changing setup, content format, API behavior, or launch
   assumptions.
+- Update [CHANGELOG.md](CHANGELOG.md) when changing public behavior, public
+  URLs, content contracts, Pack behavior, setup requirements, or release-facing
+  workflows.
 - Preserve the canonical hierarchy: `Series -> Episode -> Page -> Panel -> Bubble`.
 - Keep `contents/` and `packs/` as the canonical manga content source unless an
   explicit migration task says otherwise.
