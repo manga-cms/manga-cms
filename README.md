@@ -2,87 +2,126 @@
 
 Open source infrastructure for publishing structured manga on the web.
 
-Manga CMS treats a manga episode as more than a stack of page images. It keeps
-stable references for pages, panels, and speech bubbles so the same content can
-support precise sharing, translation packs, annotations, access control, and
-future ingestion tooling.
+Manga CMS is for creators, publishers, translation teams, and accessibility
+teams who want manga pages to remain beautiful images while also becoming
+addressable, searchable, and extensible content.
+
+Most manga sites publish a page as one flat image. Manga CMS keeps the page
+image, then adds a stable structure layer:
+
+```text
+Series
+  -> Episode
+    -> Page
+      -> Panel
+        -> Bubble
+```
+
+That structure creates reader-facing value immediately:
+
+- **Quote sharing:** link to the exact speech bubble or panel range instead of
+  sending someone to a whole page and asking them to find the moment.
+- **Translation Packs:** add approved translations, notes, learning material,
+  or commentary without rewriting the original manga source.
+- **Accessibility:** preserve reading order and structured text so assistive
+  technology, alternate displays, and future accessibility packs have a
+  dependable content model.
+
+<!-- screenshot: page-structure-review -->
+
+Try the full stack with Docker Compose:
+
+> The default Compose stack is for local demos only. It binds services to
+> `127.0.0.1` and uses development secrets; do not expose it directly to the
+> internet.
+
+```bash
+docker compose up --build
+```
+
+Then open the reader, creator CMS, or API health check:
+
+- Reader: <http://localhost:4321>
+- CMS: <http://localhost:5173>
+- API: <http://localhost:3000/api/v1/health>
+
+<!-- screenshot: reader-quote-share -->
+<!-- screenshot: cms-structure-editor -->
 
 ## Status
 
-This repository is ready for public open source iteration, but it is still an
-early project.
+This repository is ready for public open source iteration, while some workflows
+are still early and intentionally visible.
 
 Works today:
 
-- Public manga viewer powered by Astro.
-- Hono API for series, episodes, pages, quotes, clips, reactions, auth, delivery,
-  entitlements, and admin workflows.
-- React creator CMS for basic series and episode editing.
-- File-backed `contents/` source data with Zod validation.
-- Prisma-backed runtime state for DB mode.
-- Tokenized image delivery path and entitlement checks.
-- Ingestion proof of concept with draft/review/confirm separation.
+- Read structured manga through an Astro public viewer.
+- Serve series, episodes, pages, quotes, clips, reactions, auth, delivery,
+  entitlements, and admin workflows from a Hono API.
+- Edit basic series and episode metadata in the React creator CMS.
+- Store canonical manga source data in file-backed `contents/` with Zod
+  validation.
+- Use Prisma-backed runtime state for database mode.
+- Deliver tokenized images with entitlement checks.
+- Review ingestion drafts through a proof-of-concept draft/review/confirm flow.
 
 Still early:
 
-- Image upload from the CMS is not a complete production workflow.
-- Panel and bubble editing is still minimal.
-- OCR, PSD, and Clip Studio ingestion are PoC-level.
-- Published-asset strategy, monitoring, and multi-instance hardening are not
-  finished.
+- CMS image upload needs more production workflow hardening.
+- Panel and bubble editing exists only in a minimal form.
+- OCR, PSD, and Clip Studio ingestion remain proof-of-concept work.
+- Published asset strategy, monitoring, and multi-instance operations need more
+  hardening.
 - External commerce integrations are outside the current OSS deliverable.
 
 For the launch checklist and project direction, see [docs/LAUNCH-CHECKLIST.md](docs/LAUNCH-CHECKLIST.md)
 and [ROADMAP.md](ROADMAP.md).
 
-## Why This Exists
+## Why Structured Manga
 
-Most manga websites treat comics as flat images. Manga CMS keeps the image
-reading experience, but adds a structured layer:
+Structured manga separates the reading image from the content references around
+it. A reader still sees the page as manga, but the system can resolve stable IDs
+for pages, panels, and bubbles. Those IDs make quote pages, clip pages,
+translation packs, proposals, review tools, and entitlement checks less fragile
+than coordinate-only overlays.
 
-```text
-Series
-  Episode
-    Page
-      Panel
-        Bubble
-```
-
-That structure enables:
-
-- Quote sharing at the speech-bubble level.
-- Clip sharing across panel ranges.
-- Reaction search for reusable panels.
-- Translation, commentary, learning, and accessibility packs.
-- Entitlement-based access control primitives for self-hosted access rules.
-- A future ingestion pipeline that turns raw manuscripts into reviewable
-  structured drafts.
-
-## Repository Layout
-
-```text
-apps/
-  api/       Hono API server
-  cms/       React + Vite creator CMS
-  viewer/    Astro public viewer
-
-packages/
-  db/         Prisma schema and database repository layer
-  domain/     shared domain types and filesystem repositories
-  ingestion/  ingestion PoC package
-  schemas/    Zod schemas for content and pack validation
-
-contents/     manga source data
-packs/        translation/commentary/learning/accessibility packs
-docs/         launch, deployment, and operations docs
-scripts/      smoke tests and local runners
-```
-
-`contents/` and `packs/` are the canonical editorial source for manga content
-and Pack manifests. Runtime database rows may reference or index that content,
-but they are not the canonical manga content store.
+Accessibility work benefits from the same structure. Reading order, structured
+text, and explicit bubble boundaries give screen readers and alternate reading
+experiences a better source than flattened artwork alone. In Europe, the
+European Accessibility Act places accessibility expectations on many digital
+products and services; this project keeps that context in mind without claiming
+legal compliance by default.
 
 ## Quick Start
+
+Requirements:
+
+- Docker with the Compose plugin
+
+Run the local stack:
+
+> The default Compose stack is for local demos only. It binds services to
+> `127.0.0.1` and uses development secrets; do not expose it directly to the
+> internet.
+
+```bash
+docker compose up --build
+```
+
+Default local URLs:
+
+- Reader: <http://localhost:4321>
+- CMS: <http://localhost:5173>
+- API health: <http://localhost:3000/api/v1/health>
+
+The Compose stack starts PostgreSQL, the Hono API, the Astro viewer, and the
+React CMS. It mounts local content directories such as `contents/` and `packs/`
+so you can inspect the source files while the services run.
+
+## Developer Setup
+
+Use the pnpm workflow when you want package-level builds, linting, or focused
+app development outside Docker.
 
 Requirements:
 
@@ -141,6 +180,30 @@ Default CMS:
 ```text
 http://localhost:5173
 ```
+
+## Repository Layout
+
+```text
+apps/
+  api/       Hono API server
+  cms/       React + Vite creator CMS
+  viewer/    Astro public viewer
+
+packages/
+  db/         Prisma schema and database repository layer
+  domain/     shared domain types and filesystem repositories
+  ingestion/  ingestion PoC package
+  schemas/    Zod schemas for content and pack validation
+
+contents/     manga source data
+packs/        translation/commentary/learning/accessibility packs
+docs/         launch, deployment, and operations docs
+scripts/      smoke tests and local runners
+```
+
+`contents/` and `packs/` are the canonical editorial source for manga content
+and Pack manifests. Runtime database rows may reference or index that content,
+but they are not the canonical manga content store.
 
 ## Publishing Manga Content
 
