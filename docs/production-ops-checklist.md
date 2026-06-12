@@ -10,7 +10,8 @@ platform features.
 
 - [ ] GitHub Actions CI is green on `main`.
 - [ ] CI failures identify the responsible area: install, Prisma generation,
-      package build, app build, tests, or content validation.
+      package build, app build, tests, compose safety, content validation, or
+      documentation link checks.
 - [ ] Release changes are reproducible from a clean checkout.
 - [ ] No secrets, private URLs, or production tokens are committed.
 - [ ] Public history does not contain internal-only implementation notes.

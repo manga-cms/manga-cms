@@ -27,7 +27,10 @@ List commands run. Use the narrowest useful checks.
 
 ```text
 pnpm lint
+pnpm test:compose-safety
 pnpm validate:content
+pnpm test:content-validation
+pnpm check:docs
 pnpm build
 ```
 

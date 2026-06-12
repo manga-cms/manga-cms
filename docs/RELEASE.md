@@ -19,7 +19,10 @@ Run or confirm:
 
 ```bash
 pnpm lint
+pnpm test:compose-safety
 pnpm validate:content
+pnpm test:content-validation
+pnpm check:docs
 pnpm build
 ```
 
