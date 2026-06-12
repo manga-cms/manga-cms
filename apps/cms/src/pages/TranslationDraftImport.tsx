@@ -29,7 +29,7 @@ type CanonicalBubbleRow = {
     sourceText: string;
     bboxSummary: string;
     bbox: BubbleData["bbox"];
-    textDirection?: BubbleData["textDirection"];
+    pageWidth: number;
 };
 
 type ParsedTranslationRow = {
@@ -191,7 +191,7 @@ function flattenCanonicalBubbles(episode: EpisodeData | null): CanonicalBubbleRo
                 sourceText: bubble.textOriginal,
                 bboxSummary: formatBbox(bubble.bbox),
                 bbox: bubble.bbox,
-                textDirection: bubble.textDirection,
+                pageWidth: page.width,
             };
         });
     });
@@ -210,7 +210,7 @@ function resolveRows(rows: ParsedTranslationRow[], canonicalBubbles: CanonicalBu
             ? estimateTranslationFit({
                 text: row.text,
                 bbox: canonical.bbox,
-                textDirection: canonical.textDirection,
+                pageWidth: canonical.pageWidth,
             })
             : undefined;
         return {

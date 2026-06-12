@@ -37,8 +37,8 @@ export function TranslationWorkspace({
     const fitEstimate = useMemo(() => estimateTranslationFit({
         text: suggestedText,
         bbox: selectedBubble.bbox,
-        textDirection: selectedBubble.textDirection,
-    }), [selectedBubble.bbox, selectedBubble.textDirection, suggestedText]);
+        pageWidth: page.width,
+    }), [page.width, selectedBubble.bbox, suggestedText]);
 
     useEffect(() => {
         setSuggestedText("");

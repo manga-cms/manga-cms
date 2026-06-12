@@ -36,3 +36,18 @@ test("estimateTranslationFit treats whitespace as layout-neutral for character c
 
     assert.equal(spaced.characterCount, compact.characterCount);
 });
+
+test("estimateTranslationFit normalizes capacity by page width", () => {
+    const baseline = estimateTranslationFit({
+        text: "same",
+        bbox: { x: 0, y: 0, width: 120, height: 80 },
+        pageWidth: 1200,
+    });
+    const highResolution = estimateTranslationFit({
+        text: "same",
+        bbox: { x: 0, y: 0, width: 240, height: 160 },
+        pageWidth: 2400,
+    });
+
+    assert.equal(highResolution.estimatedCapacity, baseline.estimatedCapacity);
+});

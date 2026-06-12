@@ -2,8 +2,8 @@ import { getAdminPageImageUrl, type EpisodeData, type PageData, type PanelData }
 import { useTranslation } from "../../i18n/I18nProvider";
 import { getBubbleWarnings, type BubbleTextComparisonOverlayMap } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf } from "../../lib/structure-review/ids";
-import { bubbleReviewKey, panelReviewKey } from "../../lib/structure-review/reviewDecisions";
-import type { PanelTemplate, ReviewDecision, ReviewDecisions, ReviewSummary } from "../../lib/structure-review/types";
+import { bubbleReviewKey, panelReviewKey, summarizeReview } from "../../lib/structure-review/reviewDecisions";
+import type { PanelTemplate, ReviewDecisions, ReviewSummary } from "../../lib/structure-review/types";
 import { PanelBubbleLists } from "./PanelBubbleLists";
 import { ScriptAssist } from "./ScriptAssist";
 
@@ -50,22 +50,6 @@ function hasLocaleImage(page: PageData, locale: "ja" | "en") {
     return Boolean(page.images?.[locale]?.trim());
 }
 
-function increment(summary: ReviewSummary, decision: ReviewDecision) {
-    summary[decision] += 1;
-}
-
-function reviewSummaryOf(page: PageData, reviewDecisions: ReviewDecisions) {
-    const summary: ReviewSummary = { pending: 0, accepted: 0, rejected: 0 };
-    page.panels.forEach((panel) => {
-        increment(summary, reviewDecisions[panelReviewKey(panel)] ?? "pending");
-        panel.bubbles.forEach((bubble) => increment(summary, reviewDecisions[bubbleReviewKey(bubble)] ?? "pending"));
-    });
-    (page.bubbles ?? [])
-        .filter((bubble) => bubble.panelId === null)
-        .forEach((bubble) => increment(summary, reviewDecisions[bubbleReviewKey(bubble)] ?? "pending"));
-    return summary;
-}
-
 function warningCountOf(page: PageData, textComparisonOverlays?: BubbleTextComparisonOverlayMap) {
     return pageBubblesOf(page).reduce((count, bubble) => (
         count + getBubbleWarnings(page, bubble, textComparisonOverlays?.get(bubbleIdOf(bubble))).length
@@ -108,7 +92,7 @@ export function PageStructureSidebar({
     const pageContentStats = episode.pages.map((episodePage, index) => {
         const bubbles = pageBubblesOf(episodePage);
         const missingSourceText = bubbles.filter((bubble) => !bubble.textOriginal.trim()).length;
-        const pageReviewSummary = reviewSummaryOf(episodePage, reviewDecisions);
+        const pageReviewSummary = summarizeReview(episodePage, reviewDecisions);
         const warningCount = warningCountOf(episodePage, textComparisonOverlays);
         return {
             index,
@@ -203,7 +187,7 @@ export function PageStructureSidebar({
                                     {stat.candidateCount > 0 && <span className="badge badge-warn">{t("structure.reviewState.candidate")} {stat.candidateCount}</span>}
                                     {stat.confirmedCount > 0 && <span className="badge badge-ok">{t("structure.reviewState.confirmed")} {stat.confirmedCount}</span>}
                                     {stat.rejectedCount > 0 && <span className="badge badge-muted">{t("structure.reviewState.rejected")} {stat.rejectedCount}</span>}
-                                    {stat.warningCount > 0 && <span className="badge badge-err">{t("structure.reviewState.needs_review")} {stat.warningCount}</span>}
+                                    {stat.warningCount > 0 && <span className="badge badge-err">{t("structure.sidebar.pageWarningCount", { count: stat.warningCount })}</span>}
                                     {stat.missingSourceText > 0 && <span className="badge badge-warn">{t("structure.sidebar.sourceMissingShort", { count: stat.missingSourceText })}</span>}
                                 </span>
                             </span>
