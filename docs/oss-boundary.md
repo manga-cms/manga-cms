@@ -18,6 +18,8 @@ The public repository is a self-hosted manga publishing engine. It may include:
   self-hosted.
 - Generic import/export, backup/restore, manifest, and published artifact
   concepts.
+- Standards-based provenance metadata and provider-neutral published artifact
+  hashes for the publisher's own public artifacts.
 - Provider-neutral interfaces and documentation.
 - Public beta operations checklists that do not expose private infrastructure
   details.

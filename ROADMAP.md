@@ -116,6 +116,8 @@ Current focus:
 - Keep static publish/export as the preferred long-term shape for public free
   Episodes, so Reader HTML, published JSON/images, OGP images, and manifests
   can be emitted together.
+- Prefer attribution-bearing official share cards over copy-prevention claims:
+  public sharing should carry creator credit and a canonical source URL.
 - Explore an opt-in HTML text layer for Bubble text so selected titles can
   support browser text selection, search, accessibility, and browser
   translation experiments.
@@ -235,6 +237,10 @@ M6. Public sharing artifact hardening
 - Keep current dynamic OGP routes acceptable for beta while traffic is low.
 - Treat static publish/export as the umbrella design for OGP artifacts,
   manifest output, and public free Episode hosting.
+- Add creator attribution and canonical source URLs to official share cards
+  when public-safety policy allows.
+- Explore standards-based provenance, such as optional Content Credentials, and
+  provider-neutral perceptual hash fields as published artifact metadata.
 
 M7. Feature-flagged Reader text layer prototype
 - Prototype only after public launch smoke, sample rights, and text exposure

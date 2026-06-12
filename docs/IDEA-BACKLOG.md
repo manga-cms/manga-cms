@@ -15,7 +15,8 @@ Export public free Episodes as a fully static published site:
 
 - pre-rendered Reader HTML;
 - published JSON and images;
-- OGP artifacts;
+- OGP artifacts, including attribution-bearing Page/Panel/Bubble share cards
+  where policy allows;
 - manifest files that describe the published artifacts.
 
 Value:
@@ -37,7 +38,80 @@ Boundary:
 - Provider-specific upload, CDN routing, cache rules, custom hostnames, or paid
   gated delivery adapters belong outside the public OSS implementation.
 
-### 2. One-Command Docker Compose Self-Host
+### 2. Attribution-Bearing Share Cards
+
+Generate official share cards for public Page / Panel / Bubble targets with
+creator attribution and a canonical source URL.
+
+Value:
+
+- Makes official sharing more useful than unaffiliated screenshots.
+- Helps shared fragments carry creator credit and a route back to the source
+  Episode.
+- Reuses the same public-safety gates as Share URL and OGP artifact work.
+
+MVP:
+
+- Add creator label and source URL to published Page / Panel OGP cards.
+- Keep generated images deterministic and public-safe.
+- Do not add user-specific marks or reader tracing to the public OSS
+  implementation.
+
+Boundary:
+
+- Attribution and provenance are OSS-safe.
+- User-specific tracing, reader fingerprinting, leak detection, and forensic
+  workflows remain private/commercial-layer work.
+
+### 3. C2PA Content Credentials For Published Artifacts
+
+Attach Content Credentials or similar provenance manifests during publish/export
+for public artifacts.
+
+Value:
+
+- Gives creators a standards-based way to state authorship, publication time,
+  license terms, and AI-training preferences where supported.
+- Does not try to prevent copying; it records provenance and makes stripped
+  copies less authoritative than official copies.
+
+MVP:
+
+- Design provider-neutral metadata fields for published artifact provenance.
+- Add an optional publish/export step that can be enabled by a self-hoster.
+- Keep signing keys and operational key management out of sample data and out
+  of default local development.
+
+Boundary:
+
+- Standards-based provenance is OSS-safe.
+- Private key operations, hosted signing infrastructure, and commercial
+  enforcement workflows are deployment-specific.
+
+### 4. Perceptual Hash Manifest
+
+Include perceptual hashes for published images in the manifest.
+
+Value:
+
+- Creates an official artifact index that can later support manual or private
+  monitoring workflows.
+- The manifest does not prevent copying and does not identify readers.
+
+MVP:
+
+- Add optional pHash / PDQ-style fields to published artifact manifest design.
+- Treat the hashes as derived artifact metadata, not canonical manga content.
+
+Boundary:
+
+- Generating provider-neutral hashes for the publisher's own artifacts is
+  OSS-safe.
+- Web crawling, matching pipelines, notice generation, and enforcement
+  workflows belong outside the public OSS implementation unless documented only
+  at a high level.
+
+### 5. One-Command Docker Compose Self-Host
 
 Provide a `docker compose up` path that starts API, Viewer, CMS, and Postgres,
 then serves a rights-cleared sample.
@@ -54,7 +128,7 @@ MVP:
 - Initialization script.
 - Sample content only after rights and license text are complete.
 
-### 3. RSS / Atom Feed
+### 6. RSS / Atom Feed
 
 Expose a feed for public Episodes.
 
@@ -69,7 +143,7 @@ MVP:
 - Public Episodes only.
 - Links to canonical Share or Reader URLs.
 
-### 4. Local-First Reading Progress
+### 7. Local-First Reading Progress
 
 Store reading progress in `localStorage` without accounts or server sync.
 
@@ -83,7 +157,7 @@ MVP:
 - Record Series / Episode / Page progress locally.
 - Show "continue reading" on Reader-facing pages where appropriate.
 
-### 5. Bubble Full-Text Search
+### 8. Bubble Full-Text Search
 
 Build a derived runtime index from `Bubble.textOriginal` and return search
 results that link to quote/share URLs.
@@ -105,7 +179,7 @@ Boundary:
 - Because this exposes full text, it should share policy gates with the future
   HTML text layer.
 
-### 6. Storyboard To Draft Episode Flow
+### 9. Storyboard To Draft Episode Flow
 
 Import storyboard images and script text into draft Episodes for early creator
 and editor review.
@@ -242,3 +316,17 @@ MVP:
 - Use existing feedback -> proposal -> adopt proposal flow.
 - Keep reviewability; do not silently mutate canonical content.
 
+## Private / Commercial-Layer Ideas
+
+The following ideas may be useful for hosted commercial operations, but they
+should not be implemented or specified in detail in the public repository:
+
+- delivery or typesetting-level reader deterrence;
+- approved translation variant delivery by entitlement bucket;
+- reader/session-specific visible UI marks;
+- scraper behavior detection and response workflows;
+- paid-content leak tracing, forensic workflows, or enforcement automation.
+
+If public docs mention these, keep them at the level of "private commercial
+platform work" and do not include algorithms, thresholds, identifiers, or
+operational recipes.
