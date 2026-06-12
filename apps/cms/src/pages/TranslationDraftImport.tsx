@@ -16,6 +16,7 @@ import {
     type TranslationPackDraftImportEntry,
     type TranslationPackDraftImportResponse,
 } from "../api";
+import { estimateTranslationFit, type TranslationFitEstimate } from "../lib/structure-review/translationFit";
 
 type CanonicalBubbleRow = {
     bubbleId: string;
@@ -27,6 +28,8 @@ type CanonicalBubbleRow = {
     readingOrder: number;
     sourceText: string;
     bboxSummary: string;
+    bbox: BubbleData["bbox"];
+    textDirection?: BubbleData["textDirection"];
 };
 
 type ParsedTranslationRow = {
@@ -40,6 +43,7 @@ type ParsedTranslationRow = {
 type ResolvedTranslationRow = ParsedTranslationRow & {
     canonical?: CanonicalBubbleRow;
     entry?: TranslationPackDraftImportEntry;
+    fitEstimate?: TranslationFitEstimate;
 };
 
 function pageIdOf(page: EpisodeData["pages"][number]) {
@@ -186,6 +190,8 @@ function flattenCanonicalBubbles(episode: EpisodeData | null): CanonicalBubbleRo
                 readingOrder: bubble.bubbleNumber,
                 sourceText: bubble.textOriginal,
                 bboxSummary: formatBbox(bubble.bbox),
+                bbox: bubble.bbox,
+                textDirection: bubble.textDirection,
             };
         });
     });
@@ -200,9 +206,17 @@ function resolveRows(rows: ParsedTranslationRow[], canonicalBubbles: CanonicalBu
     return rows.map((row) => {
         const canonical = refMap.get(row.lookupRef);
         if (!canonical) return row;
+        const fitEstimate = row.text?.trim()
+            ? estimateTranslationFit({
+                text: row.text,
+                bbox: canonical.bbox,
+                textDirection: canonical.textDirection,
+            })
+            : undefined;
         return {
             ...row,
             canonical,
+            fitEstimate,
             entry: {
                 bubble_id: canonical.bubbleId,
                 page_id: canonical.pageId,
@@ -319,6 +333,7 @@ export default function TranslationDraftImport() {
     const missingBubbles = useMemo(() => canonicalBubbles.filter((bubble) => !matchedBubbleIds.has(bubble.bubbleId)), [canonicalBubbles, matchedBubbleIds]);
     const unmatchedRows = resolvedRows.filter((row) => !row.canonical && row.lookupRef);
     const localSourceTextMismatches = resolvedRows.filter(hasSourceTextMismatch);
+    const localFitWarnings = resolvedRows.filter((row) => row.fitEstimate?.status === "warning");
     const selectedDraft = drafts.find((draft) => draft.pack_draft_id === selectedDraftId);
     const canCallApi = Boolean(seriesId && epId && selectedDraftId && apiEntries.length > 0);
     const canApply = Boolean(apiResult?.result.can_apply && selectedDraftId && apiEntries.length > 0);
@@ -441,7 +456,11 @@ export default function TranslationDraftImport() {
                     <span className={`badge ${missingBubbles.length ? "badge-warn" : "badge-ok"}`}>missing bubbles {missingBubbles.length}</span>
                     <span className={`badge ${duplicateBubbleIds.length ? "badge-warn" : "badge-ok"}`}>duplicates {duplicateBubbleIds.length}</span>
                     <span className={`badge ${localSourceTextMismatches.length ? "badge-warn" : "badge-ok"}`}>source_text_mismatch {localSourceTextMismatches.length}</span>
+                    <span className={`badge ${localFitWarnings.length ? "badge-warn" : "badge-ok"}`}>fit warnings {localFitWarnings.length}</span>
                 </div>
+                <p className="card-meta">
+                    fit は Bubble bbox と textDirection からの簡易推定です。保存ブロックではなく、翻訳レビュー時の注意表示として扱います。
+                </p>
 
                 {localSourceTextMismatches.length > 0 && (
                     <div className="warning-list warning-list-priority translation-mismatch-summary">
@@ -464,11 +483,12 @@ export default function TranslationDraftImport() {
                                 <th>canonical bubble</th>
                                 <th>source</th>
                                 <th>English draft</th>
+                                <th>fit</th>
                             </tr>
                         </thead>
                         <tbody>
                             {resolvedRows.length === 0 ? (
-                                <tr><td colSpan={5}>Import rows are empty.</td></tr>
+                                <tr><td colSpan={6}>Import rows are empty.</td></tr>
                             ) : resolvedRows.map((row) => {
                                 const sourceMismatch = hasSourceTextMismatch(row);
                                 return (
@@ -504,6 +524,13 @@ export default function TranslationDraftImport() {
                                             </div>
                                         </td>
                                         <td>{row.text ?? "-"}</td>
+                                        <td>
+                                            {row.fitEstimate ? (
+                                                <span className={`badge ${row.fitEstimate.status === "warning" ? "badge-warn" : "badge-ok"}`}>
+                                                    {row.fitEstimate.characterCount}/{row.fitEstimate.estimatedCapacity}
+                                                </span>
+                                            ) : "-"}
+                                        </td>
                                     </tr>
                                 );
                             })}

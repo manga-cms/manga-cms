@@ -2414,6 +2414,17 @@ textarea {
     line-height: 1.5;
 }
 
+.translation-fit-guidance {
+    margin-top: 0.45rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+
+.translation-fit-guidance.is-warning {
+    color: #92400e;
+}
+
 .translation-workspace-actions {
     margin-top: 0;
 }

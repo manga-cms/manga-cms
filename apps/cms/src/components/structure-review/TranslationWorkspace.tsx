@@ -8,6 +8,7 @@ import {
     makeTranslationProposalDraftInput,
     storeLocalTranslationProposalDraft,
 } from "../../lib/structure-review/translationWorkspace";
+import { estimateTranslationFit } from "../../lib/structure-review/translationFit";
 
 type TranslationWorkspaceProps = {
     seriesId?: string;
@@ -33,6 +34,11 @@ export function TranslationWorkspace({
     const context = useMemo(() => buildBubbleTranslationContext(page, selectedBubble), [page, selectedBubble]);
     const sourceText = getBubbleSourceText(selectedBubble);
     const currentTranslation = getBubbleCurrentTranslation(selectedBubble);
+    const fitEstimate = useMemo(() => estimateTranslationFit({
+        text: suggestedText,
+        bbox: selectedBubble.bbox,
+        textDirection: selectedBubble.textDirection,
+    }), [selectedBubble.bbox, selectedBubble.textDirection, suggestedText]);
 
     useEffect(() => {
         setSuggestedText("");
@@ -120,6 +126,13 @@ export function TranslationWorkspace({
                     placeholder={t("structure.translation.suggestionPlaceholder")}
                     rows={4}
                 />
+                {suggestedText.trim() && (
+                    <p className={`translation-fit-guidance ${fitEstimate.status === "warning" ? "is-warning" : ""}`}>
+                        {fitEstimate.status === "warning"
+                            ? t("structure.translation.fitWarning", { count: fitEstimate.characterCount, capacity: fitEstimate.estimatedCapacity })
+                            : t("structure.translation.fitOk", { count: fitEstimate.characterCount, capacity: fitEstimate.estimatedCapacity })}
+                    </p>
+                )}
             </div>
 
             <div className="form-group">
