@@ -94,7 +94,13 @@ const audiences = [
 ];
 ---
 
-<BaseLayout title={siteConfig.title} description={siteConfig.description}>
+<BaseLayout
+  title={siteConfig.title}
+  description={siteConfig.description}
+  ogImage="/og-default.png"
+  ogImageWidth={1200}
+  ogImageHeight={630}
+>
   <div class="official-home official-home-plain">
     <section class="official-home-hero container">
       <h1>マンガを、あまねく届けるためのしくみ。</h1>

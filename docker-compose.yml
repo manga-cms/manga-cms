@@ -67,6 +67,17 @@ services:
       - ./github-handoffs:/data/github-handoffs
       - ./github-identities:/data/github-identities
 
+  demo-seed:
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    entrypoint: ["node", "scripts/seed-synthetic-demo.mjs"]
+    environment:
+      CONTENTS_DIR: /data/contents
+    volumes:
+      - ./contents:/data/contents
+
   viewer:
     build:
       context: .
@@ -85,6 +96,7 @@ services:
       SITE_ORIGIN: http://localhost:4321
       SITE_MODE: serial
       CONTENTS_DIR: /data/contents
+      READER_TEXT_VIEW_SERIES: ${READER_TEXT_VIEW_SERIES:-synthetic-demo}
     ports:
       - "127.0.0.1:4321:4321"
     volumes:

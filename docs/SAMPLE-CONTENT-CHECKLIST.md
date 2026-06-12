@@ -7,6 +7,11 @@ license says so.
 Use this checklist before committing anything under `contents/`, `packs/`, or
 public sample asset directories.
 
+Even when the creator made the sample specifically for Manga CMS, include a
+sample-specific `LICENSE.md` or `RIGHTS.md`. Self-authored content still needs
+explicit public repository, demo, translation, screenshot, OGP, and
+redistribution terms.
+
 ## Intended First Sample License Shape
 
 For the first curated sample, the intended terms are:
@@ -57,6 +62,26 @@ packs/
     RIGHTS.md
     pack.json
 ```
+
+## Feature Coverage Recommendations
+
+These are recommended, not mandatory. They help a single public sample double
+as a demo, documentation corpus, and regression target.
+
+- [ ] Include at least one page-level caption or SFX Bubble with
+      `panelId: null`.
+- [ ] Include both vertical and horizontal Bubbles.
+- [ ] Include at least one line with ruby/furigana needs, so future text layer
+      and ruby notation work has a realistic case to test.
+- [ ] Include a page with a bleed panel or intentional bbox overflow, so bbox
+      warnings can be demonstrated without blocking save.
+- [ ] Include both very short and longer dialogue, so translation fit guidance
+      has visible examples.
+- [ ] Include at least one Panel with `reactionTags`.
+- [ ] Include at least one shareable element marked with a spoiler flag.
+- [ ] Include one Translation Pack language when translation rights allow it,
+      so language switching, import, and fit-warning demos can use the same
+      sample.
 
 ## Rights Confirmation
 

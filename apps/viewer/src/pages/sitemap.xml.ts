@@ -12,20 +12,13 @@ const xmlEscape = (value: string) =>
 
 const absoluteUrl = (origin: string, path: string) => new URL(path, origin).href;
 
-const officialSitemapPaths = () => [
-  "/",
-  "/license",
-];
-
-const serialSitemapPaths = async () => {
+const readerSitemapPaths = async (seriesIds?: readonly string[]) => {
   const series = await getViewerSeriesCards();
-  const rootRedirectOrigin = import.meta.env.SITE_ROOT_REDIRECT_ORIGIN as string | undefined;
-  const paths = new Set<string>(["/works"]);
-  if (!rootRedirectOrigin) {
-    paths.add("/");
-  }
+  const allowedIds = seriesIds && seriesIds.length > 0 ? new Set(seriesIds) : undefined;
+  const paths = new Set<string>();
 
   for (const item of series) {
+    if (allowedIds && !allowedIds.has(item.id)) continue;
     if (!primaryOneshotEpisode(item)) {
       paths.add(`/works/${encodeURIComponent(item.id)}`);
     }
@@ -38,10 +31,25 @@ const serialSitemapPaths = async () => {
   return [...paths];
 };
 
+const officialSitemapPaths = async () => [
+  "/",
+  "/license",
+  ...(await readerSitemapPaths(siteConfig.content.demoSeriesIds)),
+];
+
+const serialSitemapPaths = async () => {
+  const rootRedirectOrigin = import.meta.env.SITE_ROOT_REDIRECT_ORIGIN as string | undefined;
+  const paths = new Set<string>(["/works", ...(await readerSitemapPaths())]);
+  if (!rootRedirectOrigin) {
+    paths.add("/");
+  }
+  return [...paths];
+};
+
 export const GET: APIRoute = async () => {
   const origin = new URL(siteConfig.origin).origin;
   const paths = siteConfig.mode === "official"
-    ? officialSitemapPaths()
+    ? await officialSitemapPaths()
     : await serialSitemapPaths();
   const urls = paths
     .map((path) => `  <url>\n    <loc>${xmlEscape(absoluteUrl(origin, path))}</loc>\n  </url>`)

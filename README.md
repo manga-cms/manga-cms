@@ -109,6 +109,16 @@ Run the local stack:
 docker compose up --build
 ```
 
+If you do not have sample manga content yet, run the optional demo profile to
+seed a clearly labeled synthetic placeholder series:
+
+```bash
+docker compose --profile demo up --build
+```
+
+The demo seed only writes to an empty `contents/` directory. It is a temporary
+placeholder until a rights-cleared sample manga is added.
+
 Default local URLs:
 
 - Reader: <http://localhost:4321>

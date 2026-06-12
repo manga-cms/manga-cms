@@ -220,6 +220,23 @@ environment:
 | `TRUST_PROXY` | `1` when behind a trusted reverse proxy |
 | `CONTENTS_DIR`, `PACKS_DIR`, runtime `*_DIR` values | Durable host paths or volumes for editorial and private runtime data |
 
+### Optional Demo Profile
+
+If `contents/` is empty and you want a quick local smoke target before a
+rights-cleared sample manga is available, start Compose with the optional demo
+profile:
+
+```bash
+docker compose --profile demo up --build
+```
+
+The profile runs a one-shot `demo-seed` service that writes a clearly labeled
+`synthetic-demo` placeholder series into `contents/`. The seed exits without
+changes when `contents/` already contains any non-`.gitkeep` entry, so it does
+not overwrite real editorial content. This placeholder is for local smoke
+testing only and should be replaced by a rights-cleared sample manga before
+public demos or screenshots.
+
 Optional production email login also needs `RESEND_API_KEY` and `EMAIL_FROM`.
 Keep commercial CDN, object storage, and provider-specific deployment choices
 outside this compose baseline.

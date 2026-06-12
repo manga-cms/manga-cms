@@ -55,7 +55,7 @@ const serialNavigation: SiteNavigationItem[] = [{ label: "Works", href: "/works"
 export const siteConfig: ViewerSiteConfig = {
   mode,
   origin,
-  title: mode === "official" ? "manga-cms.com" : "Manga Viewer",
+  title: mode === "official" ? "Manga CMS — マンガを、あまねく届けるためのオープンソース基盤" : "Manga Viewer",
   description:
     mode === "official"
       ? "マンガを、あまねく届けるためのオープンソース基盤"

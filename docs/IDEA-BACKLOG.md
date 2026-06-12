@@ -114,7 +114,7 @@ Boundary:
 ### 5. One-Command Docker Compose Self-Host
 
 Provide a `docker compose up` path that starts API, Viewer, CMS, and Postgres,
-then serves a rights-cleared sample.
+then serves a rights-cleared sample when one is available.
 
 Value:
 
@@ -127,6 +127,28 @@ MVP:
 - Compose file.
 - Initialization script.
 - Sample content only after rights and license text are complete.
+- Do not use generated placeholder manga as the primary public demo once a
+  creator-approved sample exists.
+
+### 5a. Synthetic Content Fixture Helper
+
+Generate deterministic synthetic `contents/` and `packs/` fixtures for tests and
+scale checks.
+
+Value:
+
+- Covers edge cases that a single curated sample may not include.
+- Keeps private manuscripts, creator samples, and demo artwork out of automated
+  test fixtures.
+- Lets validation, ingestion, and backup/restore tests create large or unusual
+  structures on demand.
+
+MVP:
+
+- Parameterized helper for Series / Episode / Page / Panel / Bubble counts.
+- Optional minimal placeholder PNG generation for image-dimension tests.
+- No polished comic artwork, no public demo profile dependency, and no claim
+  that generated fixtures are representative manga samples.
 
 ### 6. RSS / Atom Feed
 

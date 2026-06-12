@@ -5,6 +5,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+    buildSyntheticTranslationPack,
+    writeSyntheticContents,
+    writePlaceholderPng,
+} from "./lib/synthetic-content.mjs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 
@@ -29,64 +34,16 @@ function createTempWorkspace() {
     return mkdtempSync(join(tmpdir(), "manga-content-validation-"));
 }
 
-function createSyntheticContent(root) {
+function createSyntheticContent(root, options = {}) {
     const contentsDir = join(root, "contents");
-    const seriesDir = join(contentsDir, "series-a");
-    const episodeDir = join(seriesDir, "ep01");
-    mkdirSync(episodeDir, { recursive: true });
-
-    writeJson(join(seriesDir, "series.json"), {
-        id: "series-a",
-        title: "Series A",
-        description: "Synthetic fixture",
-        status: "ongoing",
-        episodes: ["ep01"],
-    });
-    writeJson(join(episodeDir, "episode.json"), {
-        schemaVersion: 2,
-        id: "ep01",
-        episodeNumber: 1,
-        title: "Episode 1",
-        publishedAt: "2026-01-01T00:00:00.000Z",
-        pages: [
-            {
-                pageId: "page-1",
-                pageNumber: 1,
-                images: {
-                    ja: "/synthetic/page-1.png",
-                },
-                width: 100,
-                height: 100,
-                panels: [
-                    {
-                        panelId: "panel-1",
-                        panelNumber: 1,
-                        bbox: {
-                            x: 0,
-                            y: 0,
-                            width: 100,
-                            height: 100,
-                        },
-                        reactionTags: [],
-                    },
-                ],
-                bubbles: [
-                    {
-                        bubbleId: "bubble-1",
-                        panelId: null,
-                        bubbleNumber: 1,
-                        bubbleType: "speech",
-                        textOriginal: "Synthetic text",
-                        bbox: {
-                            x: 10,
-                            y: 10,
-                            width: 30,
-                            height: 20,
-                        },
-                    },
-                ],
-            },
-        ],
+    writeSyntheticContents(contentsDir, {
+        idPrefix: "series-a",
+        pageWidth: 100,
+        pageHeight: 100,
+        panelsPerPage: 1,
+        bubblesPerPage: 1,
+        pageLevelBubbleRatio: 1,
+        ...options,
     });
 
     return contentsDir;
@@ -101,24 +58,10 @@ function createPack(root, pack) {
 }
 
 function packWithTarget(target) {
-    return {
-        id: "translation-en-series-a",
-        type: "TRANSLATION",
-        language: "en",
-        version: 1,
-        title: "Synthetic translation",
-        isPublished: false,
-        targetSeriesId: "series-a",
-        targetEpisodeId: "ep01",
-        entries: [
-            {
-                id: "entry-1",
-                target,
-                language: "en",
-                text: "Synthetic translation",
-            },
-        ],
-    };
+    return buildSyntheticTranslationPack({
+        packId: "translation-en-series-a",
+        target,
+    });
 }
 
 function assertPass(result, label) {
@@ -169,8 +112,8 @@ function testValidPackTargetPasses() {
         const packsDir = createPack(root, packWithTarget({
             seriesId: "series-a",
             episodeId: "ep01",
-            pageId: "page-1",
-            bubbleId: "bubble-1",
+            pageId: "series-a-ep01-p01",
+            bubbleId: "series-a-ep01-p01-bubble-001",
         }));
 
         assertPass(runValidate(contentsDir, packsDir), "valid pack target");
@@ -186,11 +129,55 @@ function testMissingPackBubbleFails() {
         const packsDir = createPack(root, packWithTarget({
             seriesId: "series-a",
             episodeId: "ep01",
-            pageId: "page-1",
+            pageId: "series-a-ep01-p01",
             bubbleId: "missing-bubble",
         }));
 
         assertFail(runValidate(contentsDir, packsDir), "missing pack bubble", /references missing Bubble/);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+}
+
+function testHighResolutionPagePasses() {
+    const root = createTempWorkspace();
+    try {
+        const contentsDir = createSyntheticContent(root, {
+            pageWidth: 3000,
+            pageHeight: 4500,
+            panelsPerPage: 4,
+            bubblesPerPage: 8,
+            pageLevelBubbleRatio: 0.25,
+        });
+        assertPass(runValidate(contentsDir, join(root, "missing-packs")), "high-resolution synthetic content");
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+}
+
+function testLargeSyntheticEpisodePasses() {
+    const root = createTempWorkspace();
+    try {
+        const contentsDir = createSyntheticContent(root, {
+            pagesPerEpisode: 50,
+            panelsPerPage: 6,
+            bubblesPerPage: 30,
+            pageLevelBubbleRatio: 0.1,
+        });
+        assertPass(runValidate(contentsDir, join(root, "missing-packs")), "large synthetic episode");
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+}
+
+async function testPlaceholderPngDimensions() {
+    const root = createTempWorkspace();
+    try {
+        const imagePath = join(root, "placeholder.png");
+        writePlaceholderPng(imagePath, 3000, 4500);
+        const modulePath = new URL("../packages/ingestion/dist/index.js", import.meta.url);
+        const { readImageDimensionsFromFile } = await import(modulePath.href);
+        assert.deepEqual(readImageDimensionsFromFile(imagePath), { width: 3000, height: 4500 });
     } finally {
         rmSync(root, { recursive: true, force: true });
     }
@@ -204,9 +191,16 @@ execFileSync("pnpm", ["--filter", "@manga/schemas", "build"], {
     cwd: repoRoot,
     stdio: "inherit",
 });
+execFileSync("pnpm", ["--filter", "@manga/ingestion", "build"], {
+    cwd: repoRoot,
+    stdio: "inherit",
+});
 
 testEmptyContentSkipsPackTargetValidation();
 testValidPackTargetPasses();
 testMissingPackBubbleFails();
+testHighResolutionPagePasses();
+testLargeSyntheticEpisodePasses();
+await testPlaceholderPngDimensions();
 
 console.log("Content validation script tests passed.");
