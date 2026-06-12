@@ -54,6 +54,28 @@ if [ "$status" = "200" ]; then
     pass "Works list rendering"
 fi
 
+# ---- 3. Optional Structured Text View ----
+echo "3️⃣  Structured Text View"
+if [ -n "${STRUCTURED_TEXT_SMOKE_PATH:-}" ]; then
+    text_url="$VIEWER$STRUCTURED_TEXT_SMOKE_PATH"
+    expected="${STRUCTURED_TEXT_SMOKE_EXPECT:-enabled}"
+    if [ "$expected" = "enabled" ]; then
+        check_status "Structured text view enabled" "$text_url" "200"
+        robots=$(curl -s "$text_url" | grep -i '<meta name="robots" content="noindex,follow"' || true)
+        if [ -n "$robots" ]; then
+            pass "Structured text view is noindex"
+        else
+            fail "Structured text view robots" "missing noindex,follow meta tag"
+        fi
+    elif [ "$expected" = "disabled" ]; then
+        check_status "Structured text view disabled" "$text_url" "404"
+    else
+        fail "Structured text view config" "STRUCTURED_TEXT_SMOKE_EXPECT must be enabled or disabled"
+    fi
+else
+    echo "  ⏭️  Set STRUCTURED_TEXT_SMOKE_PATH to verify /text ON/OFF behavior."
+fi
+
 # ---- Summary ----
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

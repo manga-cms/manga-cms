@@ -109,8 +109,16 @@ const IS_PRODUCTION = NODE_ENV === "production";
 function validateProductionConfig(): string[] {
     if (!IS_PRODUCTION) return [];
     const missing: string[] = [];
-    if (!process.env.DEV_AUTH_SECRET) missing.push("DEV_AUTH_SECRET");
-    if (!process.env.DELIVERY_SECRET) missing.push("DELIVERY_SECRET");
+    if (!process.env.DEV_AUTH_SECRET) {
+        missing.push("DEV_AUTH_SECRET");
+    } else if (process.env.DEV_AUTH_SECRET.includes("change-me")) {
+        missing.push("DEV_AUTH_SECRET (must be a unique production value)");
+    }
+    if (!process.env.DELIVERY_SECRET) {
+        missing.push("DELIVERY_SECRET");
+    } else if (process.env.DELIVERY_SECRET.includes("change-me")) {
+        missing.push("DELIVERY_SECRET (must be a unique production value)");
+    }
     if (!process.env.DATABASE_URL) missing.push("DATABASE_URL");
     if (!process.env.APP_URL) missing.push("APP_URL");
     return missing;
