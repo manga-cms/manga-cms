@@ -179,8 +179,8 @@ export function buildSyntheticSeries(options = {}) {
         return {
             manifest: {
                 id: seriesId,
-                title: `Synthetic Series ${seriesNumber}`,
-                description: "Synthetic fixture content.",
+                title: `Placeholder Demo Content ${seriesNumber}`,
+                description: "Placeholder demo content generated for local testing. Replace it with rights-cleared sample manga before public demos.",
                 publicationType: episodesPerSeries === 1 ? "oneshot" : "serial",
                 lifecycleStatus: "completed",
                 status: "completed",

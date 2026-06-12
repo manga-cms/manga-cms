@@ -1,6 +1,6 @@
 import type { BoundingBox } from "../../api";
 
-export type TranslationFitStatus = "ok" | "warning";
+export type TranslationFitStatus = "ok" | "tight" | "warning";
 
 export type TranslationFitEstimate = {
     status: TranslationFitStatus;
@@ -44,7 +44,7 @@ export function estimateTranslationFit(input: {
     const estimatedCapacity = estimateCapacity(input.bbox, input.textDirection ?? "horizontal", input.pageWidth);
     const ratio = estimatedCapacity === 0 ? 0 : characterCount / estimatedCapacity;
     return {
-        status: ratio > 1 ? "warning" : "ok",
+        status: ratio > 1 ? "warning" : ratio >= 0.85 ? "tight" : "ok",
         characterCount,
         estimatedCapacity,
         ratio,

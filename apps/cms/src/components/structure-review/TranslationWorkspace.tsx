@@ -127,10 +127,12 @@ export function TranslationWorkspace({
                     rows={4}
                 />
                 {suggestedText.trim() && (
-                    <p className={`translation-fit-guidance ${fitEstimate.status === "warning" ? "is-warning" : ""}`}>
+                    <p className={`translation-fit-guidance ${fitEstimate.status === "warning" ? "is-warning" : fitEstimate.status === "tight" ? "is-tight" : ""}`}>
                         {fitEstimate.status === "warning"
                             ? t("structure.translation.fitWarning", { count: fitEstimate.characterCount, capacity: fitEstimate.estimatedCapacity })
-                            : t("structure.translation.fitOk", { count: fitEstimate.characterCount, capacity: fitEstimate.estimatedCapacity })}
+                            : fitEstimate.status === "tight"
+                                ? t("structure.translation.fitTight", { count: fitEstimate.characterCount, capacity: fitEstimate.estimatedCapacity })
+                                : t("structure.translation.fitOk", { count: fitEstimate.characterCount, capacity: fitEstimate.estimatedCapacity })}
                     </p>
                 )}
             </div>

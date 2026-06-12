@@ -227,7 +227,7 @@ rights-cleared sample manga is available, start Compose with the optional demo
 profile:
 
 ```bash
-docker compose --profile demo up --build
+READER_TEXT_VIEW_SERIES=synthetic-demo docker compose --profile demo up --build
 ```
 
 The profile runs a one-shot `demo-seed` service that writes a clearly labeled

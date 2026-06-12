@@ -113,7 +113,7 @@ If you do not have sample manga content yet, run the optional demo profile to
 seed a clearly labeled synthetic placeholder series:
 
 ```bash
-docker compose --profile demo up --build
+READER_TEXT_VIEW_SERIES=synthetic-demo docker compose --profile demo up --build
 ```
 
 The demo seed only writes to an empty `contents/` directory. It is a temporary

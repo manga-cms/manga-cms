@@ -13,6 +13,18 @@ test("estimateTranslationFit returns ok when text fits rough bbox capacity", () 
     assert.ok(result.estimatedCapacity > result.characterCount);
 });
 
+test("estimateTranslationFit returns tight near rough bbox capacity", () => {
+    const result = estimateTranslationFit({
+        text: "12345678901",
+        bbox: { x: 0, y: 0, width: 60, height: 72 },
+        textDirection: "horizontal",
+    });
+
+    assert.equal(result.status, "tight");
+    assert.ok(result.ratio >= 0.85);
+    assert.ok(result.ratio <= 1);
+});
+
 test("estimateTranslationFit warns when text exceeds rough bbox capacity", () => {
     const result = estimateTranslationFit({
         text: "This translation is intentionally very long and should exceed a tiny speech bubble.",

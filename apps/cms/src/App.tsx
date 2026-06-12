@@ -28,6 +28,7 @@ export default function App() {
     const { t } = useTranslation();
     const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
     const [loginError, setLoginError] = useState("");
+    const [navOpen, setNavOpen] = useState(false);
 
     useEffect(() => {
         getMe().then(setUser).catch(() => undefined);
@@ -43,21 +44,58 @@ export default function App() {
         }
     };
 
+    const navGroups = [
+        {
+            label: t("app.nav.groupEdit"),
+            links: [
+                { to: "/", label: t("app.nav.dashboard") },
+                { to: "/works/new", label: t("app.nav.newWork") },
+                { to: "/ingestion", label: t("app.nav.ingestion") },
+            ],
+        },
+        {
+            label: t("app.nav.groupReview"),
+            links: [
+                { to: "/feedback", label: t("app.nav.feedback") },
+                { to: "/proposals", label: t("app.nav.proposals") },
+                { to: "/pack-drafts", label: t("app.nav.packDrafts") },
+            ],
+        },
+        {
+            label: t("app.nav.groupAdmin"),
+            links: [
+                { to: "/github-handoffs", label: t("app.nav.githubHandoffs") },
+                { to: "/github-identities", label: t("app.nav.githubIdentities") },
+                { to: "/rights", label: t("app.nav.rights") },
+                { to: "/entitlements", label: t("app.nav.entitlements") },
+            ],
+        },
+    ];
+
     return (
         <div className="app">
             <header className="app-header">
                 <Link to="/" className="app-logo">{t("app.logo")}</Link>
-                <nav>
-                    <Link to="/">{t("app.nav.dashboard")}</Link>
-                    <Link to="/works/new">{t("app.nav.newWork")}</Link>
-                    <Link to="/ingestion">{t("app.nav.ingestion")}</Link>
-                    <Link to="/feedback">{t("app.nav.feedback")}</Link>
-                    <Link to="/proposals">{t("app.nav.proposals")}</Link>
-                    <Link to="/pack-drafts">{t("app.nav.packDrafts")}</Link>
-                    <Link to="/github-handoffs">{t("app.nav.githubHandoffs")}</Link>
-                    <Link to="/github-identities">{t("app.nav.githubIdentities")}</Link>
-                    <Link to="/rights">{t("app.nav.rights")}</Link>
-                    <Link to="/entitlements">{t("app.nav.entitlements")}</Link>
+                <button
+                    type="button"
+                    className="app-nav-toggle"
+                    aria-controls="cms-primary-nav"
+                    aria-expanded={navOpen}
+                    onClick={() => setNavOpen((current) => !current)}
+                >
+                    {t("app.nav.menu")}
+                </button>
+                <nav id="cms-primary-nav" className={`app-nav ${navOpen ? "is-open" : ""}`}>
+                    {navGroups.map((group) => (
+                        <div key={group.label} className="app-nav-group">
+                            <span className="app-nav-group-title">{group.label}</span>
+                            {group.links.map((link) => (
+                                <Link key={link.to} to={link.to} onClick={() => setNavOpen(false)}>
+                                    {link.label}
+                                </Link>
+                            ))}
+                        </div>
+                    ))}
                 </nav>
                 <div className="app-session">
                     <LocaleSwitcher />

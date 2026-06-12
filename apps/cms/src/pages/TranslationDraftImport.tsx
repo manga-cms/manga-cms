@@ -334,6 +334,7 @@ export default function TranslationDraftImport() {
     const unmatchedRows = resolvedRows.filter((row) => !row.canonical && row.lookupRef);
     const localSourceTextMismatches = resolvedRows.filter(hasSourceTextMismatch);
     const localFitWarnings = resolvedRows.filter((row) => row.fitEstimate?.status === "warning");
+    const localFitTightRows = resolvedRows.filter((row) => row.fitEstimate?.status === "tight");
     const selectedDraft = drafts.find((draft) => draft.pack_draft_id === selectedDraftId);
     const canCallApi = Boolean(seriesId && epId && selectedDraftId && apiEntries.length > 0);
     const canApply = Boolean(apiResult?.result.can_apply && selectedDraftId && apiEntries.length > 0);
@@ -456,6 +457,7 @@ export default function TranslationDraftImport() {
                     <span className={`badge ${missingBubbles.length ? "badge-warn" : "badge-ok"}`}>missing bubbles {missingBubbles.length}</span>
                     <span className={`badge ${duplicateBubbleIds.length ? "badge-warn" : "badge-ok"}`}>duplicates {duplicateBubbleIds.length}</span>
                     <span className={`badge ${localSourceTextMismatches.length ? "badge-warn" : "badge-ok"}`}>source_text_mismatch {localSourceTextMismatches.length}</span>
+                    <span className={`badge ${localFitTightRows.length ? "badge-warn" : "badge-ok"}`}>fit tight {localFitTightRows.length}</span>
                     <span className={`badge ${localFitWarnings.length ? "badge-warn" : "badge-ok"}`}>fit warnings {localFitWarnings.length}</span>
                 </div>
                 <p className="card-meta">
@@ -526,7 +528,7 @@ export default function TranslationDraftImport() {
                                         <td>{row.text ?? "-"}</td>
                                         <td>
                                             {row.fitEstimate ? (
-                                                <span className={`badge ${row.fitEstimate.status === "warning" ? "badge-warn" : "badge-ok"}`}>
+                                                <span className={`badge ${row.fitEstimate.status === "warning" || row.fitEstimate.status === "tight" ? "badge-warn" : "badge-ok"}`}>
                                                     {row.fitEstimate.characterCount}/{row.fitEstimate.estimatedCapacity}
                                                 </span>
                                             ) : "-"}

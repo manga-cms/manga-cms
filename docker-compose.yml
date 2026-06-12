@@ -96,7 +96,7 @@ services:
       SITE_ORIGIN: http://localhost:4321
       SITE_MODE: serial
       CONTENTS_DIR: /data/contents
-      READER_TEXT_VIEW_SERIES: ${READER_TEXT_VIEW_SERIES:-synthetic-demo}
+      READER_TEXT_VIEW_SERIES: ${READER_TEXT_VIEW_SERIES:-}
     ports:
       - "127.0.0.1:4321:4321"
     volumes:

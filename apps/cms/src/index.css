@@ -59,12 +59,32 @@ a:hover {
     white-space: nowrap;
 }
 
-.app-header nav {
+.app-nav {
     display: flex;
     gap: 1rem;
     align-items: center;
     flex-wrap: wrap;
     font-size: 0.875rem;
+}
+
+.app-nav-group {
+    display: contents;
+}
+
+.app-nav-group-title,
+.app-nav-toggle {
+    display: none;
+}
+
+.app-nav-toggle {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.45rem 0.7rem;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
 }
 
 .app-session {
@@ -1590,6 +1610,10 @@ textarea {
     margin: 0 auto;
 }
 
+.structure-narrow-warning {
+    display: none;
+}
+
 .structure-header {
     display: flex;
     justify-content: space-between;
@@ -2428,6 +2452,10 @@ textarea {
     color: #92400e;
 }
 
+.translation-fit-guidance.is-tight {
+    color: #a16207;
+}
+
 .translation-workspace-actions {
     margin-top: 0;
 }
@@ -2491,6 +2519,10 @@ textarea {
 
     .structure-layout {
         grid-template-columns: 1fr;
+    }
+
+    .structure-narrow-warning {
+        display: block;
     }
 
     .structure-sidebar,
@@ -2557,6 +2589,69 @@ textarea {
 }
 
 @media (max-width: 760px) {
+    .app-header {
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        flex-wrap: wrap;
+    }
+
+    .app-logo {
+        flex: 1 1 auto;
+    }
+
+    .app-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .app-nav {
+        display: none;
+        flex: 1 0 100%;
+        width: 100%;
+        gap: 0.75rem;
+        order: 4;
+    }
+
+    .app-nav.is-open {
+        display: grid;
+    }
+
+    .app-nav-group {
+        display: grid;
+        gap: 0.35rem;
+        padding: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface-subtle);
+    }
+
+    .app-nav-group-title {
+        display: block;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .app-nav a {
+        padding: 0.35rem 0;
+    }
+
+    .app-session {
+        flex: 1 0 100%;
+        justify-content: flex-start;
+        min-width: 0;
+        order: 3;
+    }
+
+    .app-main {
+        margin-top: 1rem;
+        padding: 0 1rem;
+    }
+
     .triage-draft-header,
     .handoff-card-header,
     .sync-attempts-header,

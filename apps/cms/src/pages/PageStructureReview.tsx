@@ -883,6 +883,7 @@ export default function PageStructureReview() {
             )}
             {saved && <div className="success-msg">{t("structure.saved")}</div>}
             {dirty && <StructureChangeSummary summary={changeSummary} />}
+            <div className="structure-narrow-warning warning-msg">{t("structure.narrowWarning")}</div>
 
             <div className="structure-layout">
                 <PageStructureSidebar
