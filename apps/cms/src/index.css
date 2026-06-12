@@ -1690,6 +1690,49 @@ textarea {
     margin-bottom: 0.5rem;
 }
 
+.structure-header-hint {
+    margin-top: 0.35rem;
+}
+
+.structure-header-hint summary,
+.structure-sidebar-group summary {
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.structure-header-hint summary {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.structure-header-hint summary::before {
+    content: "ⓘ";
+    color: var(--accent);
+}
+
+.structure-header-hint .card-meta {
+    max-width: 42rem;
+    margin: 0.25rem 0 0;
+}
+
+.structure-sidebar-group {
+    margin: 0 0 0.85rem;
+    padding: 0.75rem 0 0;
+    border-top: 1px solid var(--border);
+}
+
+.structure-sidebar-group:first-child {
+    padding-top: 0;
+    border-top: none;
+}
+
+.structure-sidebar-group > summary {
+    margin-bottom: 0.65rem;
+}
+
 .panel-optional-note {
     margin-bottom: 1.25rem;
 }
@@ -1873,30 +1916,6 @@ textarea {
     margin: 0.45rem 0;
 }
 
-.review-state-candidate {
-    border-color: #b8c2d6;
-    background: #eef3fb;
-    color: #315176;
-}
-
-.review-state-confirmed {
-    border-color: #a7d6ba;
-    background: #eef8f2;
-    color: #22653b;
-}
-
-.review-state-needs_review {
-    border-color: #e7c979;
-    background: #fff8e6;
-    color: #7a5a08;
-}
-
-.review-state-rejected {
-    border-color: #e4b6b6;
-    background: #fff0f0;
-    color: #8a2d2d;
-}
-
 .structure-list-meta {
     min-width: 0;
 }
@@ -1933,7 +1952,7 @@ textarea {
 }
 
 .page-content-overview {
-    margin: 0 0 1rem;
+    margin: 0 0 0.75rem;
     padding: 0.75rem 0;
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
@@ -2219,22 +2238,6 @@ textarea {
     font-size: 0.6875rem;
     font-weight: 700;
     white-space: nowrap;
-}
-
-.bbox-text {
-    position: absolute;
-    inset: 1.25rem 0.5rem 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    color: #111827;
-    font-size: 0.7rem;
-    font-weight: 700;
-    line-height: 1.2;
-    text-align: center;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
-    pointer-events: none;
 }
 
 .bbox-resize {

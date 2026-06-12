@@ -1,4 +1,4 @@
-import { getAdminPageImageUrl, type EpisodeData, type PageData, type PanelData } from "../../api";
+import { getAdminPageImageUrl, type EpisodeData, type PageData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
 import { getBubbleWarnings, type BubbleTextComparisonOverlayMap } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf } from "../../lib/structure-review/ids";
@@ -13,7 +13,6 @@ type PageStructureSidebarProps = {
     episode: EpisodeData;
     page: PageData | null;
     pageIndex: number;
-    selectedPanel: PanelData | null;
     selectedPanelIndex: number | null;
     selectedBubbleIndex: number | null;
     scriptAssistText: string;
@@ -29,10 +28,8 @@ type PageStructureSidebarProps = {
     onScriptAssistTextChange: (value: string) => void;
     onApplyScriptAssist: () => void;
     onSelectPanel: (index: number) => void;
-    onSelectBubble: (index: number) => void;
     onSelectBubbleCandidate: (panelIndex: number | null, bubbleIndex: number) => void;
     onMovePanel: (index: number, direction: -1 | 1) => void;
-    onMoveBubble: (index: number, direction: -1 | 1) => void;
     onMoveBubbleCandidate: (panelIndex: number | null, bubbleIndex: number, direction: -1 | 1) => void;
 };
 
@@ -62,7 +59,6 @@ export function PageStructureSidebar({
     episode,
     page,
     pageIndex,
-    selectedPanel,
     selectedPanelIndex,
     selectedBubbleIndex,
     scriptAssistText,
@@ -78,10 +74,8 @@ export function PageStructureSidebar({
     onScriptAssistTextChange,
     onApplyScriptAssist,
     onSelectPanel,
-    onSelectBubble,
     onSelectBubbleCandidate,
     onMovePanel,
-    onMoveBubble,
     onMoveBubbleCandidate,
 }: PageStructureSidebarProps) {
     const { t } = useTranslation();
@@ -111,6 +105,8 @@ export function PageStructureSidebar({
 
     return (
         <aside className="structure-sidebar card">
+            <details className="structure-sidebar-group" open>
+                <summary>{t("structure.sidebar.groupPage")}</summary>
             <div className="form-group">
                 <label>{t("structure.sidebar.page")}</label>
                 <select
@@ -195,7 +191,10 @@ export function PageStructureSidebar({
                     ))}
                 </div>
             </details>
+            </details>
 
+            <details className="structure-sidebar-group">
+                <summary>{t("structure.sidebar.groupAddStructure")}</summary>
             <div className="review-summary">
                 <span className="badge badge-warn">{t("structure.sidebar.pending", { count: reviewSummary.pending })}</span>
                 <span className="badge badge-ok">{t("structure.sidebar.accepted", { count: reviewSummary.accepted })}</span>
@@ -236,20 +235,18 @@ export function PageStructureSidebar({
                 onChange={onScriptAssistTextChange}
                 onApply={onApplyScriptAssist}
             />
+            </details>
 
             <PanelBubbleLists
                 page={page}
                 panels={page?.panels ?? []}
-                selectedPanel={selectedPanel}
                 selectedPanelIndex={selectedPanelIndex}
                 selectedBubbleIndex={selectedBubbleIndex}
                 reviewDecisions={reviewDecisions}
                 textComparisonOverlays={textComparisonOverlays}
                 onSelectPanel={onSelectPanel}
-                onSelectBubble={onSelectBubble}
                 onSelectBubbleCandidate={onSelectBubbleCandidate}
                 onMovePanel={onMovePanel}
-                onMoveBubble={onMoveBubble}
                 onMoveBubbleCandidate={onMoveBubbleCandidate}
             />
         </aside>

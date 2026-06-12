@@ -547,7 +547,7 @@ export default function TranslationDraftImport() {
             </div>
 
             <div className="card">
-                <h2>3. Pack Draft 作成 / API preview / apply</h2>
+                <h2>3. Pack Draft 作成 / 事前確認 / 取り込み</h2>
                 <p className="card-meta">preview は Pack Draft を変更しません。apply した場合だけ runtime Translation Pack Draft に entries を追加します。</p>
                 <div className="translation-import-controls">
                     <div className="form-group">
@@ -571,7 +571,7 @@ export default function TranslationDraftImport() {
                         {busy ? "処理中…" : "Pack Draft を作成"}
                     </button>
                     <button type="button" className="btn btn-primary" disabled={busy || !canCallApi} onClick={() => submitImport(false)}>
-                        API preview
+                        事前確認
                     </button>
                     <button type="button" className="btn btn-success" disabled={busy || !canApply} onClick={() => submitImport(true)}>
                         Pack Draft に import
@@ -586,7 +586,7 @@ export default function TranslationDraftImport() {
 
             {apiResult && (
                 <div className="card">
-                    <h2>API preview result</h2>
+                    <h2>事前確認結果</h2>
                     <div className="translation-import-summary">
                         <span className={`badge ${apiResult.result.can_apply ? "badge-ok" : "badge-warn"}`}>can_apply {String(apiResult.result.can_apply)}</span>
                         <span className="badge">planned {apiResult.result.summary.planned_entries}</span>
@@ -598,7 +598,7 @@ export default function TranslationDraftImport() {
                     {importedDraftEntries.length > 0 && (
                         <div className="translation-import-applied">
                             <div className="translation-import-applied-header">
-                                <strong>{apiResult.applied ? "Translation Pack Draft に入った Bubble" : "API preview で追加予定の Bubble"}</strong>
+                                <strong>{apiResult.applied ? "Translation Pack Draft に入った Bubble" : "事前確認で追加予定の Bubble"}</strong>
                                 <span className="badge badge-ok">{importedDraftEntries.length} entries</span>
                             </div>
                             <p className="card-meta">draft text は Pack Draft entry に入り、canonical Bubble.textOriginal は変更しません。</p>
@@ -630,7 +630,7 @@ export default function TranslationDraftImport() {
                         </div>
                     )}
                     {apiResult.result.issues.length === 0 ? (
-                        <div className="success-msg">API validation issues はありません。</div>
+                        <div className="success-msg">検証エラーはありません。</div>
                     ) : (
                         <div className="compact-list">
                             {apiResult.result.issues.map((issue, index) => (

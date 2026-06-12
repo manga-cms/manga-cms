@@ -891,7 +891,6 @@ export default function PageStructureReview() {
                     episode={episode}
                     page={page}
                     pageIndex={pageIndex}
-                    selectedPanel={selectedPanel}
                     selectedPanelIndex={selectedPanelIndex}
                     selectedBubbleIndex={selectedBubbleIndex}
                     scriptAssistText={scriptAssistText}
@@ -914,10 +913,8 @@ export default function PageStructureReview() {
                         setSelectedPanelIndex(index);
                         setSelectedBubbleIndex(null);
                     }}
-                    onSelectBubble={setSelectedBubbleIndex}
                     onSelectBubbleCandidate={selectBubbleCandidate}
                     onMovePanel={movePanel}
-                    onMoveBubble={moveBubble}
                     onMoveBubbleCandidate={moveBubbleCandidate}
                 />
 

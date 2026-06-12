@@ -90,7 +90,7 @@ export default function Publish() {
                         <a href={result.viewerUrl} target="_blank" rel="noreferrer">{result.viewerUrl}</a>
                     </p>
                     <p>
-                        <strong>API:</strong>{" "}
+                        <strong>公開データ:</strong>{" "}
                         <a href={result.apiUrl} target="_blank" rel="noreferrer">{result.apiUrl}</a>
                     </p>
                     <div style={{ marginTop: "1rem" }}>

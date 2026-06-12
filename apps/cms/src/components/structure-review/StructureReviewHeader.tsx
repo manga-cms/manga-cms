@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { EpisodeData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
 import { TextExportMenu } from "../TextExportMenu";
+
+const STRUCTURE_HINT_SEEN_KEY = "manga-cms:structure-review-hint-seen";
 
 type StructureReviewHeaderProps = {
     seriesId: string | undefined;
@@ -31,13 +34,27 @@ export function StructureReviewHeader({
     onSave,
 }: StructureReviewHeaderProps) {
     const { t } = useTranslation();
+    const [hintOpen, setHintOpen] = useState(() => {
+        if (typeof window === "undefined") return true;
+        return window.localStorage.getItem(STRUCTURE_HINT_SEEN_KEY) !== "1";
+    });
+
+    useEffect(() => {
+        if (!hintOpen) {
+            window.localStorage.setItem(STRUCTURE_HINT_SEEN_KEY, "1");
+        }
+    }, [hintOpen]);
+
     return (
         <div className="structure-header">
             <div>
                 <h1>{t("structure.title")}</h1>
-                <p className="card-meta">{t("structure.header.description", { seriesId, episodeId })}</p>
-                <p className="card-meta">{t("structure.header.ingestion")}</p>
-                <p className="card-meta">{t("structure.header.sourceTextPolicy")}</p>
+                <details className="structure-header-hint" open={hintOpen} onToggle={(event) => setHintOpen(event.currentTarget.open)}>
+                    <summary>{t("structure.header.hintSummary")}</summary>
+                    <p className="card-meta">{t("structure.header.description", { seriesId, episodeId })}</p>
+                    <p className="card-meta">{t("structure.header.ingestion")}</p>
+                    <p className="card-meta">{t("structure.header.sourceTextPolicy")}</p>
+                </details>
             </div>
             <div className="section-actions">
                 {dirty && <span className="badge badge-warn">{t("structure.dirty")}</span>}

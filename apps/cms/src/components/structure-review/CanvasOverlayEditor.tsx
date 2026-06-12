@@ -147,8 +147,8 @@ export function CanvasOverlayEditor({
                                 style={toBoxStyle(panel.bbox, page)}
                                 onPointerDown={(e) => startBoxDrag(e, "panel", "move", panelIndex)}
                             >
-                                <span className="bbox-label">
-                                    {t("structure.canvas.panelLabel", { panelNumber: panel.panelNumber })} · {t(decisionLabelKey(reviewDecisions[panelReviewKey(panel)]))}
+                                <span className="bbox-label" title={`${t("structure.canvas.panelLabel", { panelNumber: panel.panelNumber })} · ${t(decisionLabelKey(reviewDecisions[panelReviewKey(panel)]))}`}>
+                                    {t("structure.canvas.panelLabel", { panelNumber: panel.panelNumber })}
                                 </span>
                                 <button
                                     type="button"
@@ -165,12 +165,17 @@ export function CanvasOverlayEditor({
                                 style={toBoxStyle(bubble.bbox, page)}
                                 onPointerDown={(e) => startBoxDrag(e, "bubble", "move", panelIndex, bubbleIndex)}
                             >
-                                <span className="bbox-label">
-                                    {t("structure.canvas.bubbleLabel", { bubbleNumber: bubble.bubbleNumber })} · {t("structure.sidebar.bubbleCandidateRow", { readingOrder })} · {t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)]))}
+                                <span
+                                    className="bbox-label"
+                                    title={[
+                                        t("structure.canvas.bubbleLabel", { bubbleNumber: bubble.bubbleNumber }),
+                                        t("structure.sidebar.bubbleCandidateRow", { readingOrder }),
+                                        t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)])),
+                                        bubble.textOriginal,
+                                    ].filter(Boolean).join(" · ")}
+                                >
+                                    {bubble.displayRef ?? bubble.shortId ?? t("structure.canvas.bubbleLabel", { bubbleNumber: bubble.bubbleNumber })}
                                 </span>
-                                {bubble.textOriginal && (
-                                    <span className="bbox-text">{bubble.textOriginal}</span>
-                                )}
                                 <button
                                     type="button"
                                     className="bbox-resize"
