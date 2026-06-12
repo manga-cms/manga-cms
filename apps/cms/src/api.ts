@@ -87,6 +87,7 @@ export interface BubbleData {
     textDirection?: "horizontal" | "vertical";
     lang?: string;
     flags?: ContentFlags;
+    metadata?: ContentPublicMetadata;
     bbox: BoundingBox;
 }
 

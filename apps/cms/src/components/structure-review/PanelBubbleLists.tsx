@@ -1,7 +1,7 @@
-import type { PageData, PanelData } from "../../api";
+import type { BubbleData, PageData, PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
 import type { MessageKey } from "../../i18n/messages";
-import { formatBboxSummary, getBubbleCandidates, getBubbleSourceText, getBubbleWarnings, getReviewDisplayState } from "../../lib/structure-review/bubbleDraft";
+import { formatBboxSummary, getBubbleCandidates, getBubbleSourceText, getBubbleTextComparisonBadges, getBubbleWarnings, getReviewDisplayState } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf, panelIdOf } from "../../lib/structure-review/ids";
 import { bubbleReviewKey, panelReviewKey } from "../../lib/structure-review/reviewDecisions";
 import type { ReviewDecisions } from "../../lib/structure-review/types";
@@ -26,6 +26,32 @@ const reviewStateLabelKey = (state: string): MessageKey => `structure.reviewStat
 
 function bubbleDisplayRef(bubble: PageData["bubbles"][number]) {
     return bubble.displayRef ?? bubble.shortId ?? bubbleIdOf(bubble);
+}
+
+function CandidateTextBadges({ bubble }: { bubble: BubbleData }) {
+    const { t } = useTranslation();
+    const comparison = getBubbleTextComparisonBadges(bubble);
+    if (!comparison.hasSourceText && !comparison.hasOcrText && comparison.confidence === undefined) return null;
+
+    return (
+        <div className="structure-candidate-badges">
+            {comparison.hasSourceText && (
+                <span className={`badge ${comparison.sourceDiffers ? "badge-warn" : "badge-muted"}`}>
+                    {comparison.sourceDiffers ? t("structure.textCompare.sourceDiffers") : t("structure.textCompare.psdSource")}
+                </span>
+            )}
+            {comparison.hasOcrText && (
+                <span className={`badge ${comparison.ocrDiffers ? "badge-warn" : "badge-muted"}`}>
+                    {comparison.ocrDiffers ? t("structure.textCompare.ocrDiffers") : t("structure.textCompare.ocrText")}
+                </span>
+            )}
+            {comparison.confidence !== undefined && (
+                <span className={`badge ${comparison.confidence < 0.75 ? "badge-warn" : "badge-ok"}`}>
+                    {t("structure.textCompare.confidenceShort", { value: comparison.confidence.toFixed(2) })}
+                </span>
+            )}
+        </div>
+    );
 }
 
 export function PanelBubbleLists({
@@ -73,6 +99,7 @@ export function PanelBubbleLists({
                                 </span>
                                 <span className="badge badge-muted">{t(decisionLabelKey(candidate.decision))}</span>
                             </div>
+                            <CandidateTextBadges bubble={candidate.bubble} />
                             <div className="structure-source-line">
                                 <span>{t("structure.sidebar.sourceTextLabel")}</span>
                                 <p>{getBubbleSourceText(candidate.bubble) || t("structure.sidebar.noText")}</p>
@@ -157,6 +184,7 @@ export function PanelBubbleLists({
                                                 </span>
                                                 <span className="badge badge-muted">{t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)]))}</span>
                                             </div>
+                                            <CandidateTextBadges bubble={bubble} />
                                             <div className="structure-source-line">
                                                 <span>{t("structure.sidebar.sourceTextLabel")}</span>
                                                 <p>{getBubbleSourceText(bubble) || t("structure.sidebar.noText")}</p>

@@ -1907,6 +1907,13 @@ textarea {
     flex-wrap: wrap;
 }
 
+.structure-candidate-badges {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin: 0 0 0.45rem;
+}
+
 .structure-list-item span,
 .structure-list-item small {
     overflow: hidden;

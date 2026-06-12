@@ -16,6 +16,12 @@ export function getBubbleSourceText(bubble: BubbleData) {
     return bubble.textOriginal;
 }
 
+function normalizeCandidateText(value: unknown): string {
+    return String(value ?? "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
 export function formatBboxSummary(box: BoundingBox) {
     return `x:${Math.round(box.x)}, y:${Math.round(box.y)}, w:${Math.round(box.width)}, h:${Math.round(box.height)}`;
 }
@@ -28,6 +34,11 @@ export function getBubbleWarnings(page: PageData | null, bubble: BubbleData) {
         warnings.push("outsidePage");
     }
     if ((bubble.bubbleType === "speech" || bubble.bubbleType === "thought") && !bubble.speaker?.trim()) warnings.push("missingSpeaker");
+    const comparison = getBubbleTextComparison(bubble);
+    const chosenText = normalizeCandidateText(comparison.chosenText);
+    if (comparison.confidence !== undefined && comparison.confidence < 0.75) warnings.push("lowConfidence");
+    if (comparison.sourceText && normalizeCandidateText(comparison.sourceText) !== chosenText) warnings.push("sourceTextDiffers");
+    if (comparison.ocrText && normalizeCandidateText(comparison.ocrText) !== chosenText) warnings.push("ocrTextDiffers");
     return warnings;
 }
 
@@ -54,7 +65,6 @@ export function getBubbleTextComparison(bubble: BubbleData) {
         chosenText?: unknown;
         confidence?: unknown;
         ocrConfidence?: unknown;
-        metadata?: Record<string, unknown>;
     };
     const metadata = candidate.metadata ?? {};
     const sourceText = optionalString(candidate.sourceText) ?? optionalString(metadata.sourceText);
@@ -70,6 +80,18 @@ export function getBubbleTextComparison(bubble: BubbleData) {
         ocrText,
         chosenText,
         confidence,
+    };
+}
+
+export function getBubbleTextComparisonBadges(bubble: BubbleData) {
+    const comparison = getBubbleTextComparison(bubble);
+    const chosenText = normalizeCandidateText(comparison.chosenText);
+    return {
+        hasSourceText: Boolean(comparison.sourceText),
+        hasOcrText: Boolean(comparison.ocrText),
+        sourceDiffers: Boolean(comparison.sourceText && normalizeCandidateText(comparison.sourceText) !== chosenText),
+        ocrDiffers: Boolean(comparison.ocrText && normalizeCandidateText(comparison.ocrText) !== chosenText),
+        confidence: comparison.confidence,
     };
 }
 
