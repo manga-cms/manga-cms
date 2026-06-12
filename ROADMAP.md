@@ -113,6 +113,9 @@ Current focus:
 - Move dynamically generated OGP images toward generic immutable published
   artifacts through the provider-neutral manifest/export model before public
   sharing volume makes crawler cache behavior difficult to reason about.
+- Keep static publish/export as the preferred long-term shape for public free
+  Episodes, so Reader HTML, published JSON/images, OGP images, and manifests
+  can be emitted together.
 - Explore an opt-in HTML text layer for Bubble text so selected titles can
   support browser text selection, search, accessibility, and browser
   translation experiments.
@@ -143,6 +146,7 @@ not watch the project evolve.
 Current focus:
 - Add the first rights-cleared public sample content package when the creator
   approval and sample-specific license text are complete.
+- Provide a simple one-command self-hosting path once sample content exists.
 - Keep README, screenshots, and feature GIFs aligned with what a self-hosted
   user can actually run from a clean checkout.
 - Add issue templates and contribution labels after the sample content and
@@ -229,6 +233,8 @@ M6. Public sharing artifact hardening
 - Move OGP images toward generic immutable published artifacts in a
   provider-neutral manifest/export flow.
 - Keep current dynamic OGP routes acceptable for beta while traffic is low.
+- Treat static publish/export as the umbrella design for OGP artifacts,
+  manifest output, and public free Episode hosting.
 
 M7. Feature-flagged Reader text layer prototype
 - Prototype only after public launch smoke, sample rights, and text exposure
@@ -239,6 +245,15 @@ M8. Public adoption basics
 - Add issue templates and contribution labels.
 - Add public screenshots/GIFs from rights-cleared sample content.
 - Add lightweight release tags and a changelog policy.
+- Add a one-command Docker Compose self-host path once the sample package is
+  available.
+
+## Idea Backlog
+
+Future ideas that are useful but not yet committed as near-term milestones are
+tracked in [`docs/IDEA-BACKLOG.md`](docs/IDEA-BACKLOG.md). The strongest current
+candidate is a static publish/export target for public free Episodes, because
+it also solves the long-term OGP artifact and manifest story.
 
 ## Review Checkpoints
 
@@ -264,3 +279,4 @@ review unless they touch one of the boundaries above.
 - [`docs/reader-text-layer-spec.md`](docs/reader-text-layer-spec.md)
 - [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md)
 - [`docs/BACKUP-RESTORE.md`](docs/BACKUP-RESTORE.md)
+- [`docs/IDEA-BACKLOG.md`](docs/IDEA-BACKLOG.md)
