@@ -6,6 +6,7 @@
     "scripts": {
         "dev": "astro dev",
         "build": "astro build",
+        "lint": "oxlint src --deny-warnings",
         "preview": "astro preview",
         "start": "node dist/server/entry.mjs"
     },

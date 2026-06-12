@@ -1,6 +1,5 @@
 import type { BubbleData, EpisodeData, PageData, PanelData } from "../../api";
 import { bubbleIdOf, panelIdOf } from "./ids";
-import { bubbleReviewKey, panelReviewKey } from "./reviewDecisions";
 import type { ReviewDecisions } from "./types";
 
 export type StructureChangeEntity = "page" | "panel" | "bubble" | "review";

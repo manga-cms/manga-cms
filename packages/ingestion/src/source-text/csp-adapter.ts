@@ -22,7 +22,7 @@ export function parseCspTextExport(rawText: string, source: SourceTextAdapterSou
 
     // Heuristic regex to detect page markers like "Page 1", "ページ: 2", "p.003", "- 4 -".
     // CSP export formats vary by locale and user workflow, so this parser is intentionally permissive.
-    const pageMarkerRegex = /^(?:={2,}|-{2,})?\s*(?:page|ページ|p\.?)\s*[:：#.\-]?\s*([0-9０-９]+)\s*(?:={2,}|-{2,})?$/i;
+    const pageMarkerRegex = /^(?:={2,}|-{2,})?\s*(?:page|ページ|p\.?)\s*[:：#.-]?\s*([0-9０-９]+)\s*(?:={2,}|-{2,})?$/i;
     const dividerNumberRegex = /^(?:={2,}|-{2,})\s*([0-9０-９]+)\s*(?:={2,}|-{2,})$/;
 
     const normalizeDigits = (value: string) =>

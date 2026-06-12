@@ -13,6 +13,7 @@
     },
     "scripts": {
         "build": "tsc",
+        "lint": "oxlint src test --deny-warnings",
         "test": "pnpm build && node --test --experimental-strip-types ./test/*.test.ts ./test/**/*.test.ts"
     },
     "dependencies": {

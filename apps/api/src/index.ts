@@ -93,7 +93,6 @@ import {
     type IngestionRepository,
     type PublishedPack,
     type RightsPermission,
-    type RightsRepository,
 } from "@manga/domain";
 
 // ---------------------------------------------------------------------------
@@ -657,8 +656,8 @@ app.get("/health", async (c) => {
         db: dbStatus,
         email: isEmailConfigured() ? "configured" : "disabled",
         secrets: {
-            auth: !!process.env.DEV_AUTH_SECRET ? "set" : "missing",
-            delivery: !!process.env.DELIVERY_SECRET ? "set" : "missing",
+            auth: process.env.DEV_AUTH_SECRET ? "set" : "missing",
+            delivery: process.env.DELIVERY_SECRET ? "set" : "missing",
         },
         contents: readRepo.listSeries().length > 0 ? "loaded" : "empty",
     };

@@ -7,15 +7,12 @@ import {
     CanonicalDraftPayloadSchema,
     GeminiProvider,
     OCRArtifactSchema,
-    type AlignmentArtifact,
-    type DraftBuildArtifact,
     type EpisodeInput,
     type OCRArtifact,
     type PageArtifactBundle,
     type PageInput,
     type RegionArtifact,
     type RegionDetectionArtifact,
-    type TextAlignmentArtifact,
 } from "../packages/ingestion/dist/index.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));

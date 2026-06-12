@@ -6,10 +6,11 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
+    "lint": "oxlint scripts --deny-warnings && turbo run lint",
     "validate:content": "node scripts/validate-content.mjs"
   },
   "devDependencies": {
+    "oxlint": "^1.69.0",
     "turbo": "^2.1.0"
   },
   "packageManager": "pnpm@9.5.0",

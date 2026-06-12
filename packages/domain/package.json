@@ -12,7 +12,8 @@
         }
     },
     "scripts": {
-        "build": "tsc"
+        "build": "tsc",
+        "lint": "oxlint src --deny-warnings"
     },
     "dependencies": {
         "@manga/schemas": "workspace:*"

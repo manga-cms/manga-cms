@@ -1554,11 +1554,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (target?.bubble || target?.panel) return targetTextFor(target) || "";
       return "";
     };
-    const pagePanelCount = (page) => (page?.panels || []).filter((panel) => panel.feedbackEnabled !== false).length;
-    const pageBubbleCount = (page) => (page?.panels || []).reduce(
-      (sum, panel) => sum + (panel.bubbles || []).filter((bubble) => bubble.feedbackEnabled !== false).length,
-      0,
-    );
     const closeTaskSheet = (options = {}) => {
       const { restorePreview = true } = options;
       if (taskSheet) taskSheet.hidden = true;
@@ -1581,67 +1576,6 @@ document.addEventListener("DOMContentLoaded", () => {
         ${disabled || description ? `<small>${escapeHtml(disabled ? t("targetUnavailable") : description)}</small>` : ""}
       </button>
     `;
-    const openTaskSheet = (kind, trigger = document.activeElement) => {
-      if (!taskSheet || !taskOptions) return;
-      taskSheetTrigger = trigger;
-      const page = currentPageData();
-      const hasPanels = pagePanelCount(page) > 0;
-      const hasBubbles = pageBubbleCount(page) > 0;
-      const config = kind === "share"
-        ? {
-            kicker: t("quickShare"),
-            title: t("shareEntryTitle"),
-            description: t("shareEntryDescription"),
-            options: [
-              { label: t("taskEpisode"), action: "share:episode" },
-              { label: t("taskPage"), action: "share:page" },
-              { label: t("taskPanel"), action: "share:panel", disabled: !hasPanels },
-              { label: t("taskBubble"), action: "share:bubble", disabled: !hasBubbles },
-            ],
-          }
-        : kind === "inspect"
-          ? {
-              kicker: t("quickInspect"),
-              title: t("inspectEntryTitle"),
-              description: t("inspectEntryDescription"),
-              options: [
-                { label: t("taskPage"), action: "inspect:page" },
-                { label: t("taskPanel"), action: "inspect:panel", disabled: !hasPanels },
-                { label: t("taskBubble"), action: "inspect:bubble", disabled: !hasBubbles },
-              ],
-            }
-          : {
-              kicker: t("quickReportDetail"),
-              title: t("reportEntryTitle"),
-              description: t("reportEntryDescription"),
-              options: [
-                { label: t("reportViewerBug"), action: "report:viewer", description: t("reportViewerBugDescription") },
-                { label: `${t("reportMangaContent")} · ${t("taskEpisode")}`, action: "report:episode", description: t("reportMangaContentDescription") },
-                { label: `${t("reportMangaContent")} · ${t("taskPage")}`, action: "report:page", description: t("reportMangaContentDescription") },
-                { label: `${t("reportMangaContent")} · ${t("taskPanel")}`, action: "report:panel", description: t("reportMangaContentDescription"), disabled: !hasPanels },
-                { label: `${t("reportMangaContent")} · ${t("taskBubble")}`, action: "report:bubble", description: t("reportMangaContentDescription"), disabled: !hasBubbles },
-                { label: `${t("reportMangaContent")} · ${t("taskRegion")}`, action: "report:region", description: t("reportMangaContentDescription") },
-              ],
-            };
-      if (taskKicker) {
-        taskKicker.hidden = false;
-        taskKicker.textContent = config.kicker;
-      }
-      if (taskTitle) {
-        taskTitle.hidden = false;
-        taskTitle.textContent = config.title;
-      }
-      if (taskDescription) {
-        taskDescription.hidden = false;
-        taskDescription.textContent = config.description;
-      }
-      taskOptions.innerHTML = config.options.map(taskOptionMarkup).join("");
-      taskSheet.hidden = false;
-      hideQuickActions();
-      hideTargetPreviewOverlay();
-      setReaderChromeVisible(true, { temporary: false });
-      closeContextMenu();
-    };
     const openTargetActionSheet = (target, trigger = document.activeElement) => {
       if (!taskSheet || !taskOptions || !target?.page) return;
       taskSheetTarget = target;

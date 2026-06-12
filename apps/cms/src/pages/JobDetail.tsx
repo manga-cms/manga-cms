@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
     getJob, updateDraft, submitForReview, confirmJob, cancelJob,
     getReviewCandidates, setReviewDecision, writeReviewedDraft,
@@ -9,7 +9,6 @@ import {
 
 export default function JobDetail() {
     const { jobId } = useParams<{ jobId: string }>();
-    const nav = useNavigate();
     const [job, setJob] = useState<IngestionJob | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");

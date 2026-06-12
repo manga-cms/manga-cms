@@ -7,6 +7,7 @@
         "build:workspace-deps": "pnpm --dir ../.. --filter @manga/schemas build && pnpm --dir ../.. --filter @manga/domain build && pnpm --dir ../.. --filter @manga/db build && pnpm --dir ../.. --filter @manga/ingestion build",
         "dev": "pnpm run build:workspace-deps && tsx watch src/index.ts",
         "build": "tsc",
+        "lint": "oxlint src --deny-warnings",
         "start": "node dist/index.js"
     },
     "dependencies": {

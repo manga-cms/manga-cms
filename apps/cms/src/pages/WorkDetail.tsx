@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
     getAdminEpisode,
     getSeries,
@@ -92,7 +92,6 @@ function buildSeriesPublicMetadata(current: ContentPublicMetadata | undefined, f
 
 export default function WorkDetail() {
     const { id } = useParams<{ id: string }>();
-    const nav = useNavigate();
     const [work, setWork] = useState<SeriesDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");

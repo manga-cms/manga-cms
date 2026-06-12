@@ -142,10 +142,6 @@ export interface EpisodeData {
     pages: PageData[];
 }
 
-function pageIdOf(page: Pick<PageData, "pageId" | "id">) {
-    return page.pageId ?? page.id;
-}
-
 function panelIdOf(panel: Pick<PanelData, "panelId" | "id">) {
     return panel.panelId ?? panel.id;
 }

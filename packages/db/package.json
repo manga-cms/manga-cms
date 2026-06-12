@@ -13,6 +13,7 @@
     },
     "scripts": {
         "build": "tsc",
+        "lint": "oxlint src --deny-warnings",
         "db:generate": "pnpm run db:generate:sqlite",
         "db:generate:sqlite": "prisma generate --schema=./prisma/schema.prisma",
         "db:generate:postgres": "prisma generate --schema=./prisma/schema.postgres.prisma",
