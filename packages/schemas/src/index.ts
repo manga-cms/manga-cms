@@ -1,4 +1,5 @@
 export * from "./content.js";
+export * from "./reading-order.js";
 export * from "./contributor-identity.js";
 export * from "./feedback.js";
 export * from "./proposal.js";

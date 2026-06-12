@@ -349,6 +349,30 @@ No `schemaVersion: 3` migration is needed while layout is optional and
 layout lines become required, if `textOriginal` semantics change, or if old
 content must be migrated to a new canonical text representation.
 
+### Content Lint Warnings
+
+`packages/schemas/src/content.ts` owns two layers:
+
+- Zod schema validation for hard invalid content.
+- `lintPageContent(page)` for review warnings and recoverable content issues.
+
+Lint warnings must not be treated as schema failures unless a caller
+explicitly opts into warning-as-error behavior for CI or editorial policy.
+They are meant for CMS review gates.
+
+Current lint codes:
+
+| Code | Severity | Meaning |
+| --- | --- | --- |
+| `INVALID_PANEL_REF` | `error` | A Bubble references a `panelId` that does not exist on the Page. |
+| `BBOX_OUT_OF_BOUNDS` | `warning` | A Panel or Bubble bbox extends beyond the Page dimensions. This can be intentional for bleed. |
+| `BUBBLE_OUTSIDE_PANEL_BBOX` | `warning` | A Bubble is linked to a Panel, but its bbox is not contained by the Panel bbox. |
+| `READING_ORDER_SUSPECT` | `warning` | Saved `panelNumber` order disagrees with the default RTL manga reading-order estimate for more than half the Page Panels. |
+
+`READING_ORDER_SUSPECT` follows `docs/reading-order-spec.md`. It is only a
+heuristic review signal. It must not silently reorder canonical content or make
+unusual layouts invalid.
+
 ### Shared Supporting Types
 
 ```ts

@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { estimatePanelReadingOrder } from "./reading-order.js";
 
 // ---------------------------------------------------------------------------
 // Geometry
@@ -363,6 +364,28 @@ export function lintPageContent(page: PageData): ContentLintWarning[] {
             source: "content-lint",
         });
     });
+
+    if (page.panels.length >= 2) {
+        const savedOrder = [...page.panels]
+            .sort((a, b) =>
+                a.panelNumber - b.panelNumber ||
+                (a.displayRef ?? "").localeCompare(b.displayRef ?? "") ||
+                a.panelId.localeCompare(b.panelId),
+            )
+            .map((panel) => panel.panelId);
+        const estimatedOrder = estimatePanelReadingOrder(page.panels);
+        const mismatchCount = savedOrder.reduce((count, panelId, index) => count + (panelId === estimatedOrder[index] ? 0 : 1), 0);
+        if (mismatchCount > page.panels.length / 2) {
+            warnings.push({
+                severity: "warning",
+                code: "READING_ORDER_SUSPECT",
+                message: `Panel reading order may not follow the default RTL manga order. Estimated order: ${estimatedOrder.join(", ")}`,
+                path: ["panels"],
+                pageId: page.pageId,
+                source: "content-lint",
+            });
+        }
+    }
 
     return warnings;
 }

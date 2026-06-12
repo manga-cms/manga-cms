@@ -165,4 +165,62 @@ test("PageSchema and Linter Validation", async (t) => {
         assert.equal(warnings[0].panelId, "panel-1");
         assert.equal(warnings[0].bubbleId, "bubble-1");
     });
+
+    await t.test("Linter does not warn for default RTL panel reading order", () => {
+        const rtlOrder = {
+            id: "page-1",
+            pageNumber: 1,
+            width: 1200,
+            height: 1600,
+            images: {},
+            panels: [
+                {
+                    id: "right-panel",
+                    panelNumber: 1,
+                    bbox: { x: 640, y: 40, width: 500, height: 320 }
+                },
+                {
+                    id: "left-panel",
+                    panelNumber: 2,
+                    bbox: { x: 60, y: 40, width: 500, height: 320 }
+                }
+            ],
+            bubbles: []
+        };
+
+        const parsed = PageSchema.parse(rtlOrder);
+        const warnings = lintPageContent(parsed);
+        assert.equal(warnings.some((warning) => warning.code === "READING_ORDER_SUSPECT"), false);
+    });
+
+    await t.test("Linter emits warning when panel order appears LTR", () => {
+        const ltrOrder = {
+            id: "page-1",
+            pageNumber: 1,
+            width: 1200,
+            height: 1600,
+            images: {},
+            panels: [
+                {
+                    id: "left-panel",
+                    panelNumber: 1,
+                    bbox: { x: 60, y: 40, width: 500, height: 320 }
+                },
+                {
+                    id: "right-panel",
+                    panelNumber: 2,
+                    bbox: { x: 640, y: 40, width: 500, height: 320 }
+                }
+            ],
+            bubbles: []
+        };
+
+        const parsed = PageSchema.parse(ltrOrder);
+        const warnings = lintPageContent(parsed);
+        const readingOrderWarning = warnings.find((warning) => warning.code === "READING_ORDER_SUSPECT");
+        assert.ok(readingOrderWarning);
+        assert.equal(readingOrderWarning.severity, "warning");
+        assert.deepEqual(readingOrderWarning.path, ["panels"]);
+        assert.equal(readingOrderWarning.source, "content-lint");
+    });
 });
