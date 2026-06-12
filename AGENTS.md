@@ -73,14 +73,22 @@ Run the repo lint command:
 pnpm lint
 ```
 
+Run script-level safety checks:
+
+```bash
+pnpm test:scripts
+```
+
 Run package tests that exist:
 
 ```bash
 pnpm --filter @manga/ingestion test
 ```
 
-There is no root `pnpm test` script at the time this file was written. Do not
-claim repo-wide tests passed unless a root test script has been added and run.
+There is no root `pnpm test` script at the time this file was written.
+`pnpm test:scripts` covers repository scripts and safety checks, not package
+test suites. Do not claim repo-wide tests passed unless a root test script has
+been added and run.
 
 Run local services:
 

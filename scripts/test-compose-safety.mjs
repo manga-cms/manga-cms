@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// This test intentionally checks specific Compose/entrypoint strings. If the
+// Docker local-demo stack is refactored, update these assertions together with
+// a boundary review of the default exposure and production secret guards.
+
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
