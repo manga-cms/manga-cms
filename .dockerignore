@@ -29,6 +29,8 @@ imports/**
 draft-assets/**
 rights/**
 entitlements/**
+github-handoffs/**
+github-identities/**
 backups/**
 .antigravitycli/**
 antigravity-review.md

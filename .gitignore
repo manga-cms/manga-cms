@@ -34,6 +34,11 @@ feedback/
 proposals/
 pack-drafts/
 rights/
+drafts/
+imports/
+draft-assets/
+github-handoffs/
+github-identities/
 
 # Local/private canonical content.
 # Public sample content must be explicitly unignored and licensed before commit.

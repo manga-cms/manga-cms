@@ -133,6 +133,97 @@ were initialized with `db:push:postgres` must follow the baseline procedure in
 `docs/PRODUCTION-POSTGRES-MIGRATIONS.md` before production startup is changed
 to `db:migrate:deploy:postgres`.
 
+## Docker Compose
+
+Use Docker Compose for the shortest self-host path from a fresh clone to a
+running API, Viewer, CMS, and Postgres stack.
+
+The default compose stack is for local demos only. It binds services to
+`127.0.0.1` and uses development secrets; do not expose it directly to the
+internet.
+
+```bash
+docker compose up --build
+```
+
+Default local URLs:
+
+| Service | URL |
+|---------|-----|
+| API health | `http://localhost:3000/api/v1/health` |
+| Viewer | `http://localhost:4321` |
+| CMS | `http://localhost:5173` |
+| Postgres | `localhost:5432` |
+
+The compose stack starts four services:
+
+- `postgres`: Postgres 16 with a named `postgres-data` volume.
+- `api`: Hono API on port `3000`. Its entrypoint creates runtime directories,
+  waits for Postgres, then runs `pnpm --filter @manga/db db:push:postgres`
+  before starting the API.
+- `viewer`: Astro SSR Viewer on port `4321`, with server-side API calls routed
+  to `http://api:3000/api/v1`.
+- `cms`: built React CMS served by nginx on port `5173`, with `/api/*`
+  proxied to the API container.
+
+Runtime state is not baked into images. Compose bind-mounts canonical editorial
+source and private runtime state from the host:
+
+| Data | Mount |
+|------|-------|
+| Manga content | `./contents:/data/contents` |
+| Packs | `./packs:/data/packs` |
+| Feedback | `./feedback:/data/feedback` |
+| Proposals | `./proposals:/data/proposals` |
+| Pack drafts | `./pack-drafts:/data/pack-drafts` |
+| Ingestion drafts/imports/assets | `./drafts`, `./imports`, `./draft-assets` |
+| Rights, entitlements, GitHub handoff state | `./rights`, `./entitlements`, `./github-handoffs`, `./github-identities` |
+| Postgres state | `postgres-data:/var/lib/postgresql/data` |
+
+To stop containers while keeping data:
+
+```bash
+docker compose down
+docker compose up
+```
+
+Do not pass `-v` to `docker compose down` unless you intentionally want to
+delete the Postgres volume. Host-mounted runtime directories such as
+`contents/`, `packs/`, and `feedback/` remain on disk either way.
+
+Quick validation:
+
+```bash
+curl http://localhost:3000/api/v1/health
+# Expected: JSON with "status": "ok"
+
+curl -I http://localhost:4321/
+curl -I http://localhost:5173/
+```
+
+The default compose environment is development-oriented and uses local secrets
+that are safe only for local demos. Before using the compose stack for
+production, keep it behind a reverse proxy or override the port bindings, and
+override at least these values in an environment-specific compose file or shell
+environment:
+
+| Variable | Production requirement |
+|----------|------------------------|
+| `NODE_ENV` | Set API to `production` after all required env is configured |
+| `DATABASE_URL` | Use a production Postgres URL with durable backups |
+| `DEV_AUTH_SECRET` | Set a unique random value of at least 32 characters |
+| `DELIVERY_SECRET` | Set a unique random value of at least 32 characters |
+| `APP_URL` | Public API base URL, e.g. `https://api.example.com/api/v1` |
+| `API_BASE` | Internal Viewer-to-API URL, or public API URL when not on one Docker network |
+| `DELIVERY_PUBLIC_ORIGIN` | Public origin used for signed delivery image URLs |
+| `ALLOWED_ORIGINS` | Public Viewer and CMS origins |
+| `TRUST_PROXY` | `1` when behind a trusted reverse proxy |
+| `CONTENTS_DIR`, `PACKS_DIR`, runtime `*_DIR` values | Durable host paths or volumes for editorial and private runtime data |
+
+Optional production email login also needs `RESEND_API_KEY` and `EMAIL_FROM`.
+Keep commercial CDN, object storage, and provider-specific deployment choices
+outside this compose baseline.
+
 ## Start Services
 
 ### API Server

@@ -1,0 +1,104 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: manga_cms
+      POSTGRES_USER: manga
+      POSTGRES_PASSWORD: manga
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U manga -d manga_cms"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      PRISMA_PROVIDER: postgresql
+      DATABASE_URL: postgresql://manga:manga@postgres:5432/manga_cms?schema=public
+      APP_URL: http://localhost:3000/api/v1
+      API_BASE: http://api:3000/api/v1
+      DELIVERY_PUBLIC_ORIGIN: http://localhost:3000
+      DEV_AUTH_SECRET: manga-compose-dev-auth-secret-change-me
+      DELIVERY_SECRET: manga-compose-delivery-secret-change-me
+      DEV_ADMIN_IDS: dev-admin
+      ALLOWED_ORIGINS: http://localhost:4321,http://localhost:5173
+      CONTENTS_DIR: /data/contents
+      PACKS_DIR: /data/packs
+      FEEDBACK_DIR: /data/feedback
+      PROPOSALS_DIR: /data/proposals
+      PACK_DRAFTS_DIR: /data/pack-drafts
+      DRAFTS_DIR: /data/drafts
+      IMPORTS_DIR: /data/imports
+      DRAFT_ASSETS_DIR: /data/draft-assets
+      RIGHTS_DIR: /data/rights
+      ENTITLEMENTS_DIR: /data/entitlements
+      GITHUB_HANDOFF_DIR: /data/github-handoffs
+      GITHUB_IDENTITY_DIR: /data/github-identities
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/v1/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - ./contents:/data/contents
+      - ./packs:/data/packs
+      - ./feedback:/data/feedback
+      - ./proposals:/data/proposals
+      - ./pack-drafts:/data/pack-drafts
+      - ./drafts:/data/drafts
+      - ./imports:/data/imports
+      - ./draft-assets:/data/draft-assets
+      - ./rights:/data/rights
+      - ./entitlements:/data/entitlements
+      - ./github-handoffs:/data/github-handoffs
+      - ./github-identities:/data/github-identities
+
+  viewer:
+    build:
+      context: .
+      dockerfile: apps/viewer/Dockerfile
+      args:
+        API_BASE: http://localhost:3000/api/v1
+        SITE_ORIGIN: http://localhost:4321
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4321"
+      API_BASE: http://api:3000/api/v1
+      SITE_ORIGIN: http://localhost:4321
+      SITE_MODE: serial
+      CONTENTS_DIR: /data/contents
+    ports:
+      - "127.0.0.1:4321:4321"
+    volumes:
+      - ./contents:/data/contents:ro
+
+  cms:
+    build:
+      context: .
+      dockerfile: apps/cms/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5173:5173"
+
+volumes:
+  postgres-data:

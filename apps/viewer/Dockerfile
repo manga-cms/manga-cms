@@ -1,0 +1,72 @@
+# syntax=docker/dockerfile:1
+
+FROM node:20-bookworm-slim AS base
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+WORKDIR /app
+RUN corepack enable
+
+FROM base AS deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/cms/package.json apps/cms/package.json
+COPY apps/viewer/package.json apps/viewer/package.json
+COPY packages/db/package.json packages/db/package.json
+COPY packages/domain/package.json packages/domain/package.json
+COPY packages/ingestion/package.json packages/ingestion/package.json
+COPY packages/schemas/package.json packages/schemas/package.json
+
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS build
+
+ARG API_BASE="http://localhost:3000/api/v1"
+ARG SITE_MODE="serial"
+ARG SITE_ORIGIN="http://localhost:4321"
+ARG SITE_READER_ORIGIN=""
+ARG SITE_ROOT_REDIRECT_ORIGIN=""
+ARG SITE_DEMO_SERIES_IDS=""
+ARG SITE_ALLOWED_SERIES_IDS=""
+ARG PUBLIC_ANALYTICS_ENV=""
+ARG PUBLIC_CLOUDFLARE_WEB_ANALYTICS_ENABLED=""
+ARG PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN=""
+ARG PUBLIC_ANALYTICS_ENABLED="false"
+ARG PUBLIC_GA_MEASUREMENT_ID=""
+ARG PUBLIC_INDEX_EN_LOCALE=""
+
+ENV API_BASE="${API_BASE}"
+ENV SITE_MODE="${SITE_MODE}"
+ENV SITE_ORIGIN="${SITE_ORIGIN}"
+ENV SITE_READER_ORIGIN="${SITE_READER_ORIGIN}"
+ENV SITE_ROOT_REDIRECT_ORIGIN="${SITE_ROOT_REDIRECT_ORIGIN}"
+ENV SITE_DEMO_SERIES_IDS="${SITE_DEMO_SERIES_IDS}"
+ENV SITE_ALLOWED_SERIES_IDS="${SITE_ALLOWED_SERIES_IDS}"
+ENV PUBLIC_ANALYTICS_ENV="${PUBLIC_ANALYTICS_ENV}"
+ENV PUBLIC_CLOUDFLARE_WEB_ANALYTICS_ENABLED="${PUBLIC_CLOUDFLARE_WEB_ANALYTICS_ENABLED}"
+ENV PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN="${PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN}"
+ENV PUBLIC_ANALYTICS_ENABLED="${PUBLIC_ANALYTICS_ENABLED}"
+ENV PUBLIC_GA_MEASUREMENT_ID="${PUBLIC_GA_MEASUREMENT_ID}"
+ENV PUBLIC_INDEX_EN_LOCALE="${PUBLIC_INDEX_EN_LOCALE}"
+
+COPY . .
+
+RUN pnpm --filter @manga/viewer... build
+
+FROM base AS runner
+
+ENV NODE_ENV="production"
+ENV HOST="0.0.0.0"
+ENV PORT="4321"
+
+COPY --from=build /app /app
+
+EXPOSE 4321
+
+CMD ["pnpm", "--filter", "@manga/viewer", "start"]
