@@ -63,9 +63,13 @@ resolution-dependent and will produce different orders for the same layout at
 
 Recommended deterministic grouping:
 
-1. Sort candidate panels by `bbox.y`, then `bbox.x`, then stable ID.
+1. Sort candidate panels by `bbox.y`, then `bbox.x`, then stable ID. This
+   insertion order is only for deterministic grouping; it is not the reading
+   order.
 2. Add each panel to the first existing tier whose tier vertical interval
-   overlaps by the same 40% rule.
+   overlaps by at least 40% of the incoming Panel height. Do not use the
+   current tier interval height as the threshold; a tier grows as Panels are
+   added, and using tier height would make grouping depend on earlier inserts.
 3. If no tier matches, create a new tier.
 4. After insertion, update the tier vertical interval to cover all panels in
    the tier.
@@ -201,7 +205,8 @@ The MVP heuristic should defer to human review for:
 - overlapping Panels
 - diagonal or spiral reading paths
 - double-page spreads with cross-page order
-- four-panel vertical strips that intentionally read top to bottom
+- side-by-side multi-strip four-panel pages that intentionally read one
+  vertical strip before the next
 - webtoon-style vertical scroll layouts
 - cross-panel captions or sound effects
 - Bubbles whose reading order is driven by character gaze or action flow
@@ -232,4 +237,3 @@ automatic extraction -> confidence -> human review -> confirm -> contents/packs
 
 Panel / Bubble reading order produced during ingestion is draft data. CMS review
 must make it visible, correctable, and confirmable before it becomes canonical.
-

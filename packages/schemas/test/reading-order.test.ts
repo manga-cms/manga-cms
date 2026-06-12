@@ -86,6 +86,20 @@ test("estimatePanelReadingOrder is resolution independent", () => {
     assert.deepEqual(estimatePanelReadingOrder(highResolution), ["right", "left", "wide"]);
 });
 
+test("estimatePanelReadingOrder compares tier overlap against the incoming panel height", () => {
+    const panels = [
+        { panelId: "top-left", bbox: box(60, 0, 420, 100) },
+        { panelId: "top-right", bbox: box(650, 0, 420, 100) },
+        { panelId: "lower-tall", bbox: box(650, 50, 420, 300) },
+    ];
+
+    assert.deepEqual(estimatePanelReadingOrder(panels), [
+        "top-right",
+        "top-left",
+        "lower-tall",
+    ]);
+});
+
 test("estimateBubbleReadingOrder uses panel order, RTL columns, then page-level bubbles", () => {
     const page = {
         width: 1200,
@@ -111,4 +125,3 @@ test("estimateBubbleReadingOrder uses panel order, RTL columns, then page-level 
         "page-level",
     ]);
 });
-

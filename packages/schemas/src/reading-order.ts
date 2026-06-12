@@ -65,7 +65,7 @@ function horizontalOverlap(a: { left: number; right: number }, b: ReadingOrderBo
 }
 
 function sameTier<T extends { bbox: ReadingOrderBox }>(tier: VerticalTier<T>, item: T) {
-    return verticalOverlap(tier, item.bbox) >= Math.min(tier.bottom - tier.top, item.bbox.height) * SAME_TIER_OVERLAP_RATIO;
+    return verticalOverlap(tier, item.bbox) >= item.bbox.height * SAME_TIER_OVERLAP_RATIO;
 }
 
 function sameColumn<T extends { bbox: ReadingOrderBox }>(column: HorizontalColumn<T>, item: T) {
@@ -195,4 +195,3 @@ export function estimateBubbleReadingOrder(page: PageReadingOrderInput): string[
 
     return [...resolvedOrder, ...unresolvedOrder];
 }
-

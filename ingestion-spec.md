@@ -334,6 +334,10 @@ Panel と Bubble の階層を決めるために、
 
 この時点ではまだ「ドラフト」であり、正本ではない。
 
+`panelNumber` / `bubbleNumber` の初期採番は
+`docs/reading-order-spec.md` の推定順に従う。これは review 用の初期値であり、
+CMS Review（§7）で人間が確認・修正した canonical order が正本となる。
+
 ### 出力
 - draft content tree
 - extraction report
