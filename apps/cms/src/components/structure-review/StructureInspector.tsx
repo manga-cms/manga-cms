@@ -1,6 +1,6 @@
 import type { BoundingBox, BubbleData, PageData, PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
-import { getBubbleSourceText, getBubbleTextComparison, getBubbleWarnings, getReviewDisplayState } from "../../lib/structure-review/bubbleDraft";
+import { getBubbleSourceText, getBubbleTextComparison, getBubbleWarnings, getReviewDisplayState, type BubbleTextComparisonOverlay } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf } from "../../lib/structure-review/ids";
 import type { ReviewDecision } from "../../lib/structure-review/types";
 import type { MessageKey } from "../../i18n/messages";
@@ -17,6 +17,7 @@ type StructureInspectorProps = {
     selectedPanel: PanelData | null;
     selectedPanelIndex: number | null;
     selectedBubble: BubbleData | null;
+    selectedBubbleTextComparison?: BubbleTextComparisonOverlay;
     selectedPanelDecision: ReviewDecision | null;
     selectedBubbleDecision: ReviewDecision | null;
     onUpdatePanel: (panelIndex: number, nextPanel: PanelData) => void;
@@ -38,6 +39,7 @@ export function StructureInspector({
     selectedPanel,
     selectedPanelIndex,
     selectedBubble,
+    selectedBubbleTextComparison,
     selectedPanelDecision,
     selectedBubbleDecision,
     onUpdatePanel,
@@ -52,8 +54,8 @@ export function StructureInspector({
     onRejectSelectedBubble,
 }: StructureInspectorProps) {
     const { t } = useTranslation();
-    const bubbleWarnings = selectedBubble ? getBubbleWarnings(page, selectedBubble) : [];
-    const bubbleTextComparison = selectedBubble ? getBubbleTextComparison(selectedBubble) : null;
+    const bubbleWarnings = selectedBubble ? getBubbleWarnings(page, selectedBubble, selectedBubbleTextComparison) : [];
+    const bubbleTextComparison = selectedBubble ? getBubbleTextComparison(selectedBubble, selectedBubbleTextComparison) : null;
 
     return (
         <aside className="structure-inspector card">

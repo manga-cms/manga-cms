@@ -1,7 +1,15 @@
 import type { BubbleData, PageData, PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
 import type { MessageKey } from "../../i18n/messages";
-import { formatBboxSummary, getBubbleCandidates, getBubbleSourceText, getBubbleTextComparisonBadges, getBubbleWarnings, getReviewDisplayState } from "../../lib/structure-review/bubbleDraft";
+import {
+    formatBboxSummary,
+    getBubbleCandidates,
+    getBubbleSourceText,
+    getBubbleTextComparisonBadges,
+    getBubbleWarnings,
+    getReviewDisplayState,
+    type BubbleTextComparisonOverlayMap,
+} from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf, panelIdOf } from "../../lib/structure-review/ids";
 import { bubbleReviewKey, panelReviewKey } from "../../lib/structure-review/reviewDecisions";
 import type { ReviewDecisions } from "../../lib/structure-review/types";
@@ -13,6 +21,7 @@ type PanelBubbleListsProps = {
     selectedPanelIndex: number | null;
     selectedBubbleIndex: number | null;
     reviewDecisions: ReviewDecisions;
+    textComparisonOverlays?: BubbleTextComparisonOverlayMap;
     onSelectPanel: (index: number) => void;
     onSelectBubble: (index: number) => void;
     onSelectBubbleCandidate: (panelIndex: number | null, bubbleIndex: number) => void;
@@ -28,9 +37,9 @@ function bubbleDisplayRef(bubble: PageData["bubbles"][number]) {
     return bubble.displayRef ?? bubble.shortId ?? bubbleIdOf(bubble);
 }
 
-function CandidateTextBadges({ bubble }: { bubble: BubbleData }) {
+function CandidateTextBadges({ bubble, textComparisonOverlays }: { bubble: BubbleData; textComparisonOverlays?: BubbleTextComparisonOverlayMap }) {
     const { t } = useTranslation();
-    const comparison = getBubbleTextComparisonBadges(bubble);
+    const comparison = getBubbleTextComparisonBadges(bubble, textComparisonOverlays?.get(bubbleIdOf(bubble)));
     if (!comparison.hasSourceText && !comparison.hasOcrText && comparison.confidence === undefined) return null;
 
     return (
@@ -61,6 +70,7 @@ export function PanelBubbleLists({
     selectedPanelIndex,
     selectedBubbleIndex,
     reviewDecisions,
+    textComparisonOverlays,
     onSelectPanel,
     onSelectBubble,
     onSelectBubbleCandidate,
@@ -69,7 +79,7 @@ export function PanelBubbleLists({
     onMoveBubbleCandidate,
 }: PanelBubbleListsProps) {
     const { t } = useTranslation();
-    const bubbleCandidates = getBubbleCandidates(page, reviewDecisions);
+    const bubbleCandidates = getBubbleCandidates(page, reviewDecisions, textComparisonOverlays);
     const pageLevelCandidateCount = bubbleCandidates.filter((candidate) => candidate.panelIndex === null).length;
 
     return (
@@ -99,7 +109,7 @@ export function PanelBubbleLists({
                                 </span>
                                 <span className="badge badge-muted">{t(decisionLabelKey(candidate.decision))}</span>
                             </div>
-                            <CandidateTextBadges bubble={candidate.bubble} />
+                            <CandidateTextBadges bubble={candidate.bubble} textComparisonOverlays={textComparisonOverlays} />
                             <div className="structure-source-line">
                                 <span>{t("structure.sidebar.sourceTextLabel")}</span>
                                 <p>{getBubbleSourceText(candidate.bubble) || t("structure.sidebar.noText")}</p>
@@ -163,7 +173,8 @@ export function PanelBubbleLists({
                         <h2>{t("structure.sidebar.selectedPanelBubbles")}</h2>
                         <div className="structure-list">
                             {selectedPanel.bubbles.map((bubble, index) => {
-                                const warnings = getBubbleWarnings(page, bubble);
+                                const textComparisonOverlay = textComparisonOverlays?.get(bubbleIdOf(bubble));
+                                const warnings = getBubbleWarnings(page, bubble, textComparisonOverlay);
                                 return (
                                     <div
                                         key={bubbleIdOf(bubble)}
@@ -184,7 +195,7 @@ export function PanelBubbleLists({
                                                 </span>
                                                 <span className="badge badge-muted">{t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)]))}</span>
                                             </div>
-                                            <CandidateTextBadges bubble={bubble} />
+                                            <CandidateTextBadges bubble={bubble} textComparisonOverlays={textComparisonOverlays} />
                                             <div className="structure-source-line">
                                                 <span>{t("structure.sidebar.sourceTextLabel")}</span>
                                                 <p>{getBubbleSourceText(bubble) || t("structure.sidebar.noText")}</p>

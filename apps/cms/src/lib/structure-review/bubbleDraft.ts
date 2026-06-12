@@ -1,4 +1,5 @@
 import type { BoundingBox, BubbleData, PageData, PanelData } from "../../api";
+import { bubbleIdOf } from "./ids";
 import { bubbleReviewKey } from "./reviewDecisions";
 import type { ReviewDecision, ReviewDecisions } from "./types";
 
@@ -18,6 +19,8 @@ export interface BubbleTextComparisonOverlay {
     chosenText?: string;
     confidence?: number;
 }
+
+export type BubbleTextComparisonOverlayMap = ReadonlyMap<string, BubbleTextComparisonOverlay>;
 
 export function getBubbleSourceText(bubble: BubbleData) {
     return bubble.textOriginal;
@@ -99,11 +102,12 @@ export function getBubbleTextComparisonBadges(bubble: BubbleData, overlay?: Bubb
     };
 }
 
-export function getBubbleCandidates(page: PageData | null, reviewDecisions: ReviewDecisions): BubbleCandidate[] {
+export function getBubbleCandidates(page: PageData | null, reviewDecisions: ReviewDecisions, textComparisonOverlays?: BubbleTextComparisonOverlayMap): BubbleCandidate[] {
     if (!page) return [];
     let readingOrder = 0;
     const panelBubbles = page.panels.flatMap((panel, panelIndex) => panel.bubbles.map((bubble, bubbleIndex) => {
         readingOrder += 1;
+        const overlay = textComparisonOverlays?.get(bubbleIdOf(bubble));
         return {
             bubble,
             panel,
@@ -111,13 +115,14 @@ export function getBubbleCandidates(page: PageData | null, reviewDecisions: Revi
             bubbleIndex,
             readingOrder,
             decision: reviewDecisions[bubbleReviewKey(bubble)] ?? "pending",
-            warnings: getBubbleWarnings(page, bubble),
+            warnings: getBubbleWarnings(page, bubble, overlay),
         };
     }));
     const pageLevelBubbles = (page.bubbles ?? [])
         .filter((bubble) => bubble.panelId === null)
         .map((bubble, bubbleIndex) => {
             readingOrder += 1;
+            const overlay = textComparisonOverlays?.get(bubbleIdOf(bubble));
             return {
                 bubble,
                 panel: null,
@@ -125,7 +130,7 @@ export function getBubbleCandidates(page: PageData | null, reviewDecisions: Revi
                 bubbleIndex,
                 readingOrder,
                 decision: reviewDecisions[bubbleReviewKey(bubble)] ?? "pending",
-                warnings: getBubbleWarnings(page, bubble),
+                warnings: getBubbleWarnings(page, bubble, overlay),
             };
         });
     return [...panelBubbles, ...pageLevelBubbles];

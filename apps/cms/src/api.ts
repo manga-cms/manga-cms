@@ -444,6 +444,8 @@ export interface DraftPanel {
 }
 
 export interface DraftBubble {
+    bubbleId?: string;
+    id?: string;
     bubbleNumber: number;
     bubbleType: string;
     textOriginal: string;
@@ -454,6 +456,19 @@ export interface DraftBubble {
     textDirection?: "horizontal" | "vertical";
     lang?: string;
     flags?: ContentFlags;
+    sourceText?: string;
+    source_text?: string;
+    ocrText?: string;
+    ocr_text?: string;
+    chosenText?: string;
+    chosen_text?: string;
+    confidence?: number;
+    ocrConfidence?: number;
+    ocr_confidence?: number;
+    detectionMetadata?: {
+        ocrConfidence?: number;
+        detectionConfidence?: number;
+    };
 }
 
 export type IngestionReviewDecisionValue = "pending" | "accepted" | "rejected";

@@ -39,6 +39,10 @@ export default function JobDetail() {
     }, [jobId]);
 
     const draft = job?.draft;
+    const canOpenStructureReview = job?.status === "confirmed" || confirmResult !== null;
+    const structureReviewPath = draft && jobId && canOpenStructureReview
+        ? `/works/${draft.seriesId}/episodes/${draft.episodeId}/structure?jobId=${encodeURIComponent(jobId)}`
+        : "";
 
     // --- Draft editing helpers ---
     const updateField = (field: keyof DraftPayload, value: unknown) => {
@@ -156,6 +160,12 @@ export default function JobDetail() {
                     <p>✅ Confirmed! Written to contents/{confirmResult.seriesId}/</p>
                     <p>
                         <Link to={`/works/${confirmResult.seriesId}`}>View in CMS</Link>
+                        {structureReviewPath && (
+                            <>
+                                {" | "}
+                                <Link to={structureReviewPath}>Page Structure Review で確認</Link>
+                            </>
+                        )}
                         {" | "}
                         <a href={`/api/v1/series/${confirmResult.seriesId}`} target="_blank" rel="noreferrer">API</a>
                     </p>
@@ -244,6 +254,11 @@ export default function JobDetail() {
                             </div>
                         )}
                         <div className="section-actions" style={{ marginTop: "1rem" }}>
+                            {structureReviewPath && (
+                                <Link to={structureReviewPath} className="btn btn-outline">
+                                    Page Structure Review で確認
+                                </Link>
+                            )}
                             <button type="button" className="btn btn-outline" disabled={busy || candidateSummary.pending > 0} onClick={doWriteReviewedDraft}>
                                 Write accepted structure to draft
                             </button>
@@ -292,6 +307,13 @@ export default function JobDetail() {
             {draft && !isEditable && !isReviewable && (
                 <div>
                     <h2>Draft (read-only)</h2>
+                    {structureReviewPath && (
+                        <div className="section-actions">
+                            <Link to={structureReviewPath} className="btn btn-outline">
+                                Page Structure Review で確認
+                            </Link>
+                        </div>
+                    )}
                     <div className="json-preview">{JSON.stringify(draft, null, 2)}</div>
                 </div>
             )}

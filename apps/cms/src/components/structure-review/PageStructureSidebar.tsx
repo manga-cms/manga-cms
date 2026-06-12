@@ -1,5 +1,6 @@
 import type { EpisodeData, PageData, PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
+import type { BubbleTextComparisonOverlayMap } from "../../lib/structure-review/bubbleDraft";
 import { bubbleReviewKey, panelReviewKey } from "../../lib/structure-review/reviewDecisions";
 import type { PanelTemplate, ReviewDecisions, ReviewSummary } from "../../lib/structure-review/types";
 import { PanelBubbleLists } from "./PanelBubbleLists";
@@ -15,6 +16,7 @@ type PageStructureSidebarProps = {
     scriptAssistText: string;
     reviewDecisions: ReviewDecisions;
     reviewSummary: ReviewSummary;
+    textComparisonOverlays?: BubbleTextComparisonOverlayMap;
     onPageChange: (index: number) => void;
     onPageDisplayRefChange: (displayRef: string) => void;
     onAddPanel: () => void;
@@ -55,6 +57,7 @@ export function PageStructureSidebar({
     scriptAssistText,
     reviewDecisions,
     reviewSummary,
+    textComparisonOverlays,
     onPageChange,
     onPageDisplayRefChange,
     onAddPanel,
@@ -220,6 +223,7 @@ export function PageStructureSidebar({
                 selectedPanelIndex={selectedPanelIndex}
                 selectedBubbleIndex={selectedBubbleIndex}
                 reviewDecisions={reviewDecisions}
+                textComparisonOverlays={textComparisonOverlays}
                 onSelectPanel={onSelectPanel}
                 onSelectBubble={onSelectBubble}
                 onSelectBubbleCandidate={onSelectBubbleCandidate}

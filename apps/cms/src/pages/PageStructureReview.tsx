@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
     getAdminEpisode,
     getAdminPageImageUrl,
+    getReviewCandidates,
     saveEpisode,
     type BoundingBox,
     type BubbleData,
     type EpisodeData,
+    type IngestionReviewCandidate,
     type PageData,
     type PanelData,
 } from "../api";
@@ -29,6 +31,7 @@ import {
 } from "../lib/structure-review/editSafety";
 import { clampBox } from "../lib/structure-review/geometry";
 import { bubbleIdOf, makeBubbleId, makeBubbleShortId, makePageBubbleId, makePageBubbleShortId, makePanelId, nextBubbleIdNumber, nextPageBubbleIdNumber, nextPanelIdNumber, panelIdOf, renumberPanelBubbles, renumberPanels } from "../lib/structure-review/ids";
+import { buildBubbleTextComparisonOverlayMap } from "../lib/structure-review/ingestionOverlay";
 import { syncPageBubbles } from "../lib/structure-review/pageBubbles";
 import { buildTemplatePanels } from "../lib/structure-review/panelTemplates";
 import { bubbleReviewKey, markPanels, panelReviewKey, seedAcceptedDecisions, summarizeReview } from "../lib/structure-review/reviewDecisions";
@@ -57,6 +60,7 @@ function applyBubblePatch(bubble: BubbleData, patch: Partial<BubbleData>): Bubbl
 export default function PageStructureReview() {
     const { t } = useTranslation();
     const { id: seriesId, epId } = useParams<{ id: string; epId: string }>();
+    const [searchParams] = useSearchParams();
     const nav = useNavigate();
     const stageRef = useRef<HTMLElement>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
@@ -77,6 +81,8 @@ export default function PageStructureReview() {
     const [baselineReviewDecisions, setBaselineReviewDecisions] = useState<ReviewDecisions>({});
     const [undoStack, setUndoStack] = useState<StructureReviewSnapshot[]>([]);
     const [redoStack, setRedoStack] = useState<StructureReviewSnapshot[]>([]);
+    const [reviewCandidates, setReviewCandidates] = useState<IngestionReviewCandidate[]>([]);
+    const [reviewCandidateError, setReviewCandidateError] = useState("");
     const [structureViewport, setStructureViewport] = useState<StructureViewport>({
         zoom: 1,
         panX: 0,
@@ -85,6 +91,7 @@ export default function PageStructureReview() {
     });
 
     const autosaveKey = seriesId && epId ? makeAutosaveKey(seriesId, epId) : "";
+    const ingestionJobId = searchParams.get("jobId")?.trim() ?? "";
 
     const makeSnapshot = useCallback((): StructureReviewSnapshot | null => {
         if (!episode) return null;
@@ -194,6 +201,28 @@ export default function PageStructureReview() {
             .catch((e) => setError((e as Error).message));
     }, [seriesId, epId]);
 
+    useEffect(() => {
+        let cancelled = false;
+        setReviewCandidateError("");
+        if (!ingestionJobId) {
+            setReviewCandidates([]);
+            return;
+        }
+        getReviewCandidates(ingestionJobId)
+            .then((items) => {
+                if (cancelled) return;
+                setReviewCandidates(items);
+            })
+            .catch((e) => {
+                if (cancelled) return;
+                setReviewCandidates([]);
+                setReviewCandidateError((e as Error).message);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [ingestionJobId]);
+
     const page = episode?.pages[pageIndex] ?? null;
     const selectedPanel = page && selectedPanelIndex !== null ? page.panels[selectedPanelIndex] : null;
     const pageLevelBubbles = page ? (page.bubbles ?? []).filter((bubble) => bubble.panelId === null) : [];
@@ -204,6 +233,16 @@ export default function PageStructureReview() {
             : null;
     const selectedPanelDecision = selectedPanel ? reviewDecisions[panelReviewKey(selectedPanel)] ?? "pending" : null;
     const selectedBubbleDecision = selectedBubble ? reviewDecisions[bubbleReviewKey(selectedBubble)] ?? "pending" : null;
+    const textComparisonOverlays = useMemo(() => {
+        if (!episode || !ingestionJobId) return undefined;
+        return buildBubbleTextComparisonOverlayMap(episode, reviewCandidates, (candidate) => {
+            console.warn("[PageStructureReview] Ignoring unmatched ingestion review candidate", {
+                jobId: ingestionJobId,
+                ...candidate,
+            });
+        });
+    }, [episode, ingestionJobId, reviewCandidates]);
+    const selectedBubbleTextComparison = selectedBubble ? textComparisonOverlays?.get(bubbleIdOf(selectedBubble)) : undefined;
 
     const imageUrl = useMemo(() => {
         if (!seriesId || !epId || !page) return "";
@@ -827,6 +866,11 @@ export default function PageStructureReview() {
             />
 
             {error && <div className="error-msg">{error}</div>}
+            {reviewCandidateError && (
+                <div className="warning-msg">
+                    Ingestion review candidates の取得に失敗しました: {reviewCandidateError}
+                </div>
+            )}
             {dirty && reviewSummary.pending > 0 && (
                 <div className="warning-msg">
                     {t("structure.pendingSaveWarning", { count: reviewSummary.pending })}
@@ -851,6 +895,7 @@ export default function PageStructureReview() {
                     scriptAssistText={scriptAssistText}
                     reviewDecisions={reviewDecisions}
                     reviewSummary={reviewSummary}
+                    textComparisonOverlays={textComparisonOverlays}
                     onPageChange={(next) => {
                         setPageIndex(next);
                         setSelectedPanelIndex(episode.pages[next]?.panels.length ? 0 : null);
@@ -899,6 +944,7 @@ export default function PageStructureReview() {
                     selectedPanel={selectedPanel}
                     selectedPanelIndex={selectedPanelIndex}
                     selectedBubble={selectedBubble}
+                    selectedBubbleTextComparison={selectedBubbleTextComparison}
                     selectedPanelDecision={selectedPanelDecision}
                     selectedBubbleDecision={selectedBubbleDecision}
                     onUpdatePanel={updatePanel}
