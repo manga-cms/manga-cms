@@ -27,6 +27,7 @@ LLM / VLM を組み込んだ draft 生成は任意の補助機能であり、
 
 - `docs/api-contract.md`
 - `docs/cms-ux-spec.md`
+- `docs/reading-order-spec.md`
 - `docs/oss-boundary.md`
 - `docs/architecture/layer-boundary.md`
 - `packages/domain/src/types.ts`
@@ -288,7 +289,7 @@ OCR は正本ではなく補助情報である。
 ### 利用する信号
 - 文字列類似度
 - 位置近傍
-- 読み順
+- 読み順（`docs/reading-order-spec.md` のRTL既定ルール）
 - レイヤー順
 - panel 内包判定
 - bubble候補との空間関係
