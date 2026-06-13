@@ -60,6 +60,9 @@ jobs:
       - name: Run CMS tests
         run: pnpm --filter @manga/cms test
 
+      - name: Run schemas tests
+        run: pnpm --filter @manga/schemas test
+
       - name: Run ingestion tests
         run: pnpm --filter @manga/ingestion test
 
