@@ -13,7 +13,8 @@
     },
     "scripts": {
         "build": "tsc",
-        "lint": "oxlint src --deny-warnings"
+        "lint": "oxlint src test --deny-warnings",
+        "test": "node --test --experimental-strip-types \"test/**/*.test.ts\""
     },
     "dependencies": {
         "@manga/schemas": "workspace:*"
