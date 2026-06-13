@@ -102,6 +102,19 @@ import {
 const NODE_ENV = process.env.NODE_ENV ?? "development";
 const IS_PRODUCTION = NODE_ENV === "production";
 
+function parseEmailList(value: string | undefined): Set<string> {
+    return new Set((value ?? "")
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean));
+}
+
+const CMS_ADMIN_EMAILS = parseEmailList(process.env.CMS_ADMIN_EMAILS);
+
+function roleForMagicLinkEmail(email: string): "admin" | "user" {
+    return CMS_ADMIN_EMAILS.has(email.trim().toLowerCase()) ? "admin" : "user";
+}
+
 // ---------------------------------------------------------------------------
 // Production fail-fast — validate required config before serving
 // ---------------------------------------------------------------------------
@@ -2591,8 +2604,14 @@ app.get("/auth/verify", async (c) => {
         return c.json({ error: { code: "UNAUTHORIZED", message: result.error } }, 401);
     }
 
-    // Issue a session cookie using the existing session token mechanism
-    const user: DevUser = { id: result.userId, name: result.email, role: "user" };
+    // Issue a session cookie using the existing session token mechanism.
+    // CMS admin access is allowlisted by email for production MVP. Per-series
+    // creator/editor permissions should be layered on top of this later.
+    const user: DevUser = {
+        id: result.userId,
+        name: result.email,
+        role: roleForMagicLinkEmail(result.email),
+    };
     const sessionToken = generateAuthToken(user);
     setSessionCookie(c, sessionToken);
     return c.json({ authenticated: true, user });

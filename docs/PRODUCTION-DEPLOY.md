@@ -140,6 +140,9 @@ CMS production smoke:
   `index.html`.
 - [ ] `https://cms.manga-cms.com/api/v1/health` returns the production API
   health payload through the nginx proxy.
+- [ ] Email provider is configured and the sender domain is verified.
+- [ ] `CMS_ADMIN_EMAILS` includes the initial production CMS administrator
+  email addresses.
 - [ ] Admin login works with the configured production auth path.
 
 ## Production API Runtime State

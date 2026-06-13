@@ -78,10 +78,16 @@ cp .env.example .env
 |----------|---------|
 | `RESEND_API_KEY` | Optional email delivery for magic-link login |
 | `EMAIL_FROM` | Optional sender address for magic links |
+| `CMS_ADMIN_EMAILS` | Optional comma-separated email allowlist that receives `admin` role from magic links |
 
 If `RESEND_API_KEY` is unset in production, the API still starts and magic-link
 login returns `EMAIL_NOT_CONFIGURED`. This keeps the self-hosted engine usable
 without a required commercial email provider.
+
+Magic-link users not listed in `CMS_ADMIN_EMAILS` authenticate with the `user`
+role and cannot call admin endpoints. Use this allowlist for the production CMS
+MVP; per-Series creator/editor permissions are a later runtime governance
+layer.
 
 **Public Viewer launch env gates:**
 
