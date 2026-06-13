@@ -91,7 +91,7 @@ const overlayPages = buildTextOverlayPages(episode.pages, overlayLanguage, {
   seriesId: workId,
   episodeId,
 });
-if (overlayPages.length === 0) {
+if (overlayPages.length === 0 || overlayPages.length !== (episode.pages ?? []).length) {
   return new Response(null, { status: 404, statusText: "Not Found" });
 }
 

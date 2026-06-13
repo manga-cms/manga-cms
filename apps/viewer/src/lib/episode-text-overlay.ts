@@ -1,5 +1,5 @@
 import type { PublishedPack } from "./api-client";
-import { isSafeReaderImageSrc, resolveReaderImageSrc } from "./episode-reader-data";
+import { isSafeReaderImageSrc } from "./episode-reader-data";
 
 export interface OverlayBubble {
   id: string;
@@ -194,7 +194,6 @@ const blankImageCandidates = (language: string) => [
   `blank-${language}`,
   "blank",
   "ja-blank",
-  language,
 ];
 
 const overlayImageSrc = (page: any, language: string) => {
@@ -203,7 +202,7 @@ const overlayImageSrc = (page: any, language: string) => {
     const candidate = images[key];
     if (isSafeReaderImageSrc(candidate)) return candidate;
   }
-  return resolveReaderImageSrc(page, language === "en" ? "en" : "ja");
+  return null;
 };
 
 const pct = (value: number, total: number) =>
@@ -280,7 +279,9 @@ export const buildTextOverlayPages = (
     : false;
   return [...(pages ?? [])]
     .sort((a, b) => Number(a.pageNumber ?? 0) - Number(b.pageNumber ?? 0))
-    .map((page: any) => {
+    .flatMap((page: any) => {
+      const imageSrc = overlayImageSrc(page, language);
+      if (!imageSrc) return [];
       const packs = (page.availablePacks ?? []) as PublishedPack[];
       const bubbles = [...(page.bubbles ?? [])]
         .filter(publicBubbleAllowed)
@@ -315,13 +316,13 @@ export const buildTextOverlayPages = (
             fit,
           };
         });
-      return {
+      return [{
         id: pageIdOf(page),
         pageNumber: Number(page.pageNumber ?? 0),
-        imageSrc: overlayImageSrc(page, language),
+        imageSrc,
         width: Number(page.width ?? 0),
         height: Number(page.height ?? 0),
         bubbles,
-      };
+      }];
     });
 };
