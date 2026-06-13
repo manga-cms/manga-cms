@@ -13,6 +13,7 @@
     "dependencies": {
         "@astrojs/node": "^9.0.0",
         "@manga/domain": "workspace:*",
+        "@manga/lettering": "workspace:*",
         "astro": "^5.5.0",
         "sharp": "0.34.5"
     },

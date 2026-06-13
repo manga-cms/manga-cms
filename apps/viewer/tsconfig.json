@@ -16,6 +16,12 @@
             ],
             "@manga/domain/*": [
                 "../../packages/domain/src/*"
+            ],
+            "@manga/lettering": [
+                "../../packages/lettering/src/index.ts"
+            ],
+            "@manga/lettering/*": [
+                "../../packages/lettering/src/*"
             ]
         }
     }
