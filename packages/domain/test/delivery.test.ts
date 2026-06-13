@@ -6,23 +6,38 @@ let importCounter = 0;
 
 type DeliveryModule = typeof import("../src/delivery.ts");
 
-async function importDeliveryWithSecret(secret: string | undefined): Promise<DeliveryModule> {
-    const previous = process.env.DELIVERY_SECRET;
-    if (secret === undefined) {
+async function importDeliveryWithSecrets(secrets: { deliverySecret?: string; devAuthSecret?: string }): Promise<DeliveryModule> {
+    const previousDeliverySecret = process.env.DELIVERY_SECRET;
+    const previousDevAuthSecret = process.env.DEV_AUTH_SECRET;
+    if (secrets.deliverySecret === undefined) {
         delete process.env.DELIVERY_SECRET;
     } else {
-        process.env.DELIVERY_SECRET = secret;
+        process.env.DELIVERY_SECRET = secrets.deliverySecret;
+    }
+    if (secrets.devAuthSecret === undefined) {
+        delete process.env.DEV_AUTH_SECRET;
+    } else {
+        process.env.DEV_AUTH_SECRET = secrets.devAuthSecret;
     }
 
     const module = await import(`../dist/delivery.js?delivery-test=${importCounter++}`);
 
-    if (previous === undefined) {
+    if (previousDeliverySecret === undefined) {
         delete process.env.DELIVERY_SECRET;
     } else {
-        process.env.DELIVERY_SECRET = previous;
+        process.env.DELIVERY_SECRET = previousDeliverySecret;
+    }
+    if (previousDevAuthSecret === undefined) {
+        delete process.env.DEV_AUTH_SECRET;
+    } else {
+        process.env.DEV_AUTH_SECRET = previousDevAuthSecret;
     }
 
     return module;
+}
+
+async function importDeliveryWithSecret(secret: string | undefined): Promise<DeliveryModule> {
+    return importDeliveryWithSecrets({ deliverySecret: secret });
 }
 
 function signedToken(secret: string, payload: { pageId: string; userId: string; exp: number }): string {
@@ -38,6 +53,15 @@ function retargetTokenKeepingSignature(token: string, pageId: string): string {
     const payload = JSON.parse(Buffer.from(data, "base64url").toString()) as { pageId: string; userId: string; exp: number };
     const retargetedData = Buffer.from(JSON.stringify({ ...payload, pageId })).toString("base64url");
     return `${retargetedData}.${sig}`;
+}
+
+function tamperAuthTokenKeepingSignature(token: string): string {
+    const [data, sig] = token.split(".");
+    assert.ok(data);
+    assert.ok(sig);
+    const payload = JSON.parse(Buffer.from(data, "base64url").toString()) as { id: string; name: string; role: string };
+    const tamperedData = Buffer.from(JSON.stringify({ ...payload, role: "admin" })).toString("base64url");
+    return `${tamperedData}.${sig}`;
 }
 
 test("delivery token generation and verification roundtrips page and user data", async () => {
@@ -98,4 +122,38 @@ test("delivery token verification rejects malformed tokens", async () => {
 
     assert.equal(verifyDeliveryToken("not-a-token"), null);
     assert.equal(verifyDeliveryToken("payload.signature.extra"), null);
+});
+
+test("auth token generation and verification roundtrips user data", async () => {
+    const { generateAuthToken, verifyAuthToken } = await importDeliveryWithSecrets({ devAuthSecret: "auth-test-secret" });
+
+    const token = generateAuthToken({ id: "user-1", name: "User One", role: "user" });
+    const payload = verifyAuthToken(token);
+
+    assert.deepEqual(payload, { id: "user-1", name: "User One", role: "user" });
+});
+
+test("auth token verification rejects tampered payload data", async () => {
+    const { generateAuthToken, verifyAuthToken } = await importDeliveryWithSecrets({ devAuthSecret: "auth-test-secret" });
+
+    const token = generateAuthToken({ id: "user-1", name: "User One", role: "user" });
+    const tampered = tamperAuthTokenKeepingSignature(token);
+
+    assert.equal(verifyAuthToken(tampered), null);
+});
+
+test("auth token verification rejects tokens signed with another secret", async () => {
+    const { generateAuthToken } = await importDeliveryWithSecrets({ devAuthSecret: "auth-test-secret-a" });
+    const { verifyAuthToken } = await importDeliveryWithSecrets({ devAuthSecret: "auth-test-secret-b" });
+
+    const token = generateAuthToken({ id: "user-1", name: "User One", role: "user" });
+
+    assert.equal(verifyAuthToken(token), null);
+});
+
+test("auth token verification rejects malformed tokens", async () => {
+    const { verifyAuthToken } = await importDeliveryWithSecrets({ devAuthSecret: "auth-test-secret" });
+
+    assert.equal(verifyAuthToken("not-a-token"), null);
+    assert.equal(verifyAuthToken("payload.signature.extra"), null);
 });
