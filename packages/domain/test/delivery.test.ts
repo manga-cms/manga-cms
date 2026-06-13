@@ -14,7 +14,7 @@ async function importDeliveryWithSecret(secret: string | undefined): Promise<Del
         process.env.DELIVERY_SECRET = secret;
     }
 
-    const module = await import(`../src/delivery.ts?delivery-test=${importCounter++}`);
+    const module = await import(`../dist/delivery.js?delivery-test=${importCounter++}`);
 
     if (previous === undefined) {
         delete process.env.DELIVERY_SECRET;

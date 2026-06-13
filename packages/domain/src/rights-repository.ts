@@ -7,9 +7,9 @@ import type {
     RightsGrantRevokeInput,
     RightsPermissionCheckInput,
     RightsPermissionCheckResponse,
-    RightsScope,
 } from "./rights-types.js";
 import { withFileLock } from "./file-lock.js";
+import { isActiveRightsGrant, scopeMatches } from "./rights-evaluation.js";
 
 export interface RightsGrantListFilters {
     userId?: string;
@@ -29,7 +29,11 @@ export interface RightsRepository {
 }
 
 export class FileRightsRepository implements RightsRepository {
-    constructor(private rightsDir: string) { }
+    private rightsDir: string;
+
+    constructor(rightsDir: string) {
+        this.rightsDir = rightsDir;
+    }
 
     private filePath(): string {
         return join(this.rightsDir, "rights-grants.json");
@@ -102,10 +106,8 @@ export class FileRightsRepository implements RightsRepository {
         const nowMs = Date.now();
         const matched = this.readAll().filter((record) => {
             if (record.subject_user_id !== input.user_id) return false;
-            if (record.revoked_at) return false;
             if (!record.permissions.includes(input.permission)) return false;
-            if (record.starts_at && Date.parse(record.starts_at) > nowMs) return false;
-            if (record.ends_at && Date.parse(record.ends_at) <= nowMs) return false;
+            if (!isActiveRightsGrant(record, nowMs)) return false;
             return scopeMatches(record.scope, input.scope);
         });
 
@@ -115,20 +117,6 @@ export class FileRightsRepository implements RightsRepository {
             ...(matched.length === 0 ? { reason: "No active matching rights grant" } : {}),
         };
     }
-}
-
-function scopeMatches(grantScope: RightsScope, requestedScope: RightsScope): boolean {
-    if (grantScope.series_id && grantScope.series_id !== requestedScope.series_id) return false;
-    if (grantScope.episode_id && grantScope.episode_id !== requestedScope.episode_id) return false;
-    if (grantScope.language && grantScope.language !== requestedScope.language) return false;
-    if (grantScope.pack_id && grantScope.pack_id !== requestedScope.pack_id) return false;
-    if (grantScope.territory && grantScope.territory !== requestedScope.territory) return false;
-    if (grantScope.usage?.length) {
-        const requestedUsage = requestedScope.usage ?? [];
-        if (requestedUsage.length === 0) return false;
-        if (!requestedUsage.every((usage) => grantScope.usage?.includes(usage))) return false;
-    }
-    return true;
 }
 
 export function createFileRightsRepository(rightsDir: string): RightsRepository {

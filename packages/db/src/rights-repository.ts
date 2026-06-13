@@ -7,6 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
+import { scopeMatches } from "@manga/domain";
 import type {
     RightsGrantCreateInput,
     RightsGrantListFilters,
@@ -16,7 +17,6 @@ import type {
     RightsPermissionCheckResponse,
     RightsRepository,
     RightsScope,
-    RightsUsage,
 } from "@manga/domain";
 
 export class DbRightsRepository implements RightsRepository {
@@ -146,18 +146,4 @@ function parseJson<T>(value: string | null | undefined, fallback: T): T {
 
 function toIso(value: Date | string): string {
     return value instanceof Date ? value.toISOString() : value;
-}
-
-function scopeMatches(grantScope: RightsScope, requestedScope: RightsScope): boolean {
-    if (grantScope.series_id && grantScope.series_id !== requestedScope.series_id) return false;
-    if (grantScope.episode_id && grantScope.episode_id !== requestedScope.episode_id) return false;
-    if (grantScope.language && grantScope.language !== requestedScope.language) return false;
-    if (grantScope.pack_id && grantScope.pack_id !== requestedScope.pack_id) return false;
-    if (grantScope.territory && grantScope.territory !== requestedScope.territory) return false;
-    if (grantScope.usage?.length) {
-        const requestedUsage = requestedScope.usage ?? [];
-        if (requestedUsage.length === 0) return false;
-        if (!requestedUsage.every((usage: RightsUsage) => grantScope.usage?.includes(usage))) return false;
-    }
-    return true;
 }
