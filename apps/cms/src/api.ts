@@ -1,5 +1,54 @@
 const API = "/api/v1";
 
+type ApiErrorPayload = {
+    error?: {
+        code?: string;
+        message?: string;
+    };
+};
+
+export class CmsApiError extends Error {
+    status: number;
+    code?: string;
+
+    constructor(status: number, message: string, code?: string) {
+        super(message);
+        this.name = "CmsApiError";
+        this.status = status;
+        this.code = code;
+    }
+}
+
+export function isPermissionError(error: unknown) {
+    return error instanceof CmsApiError && error.status === 403;
+}
+
+async function readApiError(res: Response): Promise<ApiErrorPayload> {
+    try {
+        return await res.json() as ApiErrorPayload;
+    } catch {
+        return {};
+    }
+}
+
+function errorMessage(data: ApiErrorPayload, fallback: string) {
+    return data.error?.message ?? fallback;
+}
+
+function throwSeriesListError(res: Response, data: ApiErrorPayload): never {
+    if (res.status === 403) {
+        throw new CmsApiError(res.status, "管理できる作品がありません。", data.error?.code);
+    }
+    throw new CmsApiError(res.status, errorMessage(data, "Admin login or Series permission required"), data.error?.code);
+}
+
+function throwSeriesEditError(res: Response, data: ApiErrorPayload, fallback: string): never {
+    if (res.status === 403) {
+        throw new CmsApiError(res.status, "この作品を編集する権限がありません。", data.error?.code);
+    }
+    throw new CmsApiError(res.status, errorMessage(data, fallback), data.error?.code);
+}
+
 export type SeriesPublicationType = "serial" | "oneshot";
 export type SeriesLifecycleStatus = "ongoing" | "completed" | "hiatus";
 
@@ -257,7 +306,7 @@ function serializePageForSave(input: any): any {
 export async function listSeries(): Promise<SeriesItem[]> {
     const res = await fetch(`${API}/admin/series`, { credentials: "include" });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message ?? "Admin login or Series permission required");
+    if (!res.ok) throwSeriesListError(res, data);
     return data.items ?? [];
 }
 
@@ -266,7 +315,7 @@ export async function getSeries(id: string): Promise<SeriesDetail | null> {
     const data = await res.json();
     if (!res.ok) {
         if (res.status === 404) return null;
-        throw new Error(data.error?.message ?? "Admin login or Series permission required");
+        throwSeriesEditError(res, data, "Admin login or Series permission required");
     }
     return data;
 }
@@ -314,7 +363,7 @@ export async function updateSeries(id: string, input: {
         body: JSON.stringify(input),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message ?? "Failed to update series");
+    if (!res.ok) throwSeriesEditError(res, data, "Failed to update series");
     return data;
 }
 
@@ -340,7 +389,7 @@ export async function saveEpisode(seriesId: string, input: {
         body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message ?? "Failed to save episode");
+    if (!res.ok) throwSeriesEditError(res, data, "Failed to save episode");
     return data;
 }
 
@@ -348,7 +397,10 @@ export async function getAdminEpisode(seriesId: string, episodeId: string): Prom
     const res = await fetch(`${API}/admin/series/${seriesId}/episodes/${episodeId}`, {
         credentials: "include",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+        if (res.status === 404) return null;
+        throwSeriesEditError(res, await readApiError(res), "Admin login or Series permission required");
+    }
     return normalizeEpisode(await res.json());
 }
 

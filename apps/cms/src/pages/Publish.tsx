@@ -36,7 +36,7 @@ export default function Publish() {
     };
 
     if (loading) return <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>;
-    if (!work) return <div className="error-msg">作品が見つかりません</div>;
+    if (!work) return <div className="error-msg">{error || "作品が見つかりません"}</div>;
 
     return (
         <div>

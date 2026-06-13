@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listSeries, type SeriesItem } from "../api";
+import { isPermissionError, listSeries, type SeriesItem } from "../api";
 import {
     formatSeriesLifecycleStatus,
     formatSeriesPublicationType,
@@ -17,11 +17,22 @@ export default function Dashboard() {
     const [works, setWorks] = useState<SeriesItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [noPermission, setNoPermission] = useState(false);
 
     useEffect(() => {
         listSeries()
-            .then(setWorks)
-            .catch((e) => setError(e.message))
+            .then((items) => {
+                setWorks(items);
+                setNoPermission(false);
+            })
+            .catch((e) => {
+                if (isPermissionError(e)) {
+                    setWorks([]);
+                    setNoPermission(true);
+                    return;
+                }
+                setError(e.message);
+            })
             .finally(() => setLoading(false));
     }, []);
 
@@ -33,6 +44,10 @@ export default function Dashboard() {
 
             {loading ? (
                 <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>
+            ) : noPermission ? (
+                <div className="card empty-state">
+                    <p>管理できる作品がありません</p>
+                </div>
             ) : works.length === 0 ? (
                 <div className="card empty-state">
                     <p>作品がまだありません</p>

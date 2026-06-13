@@ -18,6 +18,7 @@ type StructureReviewHeaderProps = {
     onRedo: () => void;
     onRequestLeave: () => boolean;
     onSave: () => void;
+    showTranslationImport?: boolean;
 };
 
 export function StructureReviewHeader({
@@ -32,6 +33,7 @@ export function StructureReviewHeader({
     onRedo,
     onRequestLeave,
     onSave,
+    showTranslationImport = false,
 }: StructureReviewHeaderProps) {
     const { t } = useTranslation();
     const [hintOpen, setHintOpen] = useState(() => {
@@ -67,15 +69,17 @@ export function StructureReviewHeader({
                 >
                     {t("structure.episode")}
                 </Link>
-                <Link
-                    to={`/works/${seriesId}/episodes/${episodeId}/translation-import`}
-                    className="btn btn-outline"
-                    onClick={(event) => {
-                        if (!onRequestLeave()) event.preventDefault();
-                    }}
-                >
-                    {t("structure.translation.import")}
-                </Link>
+                {showTranslationImport && (
+                    <Link
+                        to={`/works/${seriesId}/episodes/${episodeId}/translation-import`}
+                        className="btn btn-outline"
+                        onClick={(event) => {
+                            if (!onRequestLeave()) event.preventDefault();
+                        }}
+                    >
+                        {t("structure.translation.import")}
+                    </Link>
+                )}
                 <TextExportMenu seriesId={seriesId} episode={episode} dirty={dirty} />
                 <button type="button" className="btn btn-outline" onClick={onUndo} disabled={!canUndo} aria-label={t("structure.undoLabel")}>
                     {t("structure.undo")}

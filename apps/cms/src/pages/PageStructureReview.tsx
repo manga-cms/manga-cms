@@ -43,6 +43,10 @@ import { useStructureReviewDrag } from "../lib/structure-review/useStructureRevi
 
 const MIN_STRUCTURE_ZOOM = 0.35;
 const MAX_STRUCTURE_ZOOM = 3;
+
+type PageStructureReviewProps = {
+    currentUser?: { role: string } | null;
+};
 const MAX_HISTORY_LENGTH = 80;
 
 function clampStructureZoom(zoom: number) {
@@ -59,7 +63,7 @@ function applyBubblePatch(bubble: BubbleData, patch: Partial<BubbleData>): Bubbl
     return next;
 }
 
-export default function PageStructureReview() {
+export default function PageStructureReview({ currentUser }: PageStructureReviewProps) {
     const { t } = useTranslation();
     const { id: seriesId, epId } = useParams<{ id: string; epId: string }>();
     const [searchParams] = useSearchParams();
@@ -869,6 +873,7 @@ export default function PageStructureReview() {
                 onRedo={redo}
                 onRequestLeave={() => requestLeave(`/works/${seriesId}/episodes/${episode.id}`)}
                 onSave={save}
+                showTranslationImport={currentUser?.role === "admin"}
             />
 
             {error && <div className="error-msg">{error}</div>}

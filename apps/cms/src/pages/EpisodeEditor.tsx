@@ -4,6 +4,7 @@ import {
     saveEpisode,
     getSeries,
     getAdminEpisode,
+    isPermissionError,
     uploadAdminPageImage,
     type EpisodeData,
     type PageData,
@@ -123,7 +124,11 @@ function withPreviewReloadKey(url: string, reloadKey: number) {
     return `${url}${separator}cmsPreviewReload=${reloadKey}`;
 }
 
-export default function EpisodeEditor() {
+type EpisodeEditorProps = {
+    currentUser?: { role: string } | null;
+};
+
+export default function EpisodeEditor({ currentUser }: EpisodeEditorProps) {
     const { id: seriesId, epId } = useParams<{ id: string; epId: string }>();
     const nav = useNavigate();
     const { t } = useTranslation();
@@ -219,7 +224,12 @@ export default function EpisodeEditor() {
                         }
                         setLoaded(true);
                     })
-                    .catch(() => {
+                    .catch((loadError) => {
+                        if (isPermissionError(loadError)) {
+                            setError((loadError as Error).message);
+                            setLoaded(true);
+                            return;
+                        }
                         const nextPages = makePageStubs(episodeSummary.pageCount);
                         setPages(nextPages);
                         setBaselineExportSnapshot(JSON.stringify(buildEpisodeDraft({
@@ -248,6 +258,9 @@ export default function EpisodeEditor() {
                 })));
                 setLoaded(true);
             }
+        }).catch((loadError) => {
+            setError((loadError as Error).message);
+            setLoaded(true);
         });
     }, [seriesId, epId]);
 
@@ -365,7 +378,9 @@ export default function EpisodeEditor() {
             )}
             <div className="section-actions" style={{ marginBottom: "1rem" }}>
                 <Link to={`/works/${seriesId}/episodes/${epId}/structure`} className="btn btn-outline">Structure Review</Link>
-                <Link to={`/works/${seriesId}/episodes/${epId}/translation-import`} className="btn btn-outline">EN Translation import</Link>
+                {currentUser?.role === "admin" && (
+                    <Link to={`/works/${seriesId}/episodes/${epId}/translation-import`} className="btn btn-outline">EN Translation import</Link>
+                )}
                 <TextExportMenu seriesId={seriesId} seriesTitle={seriesTitle} episode={exportEpisode} dirty={exportDirty} />
             </div>
 

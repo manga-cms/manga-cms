@@ -94,7 +94,11 @@ function buildSeriesPublicMetadata(current: ContentPublicMetadata | undefined, f
     return Object.values(metadata).some(hasMetadataValue) ? metadata : undefined;
 }
 
-export default function WorkDetail() {
+type WorkDetailProps = {
+    currentUser?: { role: string } | null;
+};
+
+export default function WorkDetail({ currentUser }: WorkDetailProps) {
     const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const [work, setWork] = useState<SeriesDetail | null>(null);
@@ -280,7 +284,7 @@ export default function WorkDetail() {
     };
 
     if (loading) return <p style={{ color: "var(--muted)" }}>{t("common.loading")}</p>;
-    if (!work) return <div className="error-msg">作品が見つかりません</div>;
+    if (!work) return <div className="error-msg">{error || "作品が見つかりません"}</div>;
     const seriesPublicationState = getPublicationState(work);
     const lifecycleStatus = getSeriesLifecycleStatus(work);
     const publicationType = work.publicationType ?? "serial";
@@ -579,7 +583,9 @@ export default function WorkDetail() {
                             <div className="section-actions">
                                 <Link to={`/works/${id}/episodes/${ep.id}`} className="btn btn-outline">Episode</Link>
                                 <Link to={`/works/${id}/episodes/${ep.id}/structure`} className="btn btn-primary">Structure Review</Link>
-                                <Link to={`/works/${id}/episodes/${ep.id}/translation-import`} className="btn btn-outline">EN Translation import</Link>
+                                {currentUser?.role === "admin" && (
+                                    <Link to={`/works/${id}/episodes/${ep.id}/translation-import`} className="btn btn-outline">EN Translation import</Link>
+                                )}
                             </div>
                         </div>
                     ))}

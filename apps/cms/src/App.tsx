@@ -1,5 +1,5 @@
 import { Routes, Route, Link } from "react-router-dom";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Dashboard from "./pages/Dashboard";
 import CreateWork from "./pages/CreateWork";
@@ -21,15 +21,38 @@ import TranslationDraftImport from "./pages/TranslationDraftImport";
 import GitHubHandoffList from "./pages/GitHubHandoffList";
 import GitHubIdentityVerifications from "./pages/GitHubIdentityVerifications";
 import RightsManager from "./pages/RightsManager";
-import { devLogin, getMe, logout, requestLoginLink } from "./api";
+import { devLogin, getMe, isPermissionError, listSeries, logout, requestLoginLink } from "./api";
 import { LocaleSwitcher } from "./i18n/LocaleSwitcher";
 import { useTranslation } from "./i18n/I18nProvider";
 
 const devLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_CMS_ENABLE_DEV_LOGIN === "true";
 
+type CmsUser = { id: string; name: string; role: string };
+type AccessState =
+    | { status: "anonymous" }
+    | { status: "loading" }
+    | { status: "global_admin" }
+    | { status: "series_scoped"; count: number }
+    | { status: "no_permission" }
+    | { status: "unknown" };
+
+function AdminOnlyRoute({ user, children }: { user: CmsUser | null; children: ReactNode }) {
+    const { t } = useTranslation();
+    if (user?.role === "admin") return <>{children}</>;
+    return (
+        <div className="card empty-state">
+            <p>{user ? t("app.permission.adminOnly") : t("app.permission.loginRequired")}</p>
+            <Link to="/" className="btn btn-outline" style={{ marginTop: "1rem" }}>
+                {t("app.nav.dashboard")}
+            </Link>
+        </div>
+    );
+}
+
 export default function App() {
     const { t } = useTranslation();
-    const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
+    const [user, setUser] = useState<CmsUser | null>(null);
+    const [accessState, setAccessState] = useState<AccessState>({ status: "loading" });
     const [loginError, setLoginError] = useState("");
     const [loginNotice, setLoginNotice] = useState("");
     const [loginEmail, setLoginEmail] = useState("");
@@ -37,7 +60,39 @@ export default function App() {
     const [navOpen, setNavOpen] = useState(false);
 
     useEffect(() => {
-        getMe().then(setUser).catch(() => undefined);
+        let cancelled = false;
+        const loadSession = async () => {
+            try {
+                const nextUser = await getMe();
+                if (cancelled) return;
+                setUser(nextUser);
+                if (!nextUser) {
+                    setAccessState({ status: "anonymous" });
+                    return;
+                }
+                if (nextUser.role === "admin") {
+                    setAccessState({ status: "global_admin" });
+                    return;
+                }
+                setAccessState({ status: "loading" });
+                try {
+                    const items = await listSeries();
+                    if (cancelled) return;
+                    setAccessState(items.length > 0
+                        ? { status: "series_scoped", count: items.length }
+                        : { status: "no_permission" });
+                } catch (error) {
+                    if (cancelled) return;
+                    setAccessState(isPermissionError(error) ? { status: "no_permission" } : { status: "unknown" });
+                }
+            } catch {
+                if (!cancelled) setAccessState({ status: "anonymous" });
+            }
+        };
+        loadSession();
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const loginAsDevAdmin = async () => {
@@ -46,6 +101,7 @@ export default function App() {
         try {
             const session = await devLogin("dev-admin", "Dev Admin");
             setUser(session.user);
+            setAccessState(session.user.role === "admin" ? { status: "global_admin" } : { status: "loading" });
         } catch (error) {
             setLoginError((error as Error).message);
         }
@@ -74,11 +130,29 @@ export default function App() {
         try {
             await logout();
             setUser(null);
+            setAccessState({ status: "anonymous" });
             setLoginNotice(t("app.session.loggedOut"));
         } catch (error) {
             setLoginError((error as Error).message);
         }
     };
+
+    const accessLabel = (() => {
+        switch (accessState.status) {
+            case "global_admin":
+                return t("app.permission.globalAdmin");
+            case "series_scoped":
+                return t("app.permission.seriesScoped", { count: accessState.count });
+            case "no_permission":
+                return t("app.permission.noPermission");
+            case "loading":
+                return t("app.permission.checking");
+            case "unknown":
+                return t("app.permission.unknown");
+            case "anonymous":
+                return t("app.permission.loggedOut");
+        }
+    })();
 
     const navGroups = [
         {
@@ -139,7 +213,7 @@ export default function App() {
                     <LocaleSwitcher />
                     {user ? (
                         <div className="app-session-user">
-                            <span className="badge badge-ok">{user.name} · {user.role}</span>
+                            <span className="badge badge-ok">{user.name} · {accessLabel}</span>
                             <button type="button" className="btn btn-outline btn-compact" onClick={logoutSession}>
                                 {t("app.session.logout")}
                             </button>
@@ -169,25 +243,25 @@ export default function App() {
             <main className="app-main">
                 <Routes>
                     <Route path="/" element={<Dashboard />} />
-                    <Route path="/works/new" element={<CreateWork />} />
-                    <Route path="/works/:id" element={<WorkDetail />} />
-                    <Route path="/works/:id/episodes/:epId" element={<EpisodeEditor />} />
-                    <Route path="/works/:id/episodes/:epId/structure" element={<PageStructureReview />} />
-                    <Route path="/works/:id/episodes/:epId/translation-import" element={<TranslationDraftImport />} />
+                    <Route path="/works/new" element={<AdminOnlyRoute user={user}><CreateWork /></AdminOnlyRoute>} />
+                    <Route path="/works/:id" element={<WorkDetail currentUser={user} />} />
+                    <Route path="/works/:id/episodes/:epId" element={<EpisodeEditor currentUser={user} />} />
+                    <Route path="/works/:id/episodes/:epId/structure" element={<PageStructureReview currentUser={user} />} />
+                    <Route path="/works/:id/episodes/:epId/translation-import" element={<AdminOnlyRoute user={user}><TranslationDraftImport /></AdminOnlyRoute>} />
                     <Route path="/works/:id/publish" element={<Publish />} />
-                    <Route path="/ingestion" element={<JobsList />} />
-                    <Route path="/ingestion/new" element={<CreateJob />} />
-                    <Route path="/ingestion/:jobId" element={<JobDetail />} />
-                    <Route path="/feedback" element={<FeedbackList />} />
-                    <Route path="/feedback/:feedbackId" element={<FeedbackDetail />} />
-                    <Route path="/proposals" element={<ProposalList />} />
-                    <Route path="/proposals/:proposalId" element={<ProposalDetail />} />
-                    <Route path="/pack-drafts" element={<PackDraftList />} />
-                    <Route path="/pack-drafts/:packDraftId" element={<PackDraftDetail />} />
-                    <Route path="/github-handoffs" element={<GitHubHandoffList />} />
-                    <Route path="/github-identities" element={<GitHubIdentityVerifications />} />
-                    <Route path="/rights" element={<RightsManager />} />
-                    <Route path="/entitlements" element={<Entitlements />} />
+                    <Route path="/ingestion" element={<AdminOnlyRoute user={user}><JobsList /></AdminOnlyRoute>} />
+                    <Route path="/ingestion/new" element={<AdminOnlyRoute user={user}><CreateJob /></AdminOnlyRoute>} />
+                    <Route path="/ingestion/:jobId" element={<AdminOnlyRoute user={user}><JobDetail /></AdminOnlyRoute>} />
+                    <Route path="/feedback" element={<AdminOnlyRoute user={user}><FeedbackList /></AdminOnlyRoute>} />
+                    <Route path="/feedback/:feedbackId" element={<AdminOnlyRoute user={user}><FeedbackDetail /></AdminOnlyRoute>} />
+                    <Route path="/proposals" element={<AdminOnlyRoute user={user}><ProposalList /></AdminOnlyRoute>} />
+                    <Route path="/proposals/:proposalId" element={<AdminOnlyRoute user={user}><ProposalDetail /></AdminOnlyRoute>} />
+                    <Route path="/pack-drafts" element={<AdminOnlyRoute user={user}><PackDraftList /></AdminOnlyRoute>} />
+                    <Route path="/pack-drafts/:packDraftId" element={<AdminOnlyRoute user={user}><PackDraftDetail /></AdminOnlyRoute>} />
+                    <Route path="/github-handoffs" element={<AdminOnlyRoute user={user}><GitHubHandoffList /></AdminOnlyRoute>} />
+                    <Route path="/github-identities" element={<AdminOnlyRoute user={user}><GitHubIdentityVerifications /></AdminOnlyRoute>} />
+                    <Route path="/rights" element={<AdminOnlyRoute user={user}><RightsManager /></AdminOnlyRoute>} />
+                    <Route path="/entitlements" element={<AdminOnlyRoute user={user}><Entitlements /></AdminOnlyRoute>} />
                 </Routes>
             </main>
         </div>
