@@ -338,6 +338,84 @@ MVP:
 - Use existing feedback -> proposal -> adopt proposal flow.
 - Keep reviewability; do not silently mutate canonical content.
 
+## Text Overlay Evolution
+
+These ideas extend the experimental Reader text overlay (see
+`docs/reader-text-layer-spec.md`). They share one goal: fit translated and
+original Bubble text into the artwork well across writing directions and
+languages, while keeping `contents/` canonical and the Reader public-safe.
+Author decision 2026-06-13: keep vertical writing (no automatic
+vertical-to-horizontal switch); these ideas are the structural path instead.
+
+### J. Per-Language (Writing-Mode) Bubble Image And BBox Variants
+
+Vertical Japanese and horizontal translations want different Bubble shapes:
+vertical text prefers tall Bubbles, horizontal text prefers wide ones. A single
+blank-bubble image and a single bbox shared across all languages is the root
+cause of cramped wide Bubbles with vertical text. Eventually provide
+blank-bubble page images and bbox sets per language or writing direction.
+
+Direction:
+
+- Extend the existing `Page.images` variant-key convention (already used for
+  `ja-blank`) to language/direction-specific blank images.
+- Allow per-variant bbox sets so a Bubble can take a different shape per
+  language without changing canonical reading order or `bubbleId`.
+- Keep canonical `textOriginal`, `bubbleId`, and reading order unchanged; this
+  is an additive presentation layer.
+
+Boundary:
+
+- Requires a v2-compatible content contract extension; design and review the
+  schema change explicitly before implementing.
+- Overlay shows published Packs only; per-variant assets do not change that.
+
+### K. Optimal Bubble Size Suggestion From Text Volume
+
+Suggest the Bubble bbox size that best fits a given text volume, per language
+and writing direction. This is the inverse of the current fit guidance (which
+warns whether text fits): instead, compute what size would fit.
+
+Use:
+
+- Help authors size Bubbles while drawing, and show translators the target size
+  per language.
+- Combines naturally with idea J (per-language variants) and existing fit
+  guidance.
+
+MVP:
+
+- From character count plus writing direction, estimate a recommended bbox
+  width/height range and surface it in CMS.
+- Suggestion only; never auto-resize canonical bbox without human confirmation.
+
+### L. CSS/SVG-Drawn Bubbles
+
+Render speech balloons (white shape plus tail) in CSS/SVG over the artwork
+instead of relying on a baked blank-bubble image. The balloon can then grow or
+shrink with text volume (works with idea K) and avoids needing per-language
+blank images (an alternative to idea J).
+
+Trade-offs:
+
+- Pro: no blank-image asset needed; balloon resizes to fit text; consistent
+  across languages.
+- Con: loses hand-drawn balloon character; hard for irregular, hand-lettered,
+  or stylized balloon shapes. Suitability depends on art style.
+
+MVP:
+
+- Optional, opt-in per Series/Episode: a simple rounded-rectangle/ellipse
+  balloon with a tail, positioned by canonical bbox, behind the overlay text
+  layer.
+- Keep the baked-image overlay path as the default; CSS balloons are an
+  alternative rendering mode, not a replacement.
+
+Boundary:
+
+- Pure presentation; canonical content, bbox, and `textOriginal` unchanged.
+- Overlay stays opt-in and noindex during experiments.
+
 ## Private / Commercial-Layer Ideas
 
 The following ideas may be useful for hosted commercial operations, but they
