@@ -29,6 +29,16 @@ function normalizePageBubble(bubble: BubbleData): BubbleData {
     };
 }
 
+/**
+ * Normalize the editable Page Structure Review model after local edits.
+ *
+ * The CMS editor keeps assigned Bubbles on `panel.bubbles` while editing, then
+ * rebuilds the canonical `page.bubbles` array from those Panel lists plus
+ * `panelId: null` page-level Bubbles. Callers that start from canonical v2
+ * data must first hydrate assigned Bubbles into their owning Panels; otherwise
+ * panel-linked Bubbles that only exist in `page.bubbles` are intentionally not
+ * treated as an edit source here.
+ */
 export function syncPageBubbles(page: PageData): PageData {
     const assignedBubbles = page.panels.flatMap((panel) =>
         panel.bubbles.map((bubble, index) => normalizePanelBubble(page, panel, bubble, index)),

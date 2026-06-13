@@ -49,6 +49,8 @@ The target here is simple:
 ### 4. Auth and Commerce Smoke Test
 
 - [x] Dev/admin login works in non-production environments
+- [x] `CMS_ADMIN_EMAILS` includes the initial production CMS administrator before
+  production admin login testing
 - [x] Production magic-link login works end to end when email provider is configured
 - [x] Production API starts with magic-link login disabled when email provider is not configured
 - [x] Magic-link token cannot be reused
