@@ -129,15 +129,64 @@ const overlayTextForBubble = (bubble: any, packs: PublishedPack[], language: str
   return bubble.textOriginal;
 };
 
-const renderTextForOverlay = (text: string, options: { spaceAsBreak: boolean }) => {
-  if (!options.spaceAsBreak) return text;
+const SOFT_BREAK = "\u200B";
+
+const shouldSoftBreakAfterJapaneseSegment = (
+  segment: string,
+  nextSegment: string | undefined,
+  phraseLength: number,
+) => {
+  if (!nextSegment) return false;
+  if (/^[、。！？!?…]+$/u.test(segment)) return true;
+  if (/^[）」』】》〉）]+$/u.test(nextSegment)) return false;
+  if (/^[（「『【《〈(]+$/u.test(segment)) return false;
+  if (/^(は|が|を|に|へ|で|と|も|の|から|まで|より|には|では|でも|ても)$/u.test(segment)) {
+    return phraseLength >= 4;
+  }
+  if (/^(です|ます|だよ|だね|かい|かな|もの|こと)$/u.test(segment)) return true;
+  return phraseLength >= 8;
+};
+
+const japaneseWordSegments = (line: string): string[] => {
+  const Segmenter = (Intl as any).Segmenter;
+  if (typeof Segmenter !== "function") {
+    return line.match(/から|まで|より|には|では|でも|ても|[^\s]/gu) ?? [];
+  }
+  const segmenter = new Segmenter("ja", { granularity: "word" });
+  return Array.from(segmenter.segment(line), (part: any) => String(part.segment ?? ""));
+};
+
+const insertJapaneseSoftBreaks = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => {
+      const segments = japaneseWordSegments(line);
+      let phraseLength = 0;
+      return segments
+        .map((segment, index) => {
+          phraseLength += Array.from(segment.replace(/\s+/gu, "")).length;
+          const shouldBreak = shouldSoftBreakAfterJapaneseSegment(segment, segments[index + 1], phraseLength);
+          if (shouldBreak) {
+            phraseLength = 0;
+            return `${segment}${SOFT_BREAK}`;
+          }
+          return segment;
+        })
+        .join("");
+    })
+    .join("\n");
+
+const renderTextForOverlay = (text: string, options: { addJapaneseSoftBreaks: boolean; spaceAsBreak: boolean }) => {
+  const normalized = text.replace(/\r\n?/gu, "\n");
+  if (options.addJapaneseSoftBreaks) return insertJapaneseSoftBreaks(normalized);
+  if (!options.spaceAsBreak) return normalized;
   // Display-only source-locale experiment: preserve authored/new review line
   // breaks, but do not reserve ASCII spaces as hard line breaks. Manga source
   // text may use half-width spaces as punctuation, so overlay hard breaks must
   // come from explicit "\n" review text. Natural CSS line breaking and the
   // per-Bubble refitter handle fit without changing canonical textOriginal or
   // published Pack text.
-  return text.replace(/\r\n?/gu, "\n");
+  return normalized;
 };
 
 const blankImageCandidates = (language: string) => [
@@ -161,7 +210,7 @@ const pct = (value: number, total: number) =>
   `${((value / Math.max(total, 1)) * 100).toFixed(4)}%`;
 
 const countFitCharacters = (text: string) =>
-  Array.from(text.replace(/\s+/g, "")).length;
+  Array.from(text.replace(/[\s\u200B]+/g, "")).length;
 
 const estimateOverlayCapacity = (
   bbox: { width?: number; height?: number },
@@ -242,6 +291,7 @@ export const buildTextOverlayPages = (
         .map((bubble: any): OverlayBubble => {
           const displayDirection = displayDirectionForBubble(bubble, language);
           const text = renderTextForOverlay(overlayTextForBubble(bubble, packs, language), {
+            addJapaneseSoftBreaks: isSourceOverlayLanguage(language) && displayDirection === "vertical",
             spaceAsBreak: spaceAsBreak && language === "ja",
           });
           const fit = estimateOverlayFit({

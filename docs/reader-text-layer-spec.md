@@ -215,6 +215,11 @@ and source selection before broad rollout.
   as Japanese句点/読点 boundaries. Explicit `\n` line breaks should be added
   during translation/review when a Bubble needs a deliberate break; the overlay
   preserves those breaks with `white-space: pre-line`.
+- The Viewer may insert display-only soft break hints for Japanese overlay text
+  before rendering. These hints should prefer punctuation, short particles, and
+  phrase-length thresholds, and may use `Intl.Segmenter` when available. They
+  must remain invisible rendering hints: never write them back to
+  `textOriginal`, Translation Pack text, or canonical layout metadata.
 - Treating spaces as line-break hints must remain an Episode-scoped display
   option, not a content contract rule. Some manga scripts use half-width spaces
   as punctuation or rhythm marks, so a global "space means line break" rule

@@ -97,6 +97,23 @@ const setRefitScale = (element: HTMLElement, scale: number) => {
   element.style.setProperty("--overlay-refit", scale.toFixed(4));
 };
 
+const setTextShift = (element: HTMLElement) => {
+  const measurement = measureText(element);
+  const freeWidth = Math.max(0, measurement.availableWidth - measurement.textWidth);
+  const freeHeight = Math.max(0, measurement.availableHeight - measurement.textHeight);
+  if (measurement.vertical) {
+    const estimate = verticalLayoutEstimate(element);
+    const horizontalGravity = estimate.fillWidth < 0.82 ? 0.42 : 0.18;
+    const verticalGravity = estimate.fillHeight < 0.82 ? 0.42 : 0.18;
+    element.style.setProperty("--overlay-shift-x", `${(-freeWidth * horizontalGravity).toFixed(2)}px`);
+    element.style.setProperty("--overlay-shift-y", `${(freeHeight * verticalGravity).toFixed(2)}px`);
+    return;
+  }
+  const verticalGravity = measurement.textHeight / measurement.availableHeight < 0.82 ? 0.36 : 0.12;
+  element.style.setProperty("--overlay-shift-x", "0px");
+  element.style.setProperty("--overlay-shift-y", `${(freeHeight * verticalGravity).toFixed(2)}px`);
+};
+
 const storeMeasurementDebug = (element: HTMLElement) => {
   const measurement = measureText(element);
   if (measurement.vertical) {
@@ -135,6 +152,7 @@ const refitBubble = (element: HTMLElement) => {
   setRefitScale(element, 1);
 
   if (!exceedsTargetFill(element)) {
+    setTextShift(element);
     storeMeasurementDebug(element);
     return;
   }
@@ -143,12 +161,14 @@ const refitBubble = (element: HTMLElement) => {
   if (exceedsTargetFill(element)) {
     if (overflows(element)) {
       element.dataset.overflow = "scroll";
+      setTextShift(element);
       storeMeasurementDebug(element);
       return;
     }
     // The preferred whitespace target is impossible for this Bubble. Keep the
     // lower readable scale instead of growing back to a no-margin fit.
     element.dataset.overflow = "fit";
+    setTextShift(element);
     storeMeasurementDebug(element);
     return;
   }
@@ -156,6 +176,7 @@ const refitBubble = (element: HTMLElement) => {
   const best = findLargestScaleThatFits(element, exceedsTargetFill);
   setRefitScale(element, best);
   element.dataset.overflow = overflows(element) ? "scroll" : "fit";
+  setTextShift(element);
   storeMeasurementDebug(element);
 };
 
