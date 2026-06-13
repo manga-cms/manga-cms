@@ -1435,6 +1435,10 @@ contract for English or other target-language translation rows. It is a
 runtime Pack Draft operation and never writes canonical Episode JSON,
 duplicates a Series, exports `packs/`, or posts to GitHub.
 
+Machine-assisted translation should use this same import contract as its Pack
+Draft entry point. See [translation-pipeline-spec.md](translation-pipeline-spec.md)
+for the design-level staged pipeline and origin metadata boundary.
+
 Request body:
 
 ```json
