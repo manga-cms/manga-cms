@@ -114,6 +114,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
   canonicalUrl={canonicalPath}
   robots="noindex,follow"
   ogType="article"
+  loadDefaultFonts={false}
 >
   <main class="text-overlay-page" aria-labelledby="text-overlay-title" data-overlay-fit-root>
     <nav class="text-overlay-nav container" aria-label="Reader navigation">
@@ -171,6 +172,24 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
 </BaseLayout>
 
 <style>
+  @font-face {
+    font-family: "Shippori Antique";
+    font-display: swap;
+    font-style: normal;
+    font-weight: 400;
+    src: url("/fonts/shippori-antique/shippori-antique-latin-400-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0100-024F, U+2000-206F, U+20A0-20CF, U+2100-214F;
+  }
+
+  @font-face {
+    font-family: "Shippori Antique";
+    font-display: swap;
+    font-style: normal;
+    font-weight: 400;
+    src: url("/fonts/shippori-antique/shippori-antique-japanese-400-normal.woff2") format("woff2");
+    unicode-range: U+3000-30FF, U+31F0-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+  }
+
   .text-overlay-page {
     background: #f5f2ec;
     min-height: 100vh;
@@ -265,17 +284,16 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     box-sizing: border-box;
     color: #151515;
     display: flex;
-    font-family: "Noto Sans JP", system-ui, sans-serif;
+    font-family: "Shippori Antique", "Noto Sans JP", sans-serif;
     font-size: clamp(8px, calc(var(--overlay-base-size, 3.4cqw) * var(--overlay-fit, 1) * var(--overlay-refit, 1)), 24px);
-    font-weight: 700;
+    font-weight: 400;
     justify-content: center;
     line-break: strict;
-    line-height: 1.32;
+    line-height: 1.2;
     margin: 0;
     overflow: hidden;
-    overflow-wrap: anywhere;
     overscroll-behavior: contain;
-    padding: 0.9cqw;
+    padding: 0.4cqw;
     position: absolute;
     text-align: center;
     text-wrap: pretty;
@@ -283,16 +301,25 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     word-break: normal;
   }
 
+  .overlay-bubble.is-horizontal {
+    line-break: auto;
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
   .overlay-bubble.is-vertical {
     --overlay-base-size: 3cqw;
-    line-height: 1.45;
+    line-break: strict;
+    line-height: 1.3;
+    overflow-wrap: normal;
     text-orientation: mixed;
+    word-break: normal;
     writing-mode: vertical-rl;
   }
 
   .overlay-bubble.is-sfx {
     --overlay-base-size: 4cqw;
-    font-weight: 900;
+    font-weight: 400;
   }
 
   .overlay-bubble[data-overflow="scroll"] {

@@ -201,10 +201,19 @@ and source selection before broad rollout.
   viewport layout, and consistency with the separate `/text` accessibility
   view.
 - Wide horizontal Bubbles with vertical Japanese text may remain cramped even
-  after refitting. The first implementation should respect canonical
-  `textDirection`; automatic vertical-to-horizontal fallback is a review
-  decision for a later pass because it changes the authored typesetting
-  interpretation.
+  after refitting. Author decision (2026-06-13): keep vertical writing
+  (`textDirection`) and do not auto-switch to horizontal, because it changes the
+  authored typesetting interpretation. Cramped wide Bubbles are accepted for now
+  and improved through font, line-break, and refit tuning only. The structural
+  fix is tracked in the idea backlog as per-language Bubble image/bbox variants
+  (see `docs/IDEA-BACKLOG.md`), not as an automatic writing-mode switch.
+- CSS can improve line breaking but cannot reliably choose semantic breaks such
+  as Japanese句点/読点 boundaries. Explicit `\n` line breaks should be added
+  during translation/review when a Bubble needs a deliberate break; the overlay
+  preserves those breaks with `white-space: pre-line`.
+- Any fallback from vertical to horizontal writing for wide Bubbles is deferred
+  until the author chooses a policy. Do not add automatic writing-mode switching
+  without an explicit A/B/C review decision.
 
 ### Step 4: CMS Review Workflow
 

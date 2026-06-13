@@ -1,4 +1,4 @@
-const MIN_REFIT_SCALE = 0.5;
+const MIN_REFIT_SCALE = 0.32;
 const MAX_STEPS = 8;
 const FIT_EPSILON = 1;
 

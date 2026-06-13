@@ -15,6 +15,7 @@ interface Props {
   alternateUrls?: { locale: string; href: string }[];
   robots?: string;
   immersive?: boolean;
+  loadDefaultFonts?: boolean;
 }
 
 const {
@@ -29,6 +30,7 @@ const {
   alternateUrls,
   robots,
   immersive = false,
+  loadDefaultFonts = true,
 } = Astro.props;
 
 const siteOrigin = import.meta.env.SITE_ORIGIN as string | undefined;
@@ -90,12 +92,16 @@ const cloudflareWebAnalyticsConfig = cloudflareWebAnalyticsConfigForRequest(
       </>
     )}
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
+    {loadDefaultFonts && (
+      <>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+          rel="stylesheet"
+        />
+      </>
+    )}
   </head>
   <body class={`site-mode-${siteConfig.mode}`}>
     {!immersive && (
