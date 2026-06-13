@@ -22,6 +22,7 @@ CREATE TABLE "RightsGrant" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "revokedAt" TIMESTAMP(3),
+    "revokedBy" TEXT,
 
     CONSTRAINT "RightsGrant_pkey" PRIMARY KEY ("grantId")
 );

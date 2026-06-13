@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type {
     RightsGrantCreateInput,
     RightsGrantRecord,
+    RightsGrantRevokeInput,
     RightsPermissionCheckInput,
     RightsPermissionCheckResponse,
     RightsScope,
@@ -23,7 +24,7 @@ export interface RightsRepository {
     createGrant(input: RightsGrantCreateInput): MaybePromise<RightsGrantRecord>;
     listGrants(filters?: RightsGrantListFilters): MaybePromise<RightsGrantRecord[]>;
     getGrant(grantId: string): MaybePromise<RightsGrantRecord | undefined>;
-    revokeGrant(grantId: string): MaybePromise<{ success: true; record: RightsGrantRecord } | { success: false; error: string }>;
+    revokeGrant(grantId: string, input?: RightsGrantRevokeInput): MaybePromise<{ success: true; record: RightsGrantRecord } | { success: false; error: string }>;
     checkPermission(input: RightsPermissionCheckInput): MaybePromise<RightsPermissionCheckResponse>;
 }
 
@@ -79,7 +80,7 @@ export class FileRightsRepository implements RightsRepository {
         return this.readAll().find((record) => record.grant_id === grantId);
     }
 
-    revokeGrant(grantId: string): { success: true; record: RightsGrantRecord } | { success: false; error: string } {
+    revokeGrant(grantId: string, input: RightsGrantRevokeInput = {}): { success: true; record: RightsGrantRecord } | { success: false; error: string } {
         return withFileLock(this.filePath(), () => {
             const records = this.readAll();
             const index = records.findIndex((record) => record.grant_id === grantId);
@@ -88,6 +89,7 @@ export class FileRightsRepository implements RightsRepository {
             const record: RightsGrantRecord = {
                 ...records[index]!,
                 revoked_at: now,
+                revoked_by: input.revokedBy ?? null,
                 updated_at: now,
             };
             records[index] = record;

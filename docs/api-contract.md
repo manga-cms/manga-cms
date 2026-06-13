@@ -1030,7 +1030,7 @@ Base path: `/api/v1`
 | `POST` | `/admin/pack-drafts/{packDraftId}/export` | Export an approved/published Pack draft to `packs/{packId}/pack.json` |
 | `GET` | `/admin/rights/grants` | List runtime Rights grants |
 | `POST` | `/admin/rights/grants` | Create a runtime Rights grant |
-| `POST` | `/admin/rights/grants/{grantId}/revoke` | Revoke a runtime Rights grant |
+| `POST` | `/admin/rights/grants/{grantId}/revoke` | Revoke a runtime Rights grant and record revoke audit |
 | `POST` | `/admin/rights/check` | Check whether a user has a Rights permission |
 
 Admin endpoints require authenticated CMS access. Global admins are identified
@@ -1055,6 +1055,13 @@ Current Series-scoped enforcement:
 - Rights grant list/create/revoke is global-admin-only for broad scopes, and
   Series managers with `manage_rights` can manage grants bounded to their own
   `scope.series_id`.
+
+Current unscoped admin surfaces remain global-admin-only: Pack draft,
+feedback, proposal, ingestion, GitHub handoff, entitlement, and identity
+administration. This is not treated as a security hole; it is the remaining
+Series-scoped user feature coverage. CMS should avoid surfacing these global
+admin tools to Series-scoped users until each area receives explicit
+Series-scope enforcement.
 
 ### CMS Content Editing Contract
 
@@ -1525,6 +1532,11 @@ not email, GitHub login, Stripe customer, or another provider-specific account
 key. Login providers may map to a stable `subject_user_id`, but permission
 checks only consume the resolved user ID.
 
+Revoke audit is part of the Rights grant record. `POST
+/admin/rights/grants/{grantId}/revoke` sets `revoked_at` and `revoked_by` in
+the same update, where `revoked_by` is the authenticated operator's stable user
+ID. File-backed and DB-backed repositories must preserve the same fields.
+
 Rights roles:
 
 - `owner`
@@ -1565,6 +1577,11 @@ with `language: "en"` matches English checks only; a grant with no `language`
 field is an all-language grant and should be used deliberately.
 If a grant has a `usage` restriction, permission checks must provide a matching
 `usage` array.
+
+Current Series list filtering checks grants per Series. This is acceptable for
+the small MVP dataset. A later optimization should load the authenticated
+user's active grants once and evaluate all manageable Series from that in-memory
+grant set.
 
 ### Image Upload And Storage State
 

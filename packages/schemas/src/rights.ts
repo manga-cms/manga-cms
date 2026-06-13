@@ -62,6 +62,7 @@ export const RightsGrantRecordSchema = RightsGrantCreateInputSchema.extend({
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
     revoked_at: z.string().datetime().nullable().optional(),
+    revoked_by: z.string().min(1).max(120).nullable().optional(),
 }).strict();
 
 export const RightsPermissionCheckInputSchema = z.object({

@@ -111,6 +111,9 @@ Current storage policy:
   `RIGHTS_DIR/rights-grants.json`.
 - Both implementations use the same provider-neutral contract:
   `subject_user_id`, `role`, `permissions[]`, and `scope`.
+- Revocation records `revoked_at` and `revoked_by` together. `revoked_by` is
+  the authenticated operator's stable user ID and must not be a provider-local
+  email, GitHub login, or payment customer ID.
 - `scope.series_id` is the MVP boundary for CMS Series administration. Narrower
   `episode_id`, language, Pack, usage, and territory scopes are already part of
   the contract for future workflows.
@@ -132,6 +135,14 @@ The minimum implementation is:
   translation/review permissions, so the CMS can open only assigned Series.
 - Rights grant delegation requires `manage_rights` and must remain bounded to
   the delegator's own `scope.series_id`.
+- Pack draft, feedback, proposal, ingestion, GitHub handoff, entitlement, and
+  identity admin surfaces remain global-admin-only for now. This is remaining
+  Series-scoped user feature coverage, not a known security hole; CMS should
+  not expose those tools to Series-scoped users until each surface has explicit
+  Series-scope enforcement.
+- The current per-Series filtering may perform one grant check per Series. That
+  is acceptable for MVP; optimize later by loading the user's active grants once
+  and evaluating manageable Series from that grant set.
 
 Suggested role-to-permission defaults:
 
@@ -254,6 +265,7 @@ Track:
 - who reviewed
 - who approved
 - who published
+- who revoked a grant
 - when status changed
 - target series/episode/page/panel/bubble/region
 - affected pack and version

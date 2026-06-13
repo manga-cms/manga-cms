@@ -1369,6 +1369,7 @@ paths:
     post:
       tags: [Rights]
       summary: Revoke a runtime Rights grant
+      description: Marks the grant revoked and records the authenticated operator as `revoked_by` at the same time as `revoked_at`.
       security:
         - bearerAuth: []
       parameters:
@@ -4799,6 +4800,10 @@ components:
               type: string
               format: date-time
               nullable: true
+            revoked_by:
+              type: string
+              nullable: true
+              maxLength: 120
 
     RightsPermissionCheckInput:
       type: object

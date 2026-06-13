@@ -11,6 +11,7 @@ import type {
     RightsGrantCreateInput,
     RightsGrantListFilters,
     RightsGrantRecord,
+    RightsGrantRevokeInput,
     RightsPermissionCheckInput,
     RightsPermissionCheckResponse,
     RightsRepository,
@@ -65,11 +66,14 @@ export class DbRightsRepository implements RightsRepository {
         return row ? this.toRecord(row) : undefined;
     }
 
-    async revokeGrant(grantId: string): Promise<{ success: true; record: RightsGrantRecord } | { success: false; error: string }> {
+    async revokeGrant(grantId: string, input: RightsGrantRevokeInput = {}): Promise<{ success: true; record: RightsGrantRecord } | { success: false; error: string }> {
         try {
             const row = await this.prisma.rightsGrant.update({
                 where: { grantId },
-                data: { revokedAt: new Date() },
+                data: {
+                    revokedAt: new Date(),
+                    revokedBy: input.revokedBy ?? null,
+                },
             });
             return { success: true, record: this.toRecord(row) };
         } catch {
@@ -126,6 +130,7 @@ export class DbRightsRepository implements RightsRepository {
             created_at: toIso(row.createdAt),
             updated_at: toIso(row.updatedAt),
             ...(row.revokedAt ? { revoked_at: toIso(row.revokedAt) } : {}),
+            ...(row.revokedBy !== null && row.revokedBy !== undefined ? { revoked_by: row.revokedBy } : {}),
         };
     }
 }

@@ -38,6 +38,19 @@ It represents the current Postgres runtime-state schema. Existing production
 databases that were created with `db:push:postgres` must baseline this
 migration instead of applying it.
 
+Additional production migrations after the baseline include:
+
+```text
+packages/db/prisma/postgres/migrations/20260613000000_add_rights_grants/migration.sql
+```
+
+That migration creates the runtime `RightsGrant` table, including revoke audit
+fields `revokedAt` and `revokedBy`. It must be applied through
+`db:migrate:deploy:postgres` after the existing production database has been
+baselined against `20260606000000_init`; do not mark it as part of the
+baseline for an existing database unless the table was already created outside
+Prisma Migrate and drift has been reconciled.
+
 ## Available Commands
 
 Run these from the repository root:

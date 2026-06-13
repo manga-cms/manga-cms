@@ -1665,7 +1665,7 @@ app.post("/admin/rights/grants/:grantId/revoke", async (c) => {
     if (!await canManageRightsForScope(auth.user, existing.scope)) {
         return c.json({ error: { code: "FORBIDDEN", message: "manage_rights permission required for this grant scope" } }, 403);
     }
-    const result = await rightsRepo.revokeGrant(c.req.param("grantId"));
+    const result = await rightsRepo.revokeGrant(c.req.param("grantId"), { revokedBy: auth.user.id });
     if (!result.success) {
         return c.json({ error: { code: "NOT_FOUND", message: result.error } }, 404);
     }

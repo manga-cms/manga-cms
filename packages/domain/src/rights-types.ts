@@ -57,6 +57,11 @@ export interface RightsGrantRecord extends RightsGrantCreateInput {
     created_at: string;
     updated_at: string;
     revoked_at?: string | null;
+    revoked_by?: string | null;
+}
+
+export interface RightsGrantRevokeInput {
+    revokedBy?: string | null;
 }
 
 export interface RightsPermissionCheckInput {

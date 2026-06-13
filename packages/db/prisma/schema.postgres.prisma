@@ -73,6 +73,7 @@ model RightsGrant {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   revokedAt       DateTime?
+  revokedBy       String?
 
   @@index([subjectUserId])
   @@index([seriesId])
