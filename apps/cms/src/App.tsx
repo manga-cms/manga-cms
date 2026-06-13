@@ -21,7 +21,7 @@ import TranslationDraftImport from "./pages/TranslationDraftImport";
 import GitHubHandoffList from "./pages/GitHubHandoffList";
 import GitHubIdentityVerifications from "./pages/GitHubIdentityVerifications";
 import RightsManager from "./pages/RightsManager";
-import { devLogin, getMe, requestLoginLink } from "./api";
+import { devLogin, getMe, logout, requestLoginLink } from "./api";
 import { LocaleSwitcher } from "./i18n/LocaleSwitcher";
 import { useTranslation } from "./i18n/I18nProvider";
 
@@ -65,6 +65,18 @@ export default function App() {
             setLoginError((error as Error).message);
         } finally {
             setLoginSubmitting(false);
+        }
+    };
+
+    const logoutSession = async () => {
+        setLoginError("");
+        setLoginNotice("");
+        try {
+            await logout();
+            setUser(null);
+            setLoginNotice(t("app.session.loggedOut"));
+        } catch (error) {
+            setLoginError((error as Error).message);
         }
     };
 
@@ -124,7 +136,12 @@ export default function App() {
                 <div className="app-session">
                     <LocaleSwitcher />
                     {user ? (
-                        <span className="badge badge-ok">{user.name} · {user.role}</span>
+                        <div className="app-session-user">
+                            <span className="badge badge-ok">{user.name} · {user.role}</span>
+                            <button type="button" className="btn btn-outline btn-compact" onClick={logoutSession}>
+                                {t("app.session.logout")}
+                            </button>
+                        </div>
                     ) : devLoginEnabled ? (
                         <button type="button" className="btn btn-outline btn-compact" onClick={loginAsDevAdmin}>
                             {t("app.session.devLogin")}

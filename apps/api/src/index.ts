@@ -673,6 +673,20 @@ function setSessionCookie(c: any, token: string): void {
     c.header("Set-Cookie", parts.join("; "));
 }
 
+function clearSessionCookie(c: any): void {
+    const parts = [
+        "manga_auth=",
+        "Path=/",
+        "HttpOnly",
+        "SameSite=Lax",
+        "Max-Age=0",
+    ];
+    if (IS_PRODUCTION) {
+        parts.push("Secure");
+    }
+    c.header("Set-Cookie", parts.join("; "));
+}
+
 // ---------------------------------------------------------------------------
 // Auth helper — extract DevUser from Authorization header or cookie
 // ---------------------------------------------------------------------------
@@ -2643,6 +2657,11 @@ app.get("/auth/me", (c) => {
     const user = getUser(c);
     if (!user) return c.json({ authenticated: false }, 401);
     return c.json({ authenticated: true, user });
+});
+
+app.post("/auth/logout", (c) => {
+    clearSessionCookie(c);
+    return c.json({ ok: true });
 });
 
 // ===========================================================================

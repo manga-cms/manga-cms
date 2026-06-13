@@ -1459,6 +1459,16 @@ export async function getMe() {
     return data.authenticated ? data.user as { id: string; name: string; role: string } : null;
 }
 
+export async function logout() {
+    const res = await fetch(`${API}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+    });
+    const data = await jsonOrEmpty(res);
+    if (!res.ok) throw new Error(apiErrorMessage(data, "Logout failed"));
+    return data as { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Entitlements
 // ---------------------------------------------------------------------------
