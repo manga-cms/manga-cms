@@ -1,18 +1,114 @@
 const MIN_REFIT_SCALE = 0.32;
 const MAX_STEPS = 8;
 const FIT_EPSILON = 1;
-const TARGET_FILL_RATIO = 0.86;
+const HORIZONTAL_TARGET_FILL_RATIO = 0.78;
+const VERTICAL_WIDTH_TARGET_FILL_RATIO = 0.68;
+const VERTICAL_HEIGHT_TARGET_FILL_RATIO = 0.78;
 
-const overflows = (element: HTMLElement) =>
-  element.scrollHeight > element.clientHeight + FIT_EPSILON
-  || element.scrollWidth > element.clientWidth + FIT_EPSILON;
+interface TextMeasurement {
+  availableHeight: number;
+  availableWidth: number;
+  textHeight: number;
+  textWidth: number;
+  vertical: boolean;
+}
 
-const exceedsTargetFill = (element: HTMLElement) =>
-  element.scrollHeight > element.clientHeight * TARGET_FILL_RATIO + FIT_EPSILON
-  || element.scrollWidth > element.clientWidth * TARGET_FILL_RATIO + FIT_EPSILON;
+interface VerticalLayoutEstimate {
+  fillHeight: number;
+  fillWidth: number;
+  textHeight: number;
+  textWidth: number;
+}
+
+const textElementOf = (element: HTMLElement) =>
+  element.querySelector<HTMLElement>("[data-overlay-bubble-text]") ?? element;
+
+const availableBoxOf = (element: HTMLElement) => {
+  const style = window.getComputedStyle(element);
+  const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+  const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+  const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(style.paddingBottom) || 0;
+  return {
+    height: Math.max(1, element.clientHeight - paddingTop - paddingBottom),
+    width: Math.max(1, element.clientWidth - paddingLeft - paddingRight),
+  };
+};
+
+const measureText = (element: HTMLElement): TextMeasurement => {
+  const text = textElementOf(element);
+  const available = availableBoxOf(element);
+  const rect = text.getBoundingClientRect();
+  return {
+    availableHeight: available.height,
+    availableWidth: available.width,
+    textHeight: Math.max(rect.height, text.scrollHeight),
+    textWidth: Math.max(rect.width, text.scrollWidth),
+    vertical: element.classList.contains("is-vertical"),
+  };
+};
+
+const lineHeightOf = (style: CSSStyleDeclaration, fontSize: number) => {
+  const parsed = Number.parseFloat(style.lineHeight);
+  if (Number.isFinite(parsed)) return parsed;
+  return fontSize * 1.3;
+};
+
+const verticalLayoutEstimate = (element: HTMLElement): VerticalLayoutEstimate => {
+  const available = availableBoxOf(element);
+  const style = window.getComputedStyle(element);
+  const fontSize = Number.parseFloat(style.fontSize) || 1;
+  const lineHeight = lineHeightOf(style, fontSize);
+  const characterCount = Math.max(1, Number(element.dataset.fitCharacters ?? 1));
+  const charAdvance = fontSize * 1.03;
+  const maxCharsPerColumn = Math.max(
+    1,
+    Math.floor((available.height * VERTICAL_HEIGHT_TARGET_FILL_RATIO) / Math.max(charAdvance, 1)),
+  );
+  const columns = Math.ceil(characterCount / maxCharsPerColumn);
+  const textWidth = columns * lineHeight;
+  const textHeight = Math.min(characterCount, maxCharsPerColumn) * charAdvance;
+  return {
+    fillHeight: textHeight / available.height,
+    fillWidth: textWidth / available.width,
+    textHeight,
+    textWidth,
+  };
+};
+
+const overflows = (element: HTMLElement) => {
+  const measurement = measureText(element);
+  return measurement.textHeight > measurement.availableHeight + FIT_EPSILON
+    || measurement.textWidth > measurement.availableWidth + FIT_EPSILON;
+};
+
+const exceedsTargetFill = (element: HTMLElement) => {
+  const measurement = measureText(element);
+  if (measurement.vertical) {
+    const estimate = verticalLayoutEstimate(element);
+    return estimate.fillWidth > VERTICAL_WIDTH_TARGET_FILL_RATIO
+      || estimate.fillHeight > VERTICAL_HEIGHT_TARGET_FILL_RATIO;
+  }
+  return measurement.textHeight > measurement.availableHeight * HORIZONTAL_TARGET_FILL_RATIO + FIT_EPSILON
+    || measurement.textWidth > measurement.availableWidth + FIT_EPSILON;
+};
 
 const setRefitScale = (element: HTMLElement, scale: number) => {
   element.style.setProperty("--overlay-refit", scale.toFixed(4));
+};
+
+const storeMeasurementDebug = (element: HTMLElement) => {
+  const measurement = measureText(element);
+  if (measurement.vertical) {
+    const estimate = verticalLayoutEstimate(element);
+    element.dataset.fitFillWidth = estimate.fillWidth.toFixed(3);
+    element.dataset.fitFillHeight = estimate.fillHeight.toFixed(3);
+    element.dataset.fitActualWidth = (measurement.textWidth / measurement.availableWidth).toFixed(3);
+    element.dataset.fitActualHeight = (measurement.textHeight / measurement.availableHeight).toFixed(3);
+    return;
+  }
+  element.dataset.fitFillWidth = (measurement.textWidth / measurement.availableWidth).toFixed(3);
+  element.dataset.fitFillHeight = (measurement.textHeight / measurement.availableHeight).toFixed(3);
 };
 
 const findLargestScaleThatFits = (element: HTMLElement, predicate: (element: HTMLElement) => boolean) => {
@@ -38,26 +134,29 @@ const refitBubble = (element: HTMLElement) => {
   element.dataset.overflow = "fit";
   setRefitScale(element, 1);
 
-  if (!exceedsTargetFill(element)) return;
+  if (!exceedsTargetFill(element)) {
+    storeMeasurementDebug(element);
+    return;
+  }
 
   setRefitScale(element, MIN_REFIT_SCALE);
   if (exceedsTargetFill(element)) {
     if (overflows(element)) {
       element.dataset.overflow = "scroll";
+      storeMeasurementDebug(element);
       return;
     }
-    // The preferred whitespace target is impossible for this Bubble. Use the
-    // largest readable scale that avoids actual clipping instead of forcing the
-    // global lower bound, then fall back to scroll only if even that clips.
-    const fallbackScale = findLargestScaleThatFits(element, overflows);
-    setRefitScale(element, fallbackScale);
-    element.dataset.overflow = overflows(element) ? "scroll" : "fit";
+    // The preferred whitespace target is impossible for this Bubble. Keep the
+    // lower readable scale instead of growing back to a no-margin fit.
+    element.dataset.overflow = "fit";
+    storeMeasurementDebug(element);
     return;
   }
 
   const best = findLargestScaleThatFits(element, exceedsTargetFill);
   setRefitScale(element, best);
   element.dataset.overflow = overflows(element) ? "scroll" : "fit";
+  storeMeasurementDebug(element);
 };
 
 const refitNow = () => {

@@ -168,7 +168,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
                   title={bubble.displayRef ?? bubble.id}
                 >
                   {bubble.speaker && <span class="sr-only">{bubble.speaker}: </span>}
-                  {bubble.text}
+                  <span class="overlay-bubble-text" data-overlay-bubble-text>{bubble.text}</span>
                 </p>
               ))}
             </div>
@@ -297,6 +297,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
   }
 
   .overlay-bubble {
+    --overlay-padding: 1.12cqw;
     box-sizing: border-box;
     color: #151515;
     display: block;
@@ -308,12 +309,24 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     margin: 0;
     overflow: hidden;
     overscroll-behavior: contain;
-    padding: 0.4cqw;
+    padding: var(--overlay-padding);
     position: absolute;
     text-align: start;
     text-wrap: pretty;
     white-space: pre-line;
     word-break: normal;
+  }
+
+  .overlay-bubble-text {
+    box-sizing: border-box;
+    display: inline-block;
+    line-break: inherit;
+    max-block-size: 100%;
+    max-inline-size: 100%;
+    overflow-wrap: inherit;
+    text-wrap: inherit;
+    white-space: inherit;
+    word-break: inherit;
   }
 
   .text-overlay-page[data-overlay-language^="zh"] .overlay-bubble {
@@ -326,6 +339,11 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     word-break: normal;
   }
 
+  .overlay-bubble.is-horizontal .overlay-bubble-text {
+    display: block;
+    inline-size: 100%;
+  }
+
   .overlay-bubble.is-vertical {
     --overlay-base-size: 3cqw;
     line-break: strict;
@@ -334,6 +352,11 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     text-orientation: mixed;
     word-break: normal;
     writing-mode: vertical-rl;
+  }
+
+  .overlay-bubble.is-vertical .overlay-bubble-text {
+    display: inline-block;
+    max-inline-size: 100%;
   }
 
   .overlay-bubble.is-sfx {
