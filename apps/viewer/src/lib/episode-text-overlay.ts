@@ -158,6 +158,5 @@ export const buildTextOverlayPages = (pages: any[], languageInput: string): Over
         height: Number(page.height ?? 0),
         bubbles,
       };
-    })
-    .filter((page) => page.bubbles.length > 0);
+    });
 };
