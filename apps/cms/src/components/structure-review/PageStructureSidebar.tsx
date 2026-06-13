@@ -2,6 +2,7 @@ import { getAdminPageImageUrl, type EpisodeData, type PageData } from "../../api
 import { useTranslation } from "../../i18n/I18nProvider";
 import { getBubbleWarnings, type BubbleTextComparisonOverlayMap } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf } from "../../lib/structure-review/ids";
+import { getPageReviewWarnings } from "../../lib/structure-review/readingOrder";
 import { bubbleReviewKey, panelReviewKey, summarizeReview } from "../../lib/structure-review/reviewDecisions";
 import type { PanelTemplate, ReviewDecisions, ReviewSummary } from "../../lib/structure-review/types";
 import { PanelBubbleLists } from "./PanelBubbleLists";
@@ -25,6 +26,7 @@ type PageStructureSidebarProps = {
     onAddBubble: () => void;
     onApplyPanelTemplate: (template: PanelTemplate) => void;
     onClearPanels: () => void;
+    onApplyReadingOrderEstimate: () => void;
     onScriptAssistTextChange: (value: string) => void;
     onApplyScriptAssist: () => void;
     onSelectPanel: (index: number) => void;
@@ -71,6 +73,7 @@ export function PageStructureSidebar({
     onAddBubble,
     onApplyPanelTemplate,
     onClearPanels,
+    onApplyReadingOrderEstimate,
     onScriptAssistTextChange,
     onApplyScriptAssist,
     onSelectPanel,
@@ -87,7 +90,7 @@ export function PageStructureSidebar({
         const bubbles = pageBubblesOf(episodePage);
         const missingSourceText = bubbles.filter((bubble) => !bubble.textOriginal.trim()).length;
         const pageReviewSummary = summarizeReview(episodePage, reviewDecisions);
-        const warningCount = warningCountOf(episodePage, textComparisonOverlays);
+        const warningCount = warningCountOf(episodePage, textComparisonOverlays) + getPageReviewWarnings(episodePage).length;
         return {
             index,
             pageNumber: episodePage.pageNumber,
@@ -205,6 +208,10 @@ export function PageStructureSidebar({
                 <button type="button" className="btn btn-outline" onClick={onAddBubble} disabled={!page}>{t("structure.sidebar.addBubble")}</button>
             </div>
             <p className="card-meta panel-optional-note">{t("structure.sidebar.panelOptionalNote")}</p>
+            <button type="button" className="btn btn-outline" onClick={onApplyReadingOrderEstimate} disabled={!page || page.panels.length < 2}>
+                {t("structure.sidebar.applyReadingOrderEstimate")}
+            </button>
+            <p className="card-meta panel-optional-note">{t("structure.sidebar.readingOrderEstimateHelp")}</p>
 
             <h2>{t("structure.sidebar.panelTemplates")}</h2>
             <div className="template-grid">

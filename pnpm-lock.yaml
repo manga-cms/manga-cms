@@ -48,6 +48,9 @@ importers:
 
   apps/cms:
     dependencies:
+      '@manga/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
       react:
         specifier: ^19.0.0
         version: 19.2.4

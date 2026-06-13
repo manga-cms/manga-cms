@@ -34,6 +34,7 @@ import { bubbleIdOf, makeBubbleId, makeBubbleShortId, makePageBubbleId, makePage
 import { buildBubbleTextComparisonOverlayMap } from "../lib/structure-review/ingestionOverlay";
 import { syncPageBubbles } from "../lib/structure-review/pageBubbles";
 import { buildTemplatePanels } from "../lib/structure-review/panelTemplates";
+import { applyEstimatedReadingOrder, getPageReviewWarnings } from "../lib/structure-review/readingOrder";
 import { bubbleReviewKey, markPanels, panelReviewKey, seedAcceptedDecisions, summarizeReview } from "../lib/structure-review/reviewDecisions";
 import { parseScriptAssistLines } from "../lib/structure-review/scriptAssist";
 import type { PanelTemplate, ReviewDecisions, StructureViewport } from "../lib/structure-review/types";
@@ -252,6 +253,9 @@ export default function PageStructureReview() {
     const reviewSummary = useMemo(() => {
         return summarizeReview(page, reviewDecisions);
     }, [page, reviewDecisions]);
+    const pageReviewWarnings = useMemo(() => {
+        return getPageReviewWarnings(page);
+    }, [page]);
 
     const changeSummary = useMemo(() => {
         return summarizeStructureChanges(baselineEpisode, episode, baselineReviewDecisions, reviewDecisions);
@@ -470,6 +474,34 @@ export default function PageStructureReview() {
         if (!window.confirm(t("structure.clearConfirm"))) return;
         updatePage({ ...page, panels: [] });
         setSelectedPanelIndex(null);
+        setSelectedBubbleIndex(null);
+    };
+
+    const applyReadingOrderEstimate = () => {
+        if (!page) return;
+        const result = applyEstimatedReadingOrder(page);
+        const changeCount = result.changedPanelCount + result.changedBubbleCount;
+        if (changeCount === 0) {
+            window.alert(t("structure.readingOrder.noChanges"));
+            return;
+        }
+        if (!window.confirm(t("structure.readingOrder.confirm", {
+            panelCount: result.changedPanelCount,
+            bubbleCount: result.changedBubbleCount,
+        }))) {
+            return;
+        }
+        updatePage(result.page);
+        setReviewDecisions((current) => {
+            const next = markPanels(current, result.page.panels, "pending");
+            for (const bubble of result.page.bubbles ?? []) {
+                if (bubble.panelId === null) {
+                    next[bubbleReviewKey(bubble)] = "pending";
+                }
+            }
+            return next;
+        });
+        setSelectedPanelIndex(result.page.panels.length ? 0 : null);
         setSelectedBubbleIndex(null);
     };
 
@@ -876,6 +908,18 @@ export default function PageStructureReview() {
                     {t("structure.pendingSaveWarning", { count: reviewSummary.pending })}
                 </div>
             )}
+            {pageReviewWarnings.length > 0 && (
+                <div className="warning-msg">
+                    <strong>{t("structure.pageWarnings.title")}</strong>
+                    <ul>
+                        {pageReviewWarnings.map((warning) => (
+                            <li key={`${warning.code}-${warning.pageId ?? "page"}`}>
+                                {warning.code === "READING_ORDER_SUSPECT" ? t("structure.warning.READING_ORDER_SUSPECT") : warning.code}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
             {recoveredAt && (
                 <div className="success-msg">
                     {t("structure.recovered", { savedAt: new Date(recoveredAt).toLocaleString() })}
@@ -908,6 +952,7 @@ export default function PageStructureReview() {
                     onAddBubble={addBubble}
                     onApplyPanelTemplate={applyPanelTemplate}
                     onClearPanels={clearPanels}
+                    onApplyReadingOrderEstimate={applyReadingOrderEstimate}
                     onScriptAssistTextChange={setScriptAssistText}
                     onApplyScriptAssist={applyScriptAssist}
                     onSelectPanel={(index) => {

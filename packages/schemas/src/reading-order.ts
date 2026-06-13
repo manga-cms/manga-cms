@@ -17,6 +17,9 @@ export type BubbleReadingOrderInput = {
 };
 
 export type PageReadingOrderInput = {
+    // Reserved for future spread/webtoon/profile-specific heuristics. The
+    // current default RTL estimator is coordinate-based and does not scale by
+    // absolute page dimensions.
     width: number;
     height: number;
     panels: PanelReadingOrderInput[];
@@ -69,7 +72,7 @@ function sameTier<T extends { bbox: ReadingOrderBox }>(tier: VerticalTier<T>, it
 }
 
 function sameColumn<T extends { bbox: ReadingOrderBox }>(column: HorizontalColumn<T>, item: T) {
-    return horizontalOverlap(column, item.bbox) >= Math.min(column.right - column.left, item.bbox.width) * SAME_COLUMN_OVERLAP_RATIO;
+    return horizontalOverlap(column, item.bbox) >= item.bbox.width * SAME_COLUMN_OVERLAP_RATIO;
 }
 
 function stablePanelId(item: PanelReadingOrderInput) {
