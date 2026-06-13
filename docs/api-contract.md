@@ -1453,7 +1453,12 @@ Request body:
       "bubble_id": "oumaga-dokidoki-ep01-p01-bubble-001",
       "source_text": "日本語の原文",
       "text": "English translation",
-      "row_number": 2
+      "row_number": 2,
+      "translation_origin": "machine",
+      "provider": "gemini",
+      "model": "gemini-2.0-flash",
+      "confidence": 0.82,
+      "generated_at": "2026-06-13T00:00:00.000Z"
     }
   ]
 }
@@ -1464,6 +1469,21 @@ normalized rows in `entries[]`. `source_format` records whether the operator
 import originated as `csv` or `json`; it does not change validation rules.
 `text` is the canonical imported translation field, while `suggested_text` is
 accepted as an alias for clients that already use Proposal Queue naming.
+
+Origin metadata is accepted as flat import-row fields for CSV/JSON
+compatibility:
+
+- `translation_origin`: `machine`, `human`, or `imported`.
+- `provider`, `model`: optional machine translation identifiers.
+- `confidence`: optional `0..1` display-only provider confidence. It must not
+  be used as an automatic adoption or publication gate.
+- `generated_at`: optional generation timestamp.
+
+When `translation_origin` is omitted, the API treats the row as `imported` for
+backward compatibility. Applied rows store these values under runtime Pack
+Draft entry `metadata` as `metadata.translation_origin`, `metadata.provider`,
+`metadata.model`, `metadata.confidence`, and `metadata.generated_at`. This is
+review provenance only.
 
 The route always compares imported `bubble_id` values against the target
 Episode's canonical `Page.bubbles[]`:
@@ -1509,7 +1529,9 @@ operator-supplied `page_id` or `panel_id`, so stale CSV/JSON page references
 cannot retarget translations silently. The Pack draft entry stores the target
 language in `lang`, canonical original text in `original_text`, imported
 translation in `text`, and row provenance under
-`metadata.source: "translation_import"`.
+`metadata.source: "translation_import"`. Pack metadata such as
+`translation_origin` is omitted from published Reader Pack payloads unless a
+future public contract explicitly opts into it.
 
 ### Rights And Permission State
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PageSchema, lintPageContent } from "../src/content.ts";
+import { PageSchema, PublishedPackSchema, lintPageContent } from "../src/content.ts";
 
 test("PageSchema and Linter Validation", async (t) => {
     await t.test("Page requires pageId or legacy id", () => {
@@ -223,4 +223,30 @@ test("PageSchema and Linter Validation", async (t) => {
         assert.deepEqual(readingOrderWarning.path, ["panels"]);
         assert.equal(readingOrderWarning.source, "content-lint");
     });
+});
+
+test("PublishedPackSchema omits private Pack entry metadata", () => {
+    const parsed = PublishedPackSchema.parse({
+        id: "translation-en-demo",
+        type: "TRANSLATION",
+        language: "en",
+        version: 1,
+        isPublished: true,
+        entries: [{
+            id: "entry-1",
+            target: {
+                seriesId: "series-1",
+                episodeId: "ep01",
+                pageId: "p01",
+                bubbleId: "b01",
+            },
+            text: "Hello",
+            metadata: {
+                translation_origin: "machine",
+                provider: "gemini",
+            },
+        }],
+    });
+
+    assert.equal("metadata" in parsed.entries[0], false);
 });

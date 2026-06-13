@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 export const TranslationImportSourceFormatSchema = z.enum(["json", "csv"]);
+export const TranslationOriginSchema = z.enum(["machine", "human", "imported"]);
+
+const TranslationGeneratedAtSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+    message: "Must be a parseable date-time",
+});
 
 export const TranslationPackDraftImportEntrySchema = z.object({
     bubble_id: z.string().min(1),
@@ -13,6 +18,11 @@ export const TranslationPackDraftImportEntrySchema = z.object({
     row_number: z.number().int().positive().optional(),
     row_ref: z.string().max(120).optional(),
     comment: z.string().max(2000).optional(),
+    translation_origin: TranslationOriginSchema.optional(),
+    provider: z.string().min(1).max(120).optional(),
+    model: z.string().min(1).max(200).optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    generated_at: TranslationGeneratedAtSchema.optional(),
 }).strict().superRefine((value, ctx) => {
     if (!value.text && !value.suggested_text) {
         ctx.addIssue({
@@ -68,6 +78,7 @@ export const TranslationImportSummarySchema = z.object({
 }).strict();
 
 export type TranslationImportSourceFormatData = z.infer<typeof TranslationImportSourceFormatSchema>;
+export type TranslationOriginData = z.infer<typeof TranslationOriginSchema>;
 export type TranslationPackDraftImportEntryData = z.infer<typeof TranslationPackDraftImportEntrySchema>;
 export type TranslationPackDraftImportInputData = z.infer<typeof TranslationPackDraftImportInputSchema>;
 export type TranslationImportIssueData = z.infer<typeof TranslationImportIssueSchema>;

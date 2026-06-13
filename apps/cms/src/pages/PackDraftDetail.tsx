@@ -13,6 +13,7 @@ import {
     type ProposalKind,
     type ProposalRecord,
 } from "../api";
+import { translationOriginBadgeClass, translationOriginLabel, translationOriginOfEntry } from "../lib/translationOrigin";
 
 const PACK_STATUSES: PackDraftStatus[] = ["draft", "in_review", "approved", "published", "archived"];
 
@@ -257,6 +258,14 @@ export default function PackDraftDetail() {
                                 <div className="card-title">{entry.text ?? entry.note ?? entry.entry_id}</div>
                                 <div className="card-meta">
                                     {entry.target.series_id} / {entry.target.episode_id ?? "-"} / {entry.target.page_id ?? "-"} / {entry.target.bubble_id ?? "-"}
+                                </div>
+                                <div className="card-meta">
+                                    <span className={`badge ${translationOriginBadgeClass(translationOriginOfEntry(entry))}`}>
+                                        {translationOriginLabel(translationOriginOfEntry(entry))}
+                                    </span>
+                                    {entry.metadata?.provider && <span> provider: {entry.metadata.provider}</span>}
+                                    {entry.metadata?.model && <span> / model: {entry.metadata.model}</span>}
+                                    {entry.metadata?.confidence !== undefined && <span> / confidence: {entry.metadata.confidence}</span>}
                                 </div>
                                 <div className="card-meta">
                                     {entry.lang ?? "-"} · {new Date(entry.adopted_at).toLocaleString("ja-JP")} · {entry.source_proposal_id ?? "-"}

@@ -13,10 +13,12 @@ import {
     type PanelData,
     type SeriesDetail,
     type TranslationImportSourceFormat,
+    type TranslationOrigin,
     type TranslationPackDraftImportEntry,
     type TranslationPackDraftImportResponse,
 } from "../api";
 import { estimateTranslationFit, type TranslationFitEstimate } from "../lib/structure-review/translationFit";
+import { translationOriginBadgeClass, translationOriginLabel, translationOriginOfEntry } from "../lib/translationOrigin";
 
 type CanonicalBubbleRow = {
     bubbleId: string;
@@ -38,6 +40,11 @@ type ParsedTranslationRow = {
     sourceText?: string;
     text?: string;
     comment?: string;
+    translationOrigin?: TranslationOrigin;
+    provider?: string;
+    model?: string;
+    confidence?: number;
+    generatedAt?: string;
 };
 
 type ResolvedTranslationRow = ParsedTranslationRow & {
@@ -77,6 +84,19 @@ function readField(row: Map<string, string>, aliases: string[]) {
         if (value?.trim()) return value.trim();
     }
     return "";
+}
+
+function readTranslationOrigin(row: Map<string, string>): TranslationOrigin | undefined {
+    const value = readField(row, ["translation_origin", "translationorigin", "origin"]);
+    if (value === "machine" || value === "human" || value === "imported") return value;
+    return undefined;
+}
+
+function readConfidence(row: Map<string, string>): number | undefined {
+    const value = readField(row, ["confidence", "score"]);
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function parseCsvRows(input: string) {
@@ -123,6 +143,11 @@ function parsedRowFromObject(input: Record<string, unknown>, rowNumber: number):
         sourceText: readField(normalized, ["source_text", "sourcetext", "source", "original_text", "originaltext", "text_original", "textoriginal"]) || undefined,
         text: readField(normalized, ["text", "suggested_text", "suggestedtext", "translation", "english", "en"]) || undefined,
         comment: readField(normalized, ["comment", "note", "memo"]) || undefined,
+        translationOrigin: readTranslationOrigin(normalized),
+        provider: readField(normalized, ["provider", "translation_provider"]) || undefined,
+        model: readField(normalized, ["model", "translation_model"]) || undefined,
+        confidence: readConfidence(normalized),
+        generatedAt: readField(normalized, ["generated_at", "generatedat"]) || undefined,
     };
 }
 
@@ -226,6 +251,11 @@ function resolveRows(rows: ParsedTranslationRow[], canonicalBubbles: CanonicalBu
                 ...(row.sourceText && { source_text: row.sourceText }),
                 ...(row.text && { text: row.text }),
                 ...(row.comment && { comment: row.comment }),
+                ...(row.translationOrigin && { translation_origin: row.translationOrigin }),
+                ...(row.provider && { provider: row.provider }),
+                ...(row.model && { model: row.model }),
+                ...(row.confidence !== undefined && { confidence: row.confidence }),
+                ...(row.generatedAt && { generated_at: row.generatedAt }),
             },
         };
     });
@@ -335,6 +365,7 @@ export default function TranslationDraftImport() {
     const localSourceTextMismatches = resolvedRows.filter(hasSourceTextMismatch);
     const localFitWarnings = resolvedRows.filter((row) => row.fitEstimate?.status === "warning");
     const localFitTightRows = resolvedRows.filter((row) => row.fitEstimate?.status === "tight");
+    const machineOriginRows = resolvedRows.filter((row) => row.translationOrigin === "machine");
     const selectedDraft = drafts.find((draft) => draft.pack_draft_id === selectedDraftId);
     const canCallApi = Boolean(seriesId && epId && selectedDraftId && apiEntries.length > 0);
     const canApply = Boolean(apiResult?.result.can_apply && selectedDraftId && apiEntries.length > 0);
@@ -424,7 +455,7 @@ export default function TranslationDraftImport() {
 
             <div className="card">
                 <h2>1. Import source</h2>
-                <p className="card-meta">CSV header は bubble_id/text/source_text/comment を推奨します。bubbleId / id / shortId / displayRef でも canonical Bubble ID に解決します。</p>
+                <p className="card-meta">CSV header は bubble_id/text/source_text/comment を推奨します。machine output は translation_origin/provider/model/confidence/generated_at も指定できます。</p>
                 <p className="card-meta">source_text は照合用です。English draft は Translation Pack Draft に入り、canonical Bubble.textOriginal は上書きしません。</p>
                 <div className="translation-import-controls">
                     <div className="form-group">
@@ -459,6 +490,7 @@ export default function TranslationDraftImport() {
                     <span className={`badge ${localSourceTextMismatches.length ? "badge-warn" : "badge-ok"}`}>source_text_mismatch {localSourceTextMismatches.length}</span>
                     <span className={`badge ${localFitTightRows.length ? "badge-warn" : "badge-ok"}`}>fit tight {localFitTightRows.length}</span>
                     <span className={`badge ${localFitWarnings.length ? "badge-warn" : "badge-ok"}`}>fit warnings {localFitWarnings.length}</span>
+                    <span className={`badge ${machineOriginRows.length ? "badge-warn" : "badge-ok"}`}>machine origin {machineOriginRows.length}</span>
                 </div>
                 <p className="card-meta">
                     fit は Bubble bbox と textDirection からの簡易推定です。保存ブロックではなく、翻訳レビュー時の注意表示として扱います。
@@ -484,15 +516,17 @@ export default function TranslationDraftImport() {
                                 <th>ref</th>
                                 <th>canonical bubble</th>
                                 <th>source</th>
+                                <th>origin</th>
                                 <th>English draft</th>
                                 <th>fit</th>
                             </tr>
                         </thead>
                         <tbody>
                             {resolvedRows.length === 0 ? (
-                                <tr><td colSpan={6}>Import rows are empty.</td></tr>
+                                <tr><td colSpan={7}>Import rows are empty.</td></tr>
                             ) : resolvedRows.map((row) => {
                                 const sourceMismatch = hasSourceTextMismatch(row);
+                                const origin = row.translationOrigin ?? "imported";
                                 return (
                                     <tr key={`${row.rowNumber}-${row.lookupRef}`}>
                                         <td>{row.rowNumber}</td>
@@ -524,6 +558,18 @@ export default function TranslationDraftImport() {
                                                     </small>
                                                 )}
                                             </div>
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${translationOriginBadgeClass(origin)}`}>
+                                                {translationOriginLabel(origin)}
+                                            </span>
+                                            {(row.provider || row.model || row.confidence !== undefined || row.generatedAt) && (
+                                                <small>
+                                                    {[row.provider, row.model, row.confidence !== undefined ? `confidence ${row.confidence}` : "", row.generatedAt]
+                                                        .filter(Boolean)
+                                                        .join(" / ")}
+                                                </small>
+                                            )}
                                         </td>
                                         <td>{row.text ?? "-"}</td>
                                         <td>
@@ -609,6 +655,10 @@ export default function TranslationDraftImport() {
                                     <div key={entry.entry_id} className="translation-import-applied-row">
                                         <div>
                                             <code>{entry.target.bubble_id}</code>
+                                            {" "}
+                                            <span className={`badge ${translationOriginBadgeClass(translationOriginOfEntry(entry))}`}>
+                                                {translationOriginLabel(translationOriginOfEntry(entry))}
+                                            </span>
                                             <small>
                                                 {canonical
                                                     ? `Page ${canonical.pageNumber} / reading ${canonical.readingOrder} / bbox ${canonical.bboxSummary}`

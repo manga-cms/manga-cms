@@ -4520,6 +4520,29 @@ components:
         comment:
           type: string
           maxLength: 2000
+        translation_origin:
+          type: string
+          enum: [machine, human, imported]
+          description: >
+            Optional flat import provenance. Missing values are treated as
+            imported and stored on the runtime Pack Draft entry metadata.
+        provider:
+          type: string
+          maxLength: 120
+          description: Optional machine translation provider identifier.
+        model:
+          type: string
+          maxLength: 200
+          description: Optional machine translation model identifier.
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Display-only provider confidence. It must not drive automatic adoption.
+        generated_at:
+          type: string
+          format: date-time
+          description: Optional generation timestamp for machine-origin rows.
 
     TranslationPackDraftImportInput:
       type: object

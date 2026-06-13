@@ -3,6 +3,7 @@ import type { Bubble, Episode, Page } from "./types.js";
 import type { PackDraftEntry, PackDraftRecord } from "./pack-draft-types.js";
 
 export type TranslationImportSourceFormat = "json" | "csv";
+export type TranslationOrigin = "machine" | "human" | "imported";
 export type TranslationImportIssueKind =
     | "unmatched_bubble"
     | "duplicate_bubble"
@@ -23,6 +24,11 @@ export interface TranslationPackDraftImportEntryInput {
     row_number?: number;
     row_ref?: string;
     comment?: string;
+    translation_origin?: TranslationOrigin;
+    provider?: string;
+    model?: string;
+    confidence?: number;
+    generated_at?: string;
 }
 
 export interface TranslationPackDraftImportInput {
@@ -103,6 +109,18 @@ function draftEntryTargetKey(entry: PackDraftEntry): string | null {
         entry.target.bubble_id,
         entry.lang ?? "",
     ].join("\u0000");
+}
+
+function translationOriginMetadata(entry: TranslationPackDraftImportEntryInput): Record<string, unknown> {
+    const metadata: Record<string, unknown> = {
+        translation_origin: entry.translation_origin ?? "imported",
+    };
+    if (entry.provider !== undefined) metadata.provider = entry.provider;
+    if (entry.model !== undefined) metadata.model = entry.model;
+    // Display only: confidence must not become an automatic adoption gate.
+    if (entry.confidence !== undefined) metadata.confidence = entry.confidence;
+    if (entry.generated_at !== undefined) metadata.generated_at = entry.generated_at;
+    return metadata;
 }
 
 export function packDraftTranslationTargetKey(
@@ -270,6 +288,7 @@ export function buildTranslationPackDraftImportPlan(args: {
             metadata: {
                 source: "translation_import",
                 source_format: input.source_format,
+                ...translationOriginMetadata(entry),
                 ...(entry.row_number !== undefined && { row_number: entry.row_number }),
                 ...(entry.row_ref !== undefined && { row_ref: entry.row_ref }),
                 ...(entry.source_text !== undefined && { imported_source_text: entry.source_text }),

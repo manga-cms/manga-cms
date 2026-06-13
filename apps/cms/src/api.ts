@@ -1211,6 +1211,7 @@ export async function createProposalGitHubHandoff(proposalId: string, input: {
 export type PackType = "TRANSLATION" | "FOOTNOTE" | "COMMENTARY" | "LEARNING" | "ACCESSIBILITY";
 export type PackClass = "proposal" | "draft" | "official" | "deprecated";
 export type PackDraftStatus = "draft" | "in_review" | "approved" | "published" | "archived";
+export type TranslationOrigin = "machine" | "human" | "imported";
 
 export interface PackDraftEntry {
     entry_id: string;
@@ -1227,6 +1228,14 @@ export interface PackDraftEntry {
     current_translation?: string;
     text?: string;
     note?: string;
+    metadata?: {
+        translation_origin?: TranslationOrigin;
+        provider?: string;
+        model?: string;
+        confidence?: number;
+        generated_at?: string;
+        [key: string]: unknown;
+    };
     adopted_at: string;
     adopted_by?: string | null;
 }
@@ -1269,6 +1278,11 @@ export interface TranslationPackDraftImportEntry {
     row_number?: number;
     row_ref?: string;
     comment?: string;
+    translation_origin?: TranslationOrigin;
+    provider?: string;
+    model?: string;
+    confidence?: number;
+    generated_at?: string;
 }
 
 export interface TranslationImportIssue {
