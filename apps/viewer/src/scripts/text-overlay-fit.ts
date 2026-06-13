@@ -60,20 +60,40 @@ const refitBubble = (element: HTMLElement) => {
   element.dataset.overflow = overflows(element) ? "scroll" : "fit";
 };
 
-const refitAll = () => {
+const refitNow = () => {
   const bubbles = Array.from(document.querySelectorAll<HTMLElement>("[data-overlay-bubble]"));
   if (bubbles.length === 0) return;
+  for (const bubble of bubbles) {
+    refitBubble(bubble);
+  }
+};
+
+let refitQueued = false;
+
+const refitAll = () => {
+  if (refitQueued) return;
+  refitQueued = true;
   requestAnimationFrame(() => {
-    for (const bubble of bubbles) {
-      refitBubble(bubble);
-    }
+    refitQueued = false;
+    refitNow();
   });
 };
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", refitAll, { once: true });
-} else {
+const startRefit = () => {
+  // Run once immediately and again after the next paint/font load. The initial
+  // module can execute before lazy images and web fonts settle, so the follow-up
+  // passes keep fitted text deterministic without listening to viewport resize.
+  refitNow();
   refitAll();
+  window.addEventListener("load", refitAll, { once: true });
+  void document.fonts?.ready.then(refitAll);
+  window.setTimeout(refitAll, 250);
+};
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startRefit, { once: true });
+} else {
+  startRefit();
 }
 
 // Overlay coordinates and font sizes use cqw, so viewport resizing naturally

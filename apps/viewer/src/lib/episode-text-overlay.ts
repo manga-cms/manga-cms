@@ -118,11 +118,12 @@ const overlayTextForBubble = (bubble: any, packs: PublishedPack[], language: str
 const renderTextForOverlay = (text: string, options: { spaceAsBreak: boolean }) => {
   if (!options.spaceAsBreak) return text;
   // Display-only source-locale experiment: preserve authored/new review line
-  // breaks, but let selected Episodes treat inline spaces as overlay line-break
-  // hints. Do not apply this to translated text because spaces are ordinary word
-  // separators in many target languages. This does not change canonical
-  // textOriginal or published Pack text.
-  return text.replace(/[ \t\f\v\u00a0\u3000]+/g, "\n");
+  // breaks, but do not reserve ASCII spaces as hard line breaks. Manga source
+  // text may use half-width spaces as punctuation, so overlay hard breaks must
+  // come from explicit "\n" review text. Natural CSS line breaking and the
+  // per-Bubble refitter handle fit without changing canonical textOriginal or
+  // published Pack text.
+  return text.replace(/\r\n?/gu, "\n");
 };
 
 const blankImageCandidates = (language: string) => [

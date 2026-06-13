@@ -101,6 +101,10 @@ Rules:
 - `textLayout.lines` should render as one text node joined with `\n` and
   displayed with `white-space: pre-line`.
 - If `textLayout.lines` is missing, render `textOriginal` as the source text.
+- Explicit newline characters may be displayed as hard line breaks during the
+  experiment, but half-width spaces are not hard line breaks. Manga source text
+  may use spaces like punctuation, so overlay fitting must rely on CSS line
+  breaking and per-Bubble refit unless reviewed layout metadata exists.
 - Ruby markup, if supported later, must be escaped and tokenized safely. Do not
   build untrusted HTML strings from Bubble text.
 
