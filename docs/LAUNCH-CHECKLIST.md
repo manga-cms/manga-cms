@@ -98,6 +98,8 @@ not hosted SaaS or commercial platform delivery.
   `https://manga-cms.com/`
 - [x] Confirm `read.manga-cms.com` is attached to the production Reader Fly app
   and the certificate is ready
+- [ ] Confirm `cms.manga-cms.com` is attached to the production CMS Fly app,
+  the certificate is ready, and `/api/*` proxies to the production API
 - [ ] Confirm Search Console uses a Domain property for `manga-cms.com`
 - [ ] Verify Search Console ownership with a Cloudflare DNS TXT record and keep
   the TXT record after verification

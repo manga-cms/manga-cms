@@ -14,6 +14,8 @@ Use these public hosts for the first production launch:
 - `https://www.manga-cms.com/` redirects permanently to
   `https://manga-cms.com/`.
 - `https://read.manga-cms.com/` is the public Reader.
+- `https://cms.manga-cms.com/` is the creator CMS. Keep it out of sitemap
+  submission and do not treat it as a public reader/indexing surface.
 
 Keep staging, preview, local, API, and CMS hosts out of public sitemap
 submission.
@@ -33,6 +35,8 @@ Before launch:
   certificate.
 - [ ] Point `read.manga-cms.com` to the production Reader Fly app using the DNS
   record shape returned by `fly certs show read.manga-cms.com`.
+- [ ] Point `cms.manga-cms.com` to the production CMS Fly app using the DNS
+  record shape returned by `fly certs show cms.manga-cms.com`.
 - [ ] Keep new Fly custom-domain DNS records DNS-only until Fly certificate
   validation is active; enable Cloudflare proxy only after certificate and
   origin behavior are confirmed.
@@ -49,11 +53,16 @@ Recommended production Fly app split:
 - `manga-cms-official-prod` for `manga-cms.com`
 - `manga-cms-reader-prod` for `read.manga-cms.com`
 - `manga-cms-api-prod` for the Reader's `API_BASE`
+- `manga-cms-cms-prod` for `cms.manga-cms.com`
 
 The production Viewer configs are:
 
 - `deploy/fly/viewer-official-production.fly.toml`
 - `deploy/fly/viewer-reader-production.fly.toml`
+
+The production CMS config is:
+
+- `deploy/fly/cms-production.fly.toml`
 
 Until `api.manga-cms.com` DNS and certificate are ready, those Viewer configs
 use `https://manga-cms-api-prod.fly.dev/api/v1` as `API_BASE` for production
@@ -69,6 +78,9 @@ fly certs show manga-cms.com --app manga-cms-official-prod
 
 fly certs add read.manga-cms.com --app manga-cms-reader-prod
 fly certs show read.manga-cms.com --app manga-cms-reader-prod
+
+fly certs add cms.manga-cms.com --app manga-cms-cms-prod
+fly certs show cms.manga-cms.com --app manga-cms-cms-prod
 ```
 
 If `www.manga-cms.com` is served by Fly instead of Cloudflare redirect-only,
@@ -96,12 +108,39 @@ Before DNS cutover:
 
 - [ ] `fly certs show manga-cms.com` reports the certificate as ready.
 - [ ] `fly certs show read.manga-cms.com` reports the certificate as ready.
+- [ ] `fly certs show cms.manga-cms.com` reports the certificate as ready.
 - [ ] `www.manga-cms.com` either redirects at Cloudflare or has its Fly
   certificate ready.
 - [ ] Viewer `SITE_ORIGIN` values match the public host served by each app.
 - [ ] Reader `API_BASE` points at the production API origin used for SSR.
 - [ ] API `APP_URL`, `DELIVERY_PUBLIC_ORIGIN`, and `ALLOWED_ORIGINS` match the
   production public hosts.
+
+Deploy the production CMS after the production API is reachable:
+
+```bash
+fly apps create manga-cms-cms-prod
+fly deploy . \
+  --config deploy/fly/cms-production.fly.toml \
+  --app manga-cms-cms-prod
+```
+
+`deploy/fly/cms-production.fly.toml` serves the built React CMS with nginx.
+`deploy/fly/cms-production.nginx.conf` proxies same-origin `/api/*` requests to
+`https://api.manga-cms.com/api/*`, so the browser uses
+`https://cms.manga-cms.com/api/v1/...` while the CMS container talks to the
+production API origin. Keep `https://cms.manga-cms.com` in API
+`ALLOWED_ORIGINS` for deployments that call the API directly or evolve away
+from the same-origin proxy.
+
+CMS production smoke:
+
+- [ ] `https://cms.manga-cms.com/` returns the CMS shell.
+- [ ] Direct SPA routes under `https://cms.manga-cms.com/` fall back to
+  `index.html`.
+- [ ] `https://cms.manga-cms.com/api/v1/health` returns the production API
+  health payload through the nginx proxy.
+- [ ] Admin login works with the configured production auth path.
 
 ## Production API Runtime State
 

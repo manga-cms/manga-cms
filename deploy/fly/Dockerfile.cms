@@ -30,7 +30,7 @@ RUN pnpm --filter @manga/cms... build
 
 FROM nginx:1.27-alpine AS runner
 
-COPY apps/cms/nginx.conf /etc/nginx/conf.d/default.conf
+COPY deploy/fly/cms-production.nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/cms/dist /usr/share/nginx/html
 
 EXPOSE 5173

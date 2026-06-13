@@ -16,6 +16,7 @@ The first production architecture should stay close to the current repository:
 Cloudflare DNS / SSL / CDN / Access / Turnstile
   -> Fly.io nrt API       Hono / Node
   -> Fly.io nrt Viewer    Astro SSR / Node
+  -> Fly.io nrt CMS       React SPA / nginx
   -> Postgres             Prisma runtime state
   -> R2                   published immutable assets, introduced in a later step
 ```
@@ -23,7 +24,7 @@ Cloudflare DNS / SSL / CDN / Access / Turnstile
 Do not treat the Cloudflare Workers/R2/D1 reference design as a one-step
 replacement for the current Fly deployment. The recommended path is:
 
-1. Run the API and Viewer on Fly.io `nrt`.
+1. Run the API, Viewer, and CMS on Fly.io `nrt`.
 2. Use Postgres for production runtime state before real paid sales.
 3. Keep `contents/` and `packs/` as canonical editorial source.
 4. Add R2/manifest delivery for published images and JSON before traffic-heavy
@@ -40,9 +41,10 @@ implementation boundaries, and GA4 enablement boundaries.
 
 For production public-domain cutover, use
 [`PRODUCTION-DEPLOY.md`](PRODUCTION-DEPLOY.md). That checklist covers
-`manga-cms.com`, `www.manga-cms.com`, and `read.manga-cms.com` DNS, Fly custom
-domains and certificates, production analytics env, Search Console DNS TXT
-verification, robots/sitemap submission, and public smoke URLs.
+`manga-cms.com`, `www.manga-cms.com`, `read.manga-cms.com`, and
+`cms.manga-cms.com` DNS, Fly custom domains and certificates, production
+analytics env, Search Console DNS TXT verification, robots/sitemap submission,
+and public smoke URLs.
 
 ## Environment Variables
 
@@ -287,6 +289,22 @@ npx serve apps/cms/dist -l 5173
 ```
 
 Or deploy to any static hosting (Cloudflare Pages, Vercel, Netlify).
+
+For the `manga-cms.com` production deployment, the repo also includes a Fly
+config for the creator CMS:
+
+```bash
+fly apps create manga-cms-cms-prod
+fly deploy . \
+  --config deploy/fly/cms-production.fly.toml \
+  --app manga-cms-cms-prod
+```
+
+This deployment serves the CMS at `https://cms.manga-cms.com/` and proxies
+same-origin `/api/*` requests to `https://api.manga-cms.com/api/*` through
+nginx. It is a static CMS deployment only; canonical manga content still lives
+under the API's `CONTENTS_DIR`, and runtime state still belongs to the API /
+Postgres side.
 
 For local CMS development, `apps/cms/vite.config.ts` proxies `/api` to
 `http://localhost:3000` by default. Override it when the API is on another port:
