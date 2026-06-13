@@ -86,6 +86,10 @@ export interface EpisodeMetaResponse {
                 bubbleType: string;
                 bbox: { x: number; y: number; width: number; height: number };
                 textOriginal: string;
+                textDirection?: "horizontal" | "vertical";
+                lang?: string;
+                textLayout?: BubbleTextLayout;
+                textStyle?: BubbleTextStyle;
                 speaker: string | null;
                 metadata?: Record<string, unknown>;
             }[];
@@ -107,6 +111,10 @@ export interface EpisodeMetaResponse {
                     bubbleType: string;
                     bbox: { x: number; y: number; width: number; height: number };
                     textOriginal: string;
+                    textDirection?: "horizontal" | "vertical";
+                    lang?: string;
+                    textLayout?: BubbleTextLayout;
+                    textStyle?: BubbleTextStyle;
                     speaker: string | null;
                     metadata?: Record<string, unknown>;
                 }[];
@@ -115,6 +123,21 @@ export interface EpisodeMetaResponse {
     };
     prev: { id: string; title: string; episodeNumber: number } | null;
     next: { id: string; title: string; episodeNumber: number } | null;
+}
+
+export interface BubbleTextLayout {
+    lines?: string[];
+    inlineAlign?: "start" | "center" | "end";
+    blockAlign?: "start" | "center" | "end";
+    source?: "manual" | "imported" | "ocr";
+}
+
+export interface BubbleTextStyle {
+    fontSizePx?: number;
+    fontWeight?: number;
+    lineHeight?: number;
+    letterSpacing?: number;
+    fitMode?: "auto" | "shrink" | "fixed";
 }
 
 export interface PublicSeriesListItem {
@@ -153,6 +176,8 @@ export interface PublishedPackEntry {
     originalText?: string;
     text?: string;
     note?: string;
+    textLayout?: BubbleTextLayout;
+    textStyle?: BubbleTextStyle;
 }
 
 export interface PublishedPack {

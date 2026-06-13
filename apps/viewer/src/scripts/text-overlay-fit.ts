@@ -97,10 +97,33 @@ const setRefitScale = (element: HTMLElement, scale: number) => {
   element.style.setProperty("--overlay-refit", scale.toFixed(4));
 };
 
+const alignFactor = (value: string | undefined) => {
+  if (value === "center") return 0.5;
+  if (value === "end") return 1;
+  return 0;
+};
+
+const hasExplicitAlign = (element: HTMLElement) =>
+  Boolean(element.dataset.inlineAlign || element.dataset.blockAlign);
+
 const setTextShift = (element: HTMLElement) => {
   const measurement = measureText(element);
   const freeWidth = Math.max(0, measurement.availableWidth - measurement.textWidth);
   const freeHeight = Math.max(0, measurement.availableHeight - measurement.textHeight);
+  if (hasExplicitAlign(element)) {
+    const inlineAlign = element.dataset.inlineAlign;
+    const blockAlign = element.dataset.blockAlign;
+    if (measurement.vertical) {
+      const inlineFactor = alignFactor(inlineAlign);
+      const blockFactor = alignFactor(blockAlign);
+      element.style.setProperty("--overlay-shift-x", `${(-freeWidth * (1 - blockFactor)).toFixed(2)}px`);
+      element.style.setProperty("--overlay-shift-y", `${(freeHeight * inlineFactor).toFixed(2)}px`);
+      return;
+    }
+    element.style.setProperty("--overlay-shift-x", `${(freeWidth * alignFactor(inlineAlign)).toFixed(2)}px`);
+    element.style.setProperty("--overlay-shift-y", `${(freeHeight * alignFactor(blockAlign)).toFixed(2)}px`);
+    return;
+  }
   if (measurement.vertical) {
     const estimate = verticalLayoutEstimate(element);
     const horizontalGravity = estimate.fillWidth < 0.82 ? 0.42 : 0.18;
@@ -150,6 +173,37 @@ const findLargestScaleThatFits = (element: HTMLElement, predicate: (element: HTM
 const refitBubble = (element: HTMLElement) => {
   element.dataset.overflow = "fit";
   setRefitScale(element, 1);
+  const fitMode = element.dataset.fitMode ?? "auto";
+
+  if (fitMode === "fixed") {
+    if (overflows(element)) {
+      element.dataset.overflow = "scroll";
+    }
+    setTextShift(element);
+    storeMeasurementDebug(element);
+    return;
+  }
+
+  if (fitMode === "shrink") {
+    if (!overflows(element)) {
+      setTextShift(element);
+      storeMeasurementDebug(element);
+      return;
+    }
+    setRefitScale(element, MIN_REFIT_SCALE);
+    if (overflows(element)) {
+      element.dataset.overflow = "scroll";
+      setTextShift(element);
+      storeMeasurementDebug(element);
+      return;
+    }
+    const best = findLargestScaleThatFits(element, overflows);
+    setRefitScale(element, best);
+    element.dataset.overflow = overflows(element) ? "scroll" : "fit";
+    setTextShift(element);
+    storeMeasurementDebug(element);
+    return;
+  }
 
   if (!exceedsTargetFill(element)) {
     setTextShift(element);

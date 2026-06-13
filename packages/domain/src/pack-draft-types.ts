@@ -1,4 +1,4 @@
-import type { PackType } from "./types.js";
+import type { BubbleTextLayout, BubbleTextStyle, PackType } from "./types.js";
 
 export type PackDraftStatus = "draft" | "in_review" | "approved" | "published" | "archived";
 
@@ -20,6 +20,8 @@ export interface PackDraftEntry {
     text?: string;
     note?: string;
     metadata?: Record<string, unknown>;
+    text_layout?: BubbleTextLayout;
+    text_style?: BubbleTextStyle;
     adopted_at: string;
     adopted_by?: string | null;
 }

@@ -103,11 +103,19 @@ export class FilePackDraftRepository implements PackDraftRepository {
         });
     }
 
+    private letteringGuard(entries: PackDraftEntry[]): string | null {
+        const blocked = entries.find((entry) => entry.text_layout !== undefined || entry.text_style !== undefined);
+        if (!blocked) return null;
+        return "Pack Draft lettering fields are not accepted in Phase 0";
+    }
+
     addEntry(
         packDraftId: string,
         entry: PackDraftEntry,
     ): { success: true; record: PackDraftRecord } | { success: false; error: string } {
         return withFileLock(this.filePath(), () => {
+            const letteringError = this.letteringGuard([entry]);
+            if (letteringError) return { success: false, error: letteringError };
             const records = this.readAll();
             const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
             if (index < 0) return { success: false, error: "Pack draft not found" };
@@ -131,6 +139,8 @@ export class FilePackDraftRepository implements PackDraftRepository {
     ): { success: true; record: PackDraftRecord } | { success: false; error: string } {
         return withFileLock(this.filePath(), () => {
             if (entries.length === 0) return { success: false, error: "No pack draft entries to add" };
+            const letteringError = this.letteringGuard(entries);
+            if (letteringError) return { success: false, error: letteringError };
             const records = this.readAll();
             const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
             if (index < 0) return { success: false, error: "Pack draft not found" };

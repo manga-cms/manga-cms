@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PageSchema, PublishedPackSchema, lintPageContent } from "../src/content.ts";
+import { PackManifestSchema, PageSchema, PublishedPackSchema, lintPackContent, lintPageContent } from "../src/content.ts";
 
 test("PageSchema and Linter Validation", async (t) => {
     await t.test("Page requires pageId or legacy id", () => {
@@ -223,6 +223,96 @@ test("PageSchema and Linter Validation", async (t) => {
         assert.deepEqual(readingOrderWarning.path, ["panels"]);
         assert.equal(readingOrderWarning.source, "content-lint");
     });
+
+    await t.test("Bubble accepts lettering layout and style hints", () => {
+        const page = PageSchema.parse({
+            id: "page-1",
+            pageNumber: 1,
+            width: 800,
+            height: 1200,
+            images: {},
+            panels: [],
+            bubbles: [
+                {
+                    id: "bubble-1",
+                    bubbleNumber: 1,
+                    bubbleType: "speech",
+                    textOriginal: "こんにちは世界",
+                    panelId: null,
+                    textLayout: {
+                        lines: ["こんにちは", "世界"],
+                        inlineAlign: "start",
+                        blockAlign: "center",
+                        source: "manual",
+                    },
+                    textStyle: {
+                        fontSizePx: 28,
+                        fontWeight: 500,
+                        lineHeight: 1.2,
+                        letterSpacing: 1.5,
+                        fitMode: "fixed",
+                    },
+                    bbox: { x: 20, y: 20, width: 100, height: 100 },
+                },
+            ],
+        });
+
+        assert.deepEqual(page.bubbles[0].textLayout?.lines, ["こんにちは", "世界"]);
+        assert.equal(page.bubbles[0].textStyle?.fontWeight, 500);
+    });
+
+    await t.test("Bubble rejects invalid lettering style values", () => {
+        assert.throws(() => PageSchema.parse({
+            id: "page-1",
+            pageNumber: 1,
+            width: 800,
+            height: 1200,
+            images: {},
+            panels: [],
+            bubbles: [
+                {
+                    id: "bubble-1",
+                    bubbleNumber: 1,
+                    bubbleType: "speech",
+                    textOriginal: "Hello",
+                    panelId: null,
+                    textStyle: {
+                        fontSizePx: -1,
+                        fontWeight: 450,
+                        lineHeight: 0,
+                    },
+                    bbox: { x: 20, y: 20, width: 100, height: 100 },
+                },
+            ],
+        }), /fontWeight|Number must be greater than/);
+    });
+
+    await t.test("Linter warns for stale textLayout lines and invalid fitMode pairing", () => {
+        const page = PageSchema.parse({
+            id: "page-1",
+            pageNumber: 1,
+            width: 800,
+            height: 1200,
+            images: {},
+            panels: [],
+            bubbles: [
+                {
+                    id: "bubble-1",
+                    bubbleNumber: 1,
+                    bubbleType: "speech",
+                    textOriginal: "こんにちは",
+                    panelId: null,
+                    textLayout: { lines: ["こんばんは"] },
+                    textStyle: { fitMode: "fixed" },
+                    bbox: { x: 20, y: 20, width: 100, height: 100 },
+                },
+            ],
+        });
+
+        const warnings = lintPageContent(page);
+        assert.ok(warnings.some((warning) => warning.code === "TEXT_LAYOUT_TEXT_MISMATCH"));
+        assert.ok(warnings.some((warning) => warning.code === "TEXT_STYLE_FITMODE_WITHOUT_FONT_SIZE"));
+    });
 });
 
 test("PublishedPackSchema omits private Pack entry metadata", () => {
@@ -241,6 +331,8 @@ test("PublishedPackSchema omits private Pack entry metadata", () => {
                 bubbleId: "b01",
             },
             text: "Hello",
+            textLayout: { lines: ["Hel", "lo"], inlineAlign: "center" },
+            textStyle: { fontSizePx: 24, fontWeight: 700, fitMode: "shrink" },
             metadata: {
                 translation_origin: "machine",
                 provider: "gemini",
@@ -249,4 +341,27 @@ test("PublishedPackSchema omits private Pack entry metadata", () => {
     });
 
     assert.equal("metadata" in parsed.entries[0], false);
+    assert.deepEqual(parsed.entries[0].textLayout?.lines, ["Hel", "lo"]);
+    assert.equal(parsed.entries[0].textStyle?.fontWeight, 700);
+});
+
+test("Pack lint warns for stale translation textLayout lines", () => {
+    const pack = PackManifestSchema.parse({
+        id: "translation-en-demo",
+        type: "TRANSLATION",
+        language: "en",
+        version: 1,
+        isPublished: false,
+        entries: [{
+            id: "entry-1",
+            target: { seriesId: "series-1", bubbleId: "b01" },
+            text: "Hello world",
+            textLayout: { lines: ["Goodbye", "world"] },
+            textStyle: { fitMode: "shrink" },
+        }],
+    });
+
+    const warnings = lintPackContent(pack);
+    assert.ok(warnings.some((warning) => warning.code === "TEXT_LAYOUT_TEXT_MISMATCH"));
+    assert.ok(warnings.some((warning) => warning.code === "TEXT_STYLE_FITMODE_WITHOUT_FONT_SIZE"));
 });

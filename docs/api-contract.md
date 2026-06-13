@@ -284,6 +284,8 @@ interface Bubble {
   lang?: string;
   flags?: ContentFlags;
   metadata?: ContentPublicMetadata;
+  textLayout?: BubbleTextLayout;
+  textStyle?: BubbleTextStyle;
   bbox: BoundingBox;
 }
 ```
@@ -299,10 +301,9 @@ Rules:
 - `textOriginal` is canonical source text, not a lettering layout field. Do
   not treat half-width spaces as automatic line breaks, word separators for
   vertical lettering, or panel-layout hints.
-- Line breaks and typesetting hints should be modeled as optional layout
-  metadata in a v2-compatible extension, for example
-  `textLayout.lines: string[]`. Existing content must not be auto-converted
-  from spaces or punctuation; CMS reviewers should set line layout explicitly.
+- Line breaks and typesetting hints are optional layout metadata. Existing
+  content must not be auto-converted from spaces or punctuation; CMS reviewers
+  or hand-authored JSON should set line layout explicitly.
 
 Text layout design:
 
@@ -310,15 +311,25 @@ Text layout design:
 interface BubbleTextLayout {
   // Human-reviewed source text split for lettering/typesetting display.
   lines?: string[];
-  // Reserved for future display hints such as vertical flow or ruby grouping.
+  inlineAlign?: "start" | "center" | "end";
+  blockAlign?: "start" | "center" | "end";
   source?: "manual" | "imported" | "ocr";
+}
+
+interface BubbleTextStyle {
+  fontSizePx?: number;
+  fontWeight?: 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
+  lineHeight?: number;
+  letterSpacing?: number;
+  fitMode?: "auto" | "shrink" | "fixed";
 }
 ```
 
 `textLayout.lines` is the preferred future field over top-level `textLines`
 because it keeps source text, layout, and future lettering hints grouped
 without changing the meaning of `Bubble.textOriginal`. It is design-level only
-until domain and schema fields are added.
+outside the optional Phase 0 overlay reader; regular Reader text and share
+metadata keep using `textOriginal`.
 
 Comparison:
 
@@ -348,6 +359,30 @@ No `schemaVersion: 3` migration is needed while layout is optional and
 `textOriginal` keeps its existing meaning. A future v3 is justified only if
 layout lines become required, if `textOriginal` semantics change, or if old
 content must be migrated to a new canonical text representation.
+
+Lettering Tool Phase 0 contract:
+
+- `Bubble.textLayout` and `Bubble.textStyle` are optional and backward
+  compatible. `Bubble.textOriginal`, `bbox`, and normal Reader behavior remain
+  unchanged.
+- Published Pack entries may also carry optional `textLayout` and `textStyle`
+  for reviewed translation lettering. Private Pack `metadata` remains omitted
+  from public Reader payloads.
+- Validation rejects invalid style values: `fontSizePx > 0`, `fontWeight`
+  between 100 and 900 in 100-step increments, `lineHeight > 0`, finite
+  `letterSpacing`, and `fitMode` in `auto | shrink | fixed`.
+- Content lint warns, but does not hard-error, when `textLayout.lines` no
+  longer approximately matches source text. For CJK languages, lines are joined
+  without spaces; for non-CJK languages, lines are joined with spaces.
+- Content lint also warns when `fitMode: "shrink"` or `"fixed"` is present
+  without `fontSizePx`; Reader overlay falls back to `auto`.
+- The experimental overlay route reads these fields only for noindex overlay
+  display. Hand-authored `textLayout.lines` takes precedence over
+  `READER_TEXT_OVERLAY_SPACE_AS_BREAK`.
+- Full Episode saves strip incoming lettering field changes and preserve any
+  already-authored lettering fields on matching Bubble IDs. Pack Draft writes
+  reject `text_layout` / `text_style` in Phase 0. A narrow write endpoint for
+  lettering edits is a later phase.
 
 ### Content Lint Warnings
 

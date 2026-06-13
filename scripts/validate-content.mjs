@@ -10,7 +10,7 @@ import {
     pageIdOf,
     panelIdOf,
 } from "../packages/domain/dist/index.js";
-import { lintPageContent } from "../packages/schemas/dist/index.js";
+import { lintPackContent, lintPageContent } from "../packages/schemas/dist/index.js";
 
 function parseArgs(argv) {
     const options = {
@@ -299,7 +299,7 @@ function validatePackTargets(packs, contentIndex) {
     return errorCount;
 }
 
-function validatePacks(packsDir, contentIndex) {
+function validatePacks(packsDir, contentIndex, failOnWarnings) {
     const repo = new FilePackRepository(packsDir);
     const packs = repo.listPacks();
     const schemaErrors = repo.getValidationErrors();
@@ -307,7 +307,21 @@ function validatePacks(packsDir, contentIndex) {
         console.error(error);
     }
     const targetErrorCount = validatePackTargets(packs, contentIndex);
-    return { packCount: packs.length, errorCount: schemaErrors.length + targetErrorCount };
+    let warningCount = 0;
+    let lintErrorCount = 0;
+    for (const pack of packs) {
+        const issues = lintPackContent(pack);
+        for (const issue of issues) {
+            if (issue.severity === "warning") warningCount += 1;
+            else lintErrorCount += 1;
+            console.log(`[${issue.severity}] ${issue.code}: pack=${pack.id} ${issue.message}${issue.path?.length ? ` path=${issue.path.join(".")}` : ""}`);
+        }
+    }
+    return {
+        packCount: packs.length,
+        warningCount,
+        errorCount: schemaErrors.length + targetErrorCount + lintErrorCount + (failOnWarnings ? warningCount : 0),
+    };
 }
 
 function main() {
@@ -332,13 +346,13 @@ function main() {
             errorCount: 0,
         };
     const packResult = packsExists
-        ? validatePacks(packsDir, contentResult.contentIndex)
-        : { packCount: 0, errorCount: 0 };
+        ? validatePacks(packsDir, contentResult.contentIndex, options.failOnWarnings)
+        : { packCount: 0, warningCount: 0, errorCount: 0 };
 
     console.log(
         `Content validation checked ${contentResult.seriesCount} series, ${contentResult.pageCount} pages, ${packResult.packCount} packs.`,
     );
-    console.log(`Content lint warnings: ${contentResult.warningCount}.`);
+    console.log(`Content lint warnings: ${contentResult.warningCount + packResult.warningCount}.`);
 
     const errorCount = contentResult.errorCount + packResult.errorCount;
     if (errorCount > 0) {

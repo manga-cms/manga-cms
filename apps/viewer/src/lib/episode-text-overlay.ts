@@ -1,4 +1,4 @@
-import type { PublishedPack } from "./api-client";
+import type { BubbleTextLayout, BubbleTextStyle, PublishedPack, PublishedPackEntry } from "./api-client";
 import { isSafeReaderImageSrc } from "./episode-reader-data";
 
 export interface OverlayBubble {
@@ -11,6 +11,9 @@ export interface OverlayBubble {
   textDirection?: string;
   displayDirection: "horizontal" | "vertical";
   text: string;
+  fitMode: "auto" | "shrink" | "fixed";
+  inlineAlign?: "start" | "center" | "end";
+  blockAlign?: "start" | "center" | "end";
   bbox: { x: number; y: number; width: number; height: number };
   style: string;
   fit: {
@@ -106,7 +109,72 @@ const displayDirectionForBubble = (bubble: any, language: string): "horizontal" 
   return "horizontal";
 };
 
-const publishedTranslationForBubble = (packs: PublishedPack[], bubbleId: string, language: string): string | undefined => {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isAlignValue = (value: unknown): value is "start" | "center" | "end" =>
+  value === "start" || value === "center" || value === "end";
+
+const isLayoutSourceValue = (value: unknown): value is "manual" | "imported" | "ocr" =>
+  value === "manual" || value === "imported" || value === "ocr";
+
+const isFitModeValue = (value: unknown): value is "auto" | "shrink" | "fixed" =>
+  value === "auto" || value === "shrink" || value === "fixed";
+
+const numberInRange = (value: unknown, min: number, max: number) => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue >= min && numberValue <= max
+    ? numberValue
+    : undefined;
+};
+
+const sanitizeTextLayout = (value: unknown): BubbleTextLayout | undefined => {
+  if (!isRecord(value)) return undefined;
+  const lines = Array.isArray(value.lines)
+    ? value.lines.filter((line): line is string => typeof line === "string")
+    : undefined;
+  const inlineAlign = isAlignValue(value.inlineAlign) ? value.inlineAlign : undefined;
+  const blockAlign = isAlignValue(value.blockAlign) ? value.blockAlign : undefined;
+  const source = isLayoutSourceValue(value.source) ? value.source : undefined;
+  const sanitized: BubbleTextLayout = {
+    ...(lines && lines.length > 0 && { lines }),
+    ...(inlineAlign && { inlineAlign }),
+    ...(blockAlign && { blockAlign }),
+    ...(source && { source }),
+  };
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+};
+
+const sanitizeTextStyle = (value: unknown): BubbleTextStyle | undefined => {
+  if (!isRecord(value)) return undefined;
+  const fontSizePx = numberInRange(value.fontSizePx, 0.01, 512);
+  const fontWeight = numberInRange(value.fontWeight, 100, 900);
+  const roundedWeight = fontWeight !== undefined && Number.isInteger(fontWeight) && fontWeight % 100 === 0
+    ? fontWeight
+    : undefined;
+  const lineHeight = numberInRange(value.lineHeight, 0.01, 4);
+  const letterSpacing = numberInRange(value.letterSpacing, -64, 64);
+  const fitMode = isFitModeValue(value.fitMode) ? value.fitMode : undefined;
+  const sanitized: BubbleTextStyle = {
+    ...(fontSizePx !== undefined && { fontSizePx }),
+    ...(roundedWeight !== undefined && { fontWeight: roundedWeight }),
+    ...(lineHeight !== undefined && { lineHeight }),
+    ...(letterSpacing !== undefined && { letterSpacing }),
+    ...(fitMode && { fitMode }),
+  };
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+};
+
+const resolvedFitMode = (style: BubbleTextStyle | undefined): "auto" | "shrink" | "fixed" => {
+  if (!style) return "auto";
+  const requested = style.fitMode ?? (style.fontSizePx != null ? "shrink" : "auto");
+  if ((requested === "shrink" || requested === "fixed") && style.fontSizePx == null) {
+    return "auto";
+  }
+  return requested;
+};
+
+const publishedTranslationForBubble = (packs: PublishedPack[], bubbleId: string, language: string): PublishedPackEntry | undefined => {
   for (const pack of packs) {
     if (!pack.isPublished || pack.type !== "TRANSLATION") continue;
     for (const entry of pack.entries ?? []) {
@@ -114,19 +182,35 @@ const publishedTranslationForBubble = (packs: PublishedPack[], bubbleId: string,
       if (entryLanguage !== language) continue;
       if (entry.target?.bubbleId !== bubbleId) continue;
       if (typeof entry.text === "string" && entry.text.trim().length > 0) {
-        return entry.text;
+        return entry;
       }
     }
   }
   return undefined;
 };
 
+interface OverlayTextSource {
+  text: string;
+  textLayout?: BubbleTextLayout;
+  textStyle?: BubbleTextStyle;
+}
+
 const overlayTextForBubble = (bubble: any, packs: PublishedPack[], language: string) => {
   if (language !== "ja") {
     const translated = publishedTranslationForBubble(packs, bubbleIdOf(bubble), language);
-    if (translated) return translated;
+    if (translated) {
+      return {
+        text: translated.text ?? "",
+        textLayout: sanitizeTextLayout(translated.textLayout),
+        textStyle: sanitizeTextStyle(translated.textStyle),
+      };
+    }
   }
-  return bubble.textOriginal;
+  return {
+    text: bubble.textOriginal,
+    textLayout: sanitizeTextLayout(bubble.textLayout),
+    textStyle: sanitizeTextStyle(bubble.textStyle),
+  };
 };
 
 const SOFT_BREAK = "\u200B";
@@ -176,8 +260,10 @@ const insertJapaneseSoftBreaks = (text: string) =>
     })
     .join("\n");
 
-const renderTextForOverlay = (text: string, options: { addJapaneseSoftBreaks: boolean; spaceAsBreak: boolean }) => {
-  const normalized = text.replace(/\r\n?/gu, "\n");
+const renderTextForOverlay = (source: OverlayTextSource, options: { addJapaneseSoftBreaks: boolean; spaceAsBreak: boolean }) => {
+  const layoutLines = source.textLayout?.lines;
+  const normalized = (layoutLines && layoutLines.length > 0 ? layoutLines.join("\n") : source.text).replace(/\r\n?/gu, "\n");
+  if (layoutLines && layoutLines.length > 0) return normalized;
   if (options.addJapaneseSoftBreaks) return insertJapaneseSoftBreaks(normalized);
   if (!options.spaceAsBreak) return normalized;
   // Display-only source-locale experiment: preserve authored/new review line
@@ -250,21 +336,36 @@ const estimateOverlayFit = (input: {
   return { characterCount, estimatedCapacity, ratio, scale };
 };
 
-const bubbleStyle = (bubble: any, page: any, displayDirection: "horizontal" | "vertical") => {
+const styleNumberToCqw = (value: number, pageWidth: number) =>
+  `${((value / Math.max(pageWidth, 1)) * 100).toFixed(4)}cqw`;
+
+const bubbleStyle = (
+  bubble: any,
+  page: any,
+  displayDirection: "horizontal" | "vertical",
+  textStyle: BubbleTextStyle | undefined,
+  fitMode: "auto" | "shrink" | "fixed",
+) => {
   const bbox = bubble.bbox ?? { x: 0, y: 0, width: 0, height: 0 };
   const text = String(bubble.__overlayText ?? bubble.textOriginal ?? "");
+  const pageWidth = Number(page.width ?? 1200);
   const fit = estimateOverlayFit({
     text,
     bbox,
     displayDirection,
-    pageWidth: Number(page.width ?? 1200),
+    pageWidth,
   });
+  const initialFit = fitMode === "auto" ? fit.scale : 1;
   return [
     `left:${pct(Number(bbox.x ?? 0), Number(page.width ?? 1))}`,
     `top:${pct(Number(bbox.y ?? 0), Number(page.height ?? 1))}`,
     `width:${pct(Number(bbox.width ?? 0), Number(page.width ?? 1))}`,
     `height:${pct(Number(bbox.height ?? 0), Number(page.height ?? 1))}`,
-    `--overlay-fit:${fit.scale.toFixed(4)}`,
+    `--overlay-fit:${initialFit.toFixed(4)}`,
+    ...(textStyle?.fontSizePx !== undefined ? [`--overlay-manual-font-size:${styleNumberToCqw(textStyle.fontSizePx, pageWidth)}`] : []),
+    ...(textStyle?.fontWeight !== undefined ? [`--overlay-font-weight:${textStyle.fontWeight}`] : []),
+    ...(textStyle?.lineHeight !== undefined ? [`--overlay-line-height:${textStyle.lineHeight}`] : []),
+    ...(textStyle?.letterSpacing !== undefined ? [`--overlay-letter-spacing:${styleNumberToCqw(textStyle.letterSpacing, pageWidth)}`] : []),
   ].join(";");
 };
 
@@ -291,7 +392,9 @@ export const buildTextOverlayPages = (
         )
         .map((bubble: any): OverlayBubble => {
           const displayDirection = displayDirectionForBubble(bubble, language);
-          const text = renderTextForOverlay(overlayTextForBubble(bubble, packs, language), {
+          const source = overlayTextForBubble(bubble, packs, language);
+          const fitMode = resolvedFitMode(source.textStyle);
+          const text = renderTextForOverlay(source, {
             addJapaneseSoftBreaks: isSourceOverlayLanguage(language) && displayDirection === "vertical",
             spaceAsBreak: spaceAsBreak && language === "ja",
           });
@@ -311,8 +414,11 @@ export const buildTextOverlayPages = (
             textDirection: bubble.textDirection,
             displayDirection,
             text,
+            fitMode,
+            inlineAlign: source.textLayout?.inlineAlign,
+            blockAlign: source.textLayout?.blockAlign,
             bbox: bubble.bbox,
-            style: bubbleStyle({ ...bubble, __overlayText: text }, page, displayDirection),
+            style: bubbleStyle({ ...bubble, __overlayText: text }, page, displayDirection, source.textStyle, fitMode),
             fit,
           };
         });

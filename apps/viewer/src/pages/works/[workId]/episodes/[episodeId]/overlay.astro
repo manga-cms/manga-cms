@@ -217,6 +217,9 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
                   data-panel-id={bubble.panelId ?? undefined}
                   data-bubble-type={bubble.bubbleType}
                   data-overlay-bubble
+                  data-fit-mode={bubble.fitMode}
+                  data-inline-align={bubble.inlineAlign ?? undefined}
+                  data-block-align={bubble.blockAlign ?? undefined}
                   data-fit-characters={bubble.fit.characterCount}
                   data-fit-capacity={bubble.fit.estimatedCapacity}
                   data-fit-ratio={bubble.fit.ratio.toFixed(3)}
@@ -399,10 +402,11 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     color: #151515;
     display: block;
     font-family: "Shippori Antique", "Noto Sans JP", "Noto Sans SC", sans-serif;
-    font-size: clamp(8px, calc(var(--overlay-base-size, 3.4cqw) * var(--overlay-fit, 1) * var(--overlay-refit, 1)), 24px);
-    font-weight: 400;
+    font-size: clamp(8px, calc(var(--overlay-manual-font-size, var(--overlay-base-size, 3.4cqw)) * var(--overlay-fit, 1) * var(--overlay-refit, 1)), 24px);
+    font-weight: var(--overlay-font-weight, 400);
+    letter-spacing: var(--overlay-letter-spacing, 0);
     line-break: strict;
-    line-height: 1.2;
+    line-height: var(--overlay-line-height, 1.2);
     margin: 0;
     overflow: hidden;
     overscroll-behavior: contain;
@@ -446,7 +450,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     --overlay-base-size: 3cqw;
     --overlay-padding: 2cqw 1.55cqw;
     line-break: strict;
-    line-height: 1.3;
+    line-height: var(--overlay-line-height, 1.3);
     overflow-wrap: normal;
     text-orientation: mixed;
     word-break: normal;

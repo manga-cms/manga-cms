@@ -119,6 +119,21 @@ export interface ContentPublicMetadata {
     publicSafety?: ContentPublicSafetyMetadata;
 }
 
+export interface BubbleTextLayout {
+    lines?: string[];
+    inlineAlign?: "start" | "center" | "end";
+    blockAlign?: "start" | "center" | "end";
+    source?: "manual" | "imported" | "ocr";
+}
+
+export interface BubbleTextStyle {
+    fontSizePx?: number;
+    fontWeight?: number;
+    lineHeight?: number;
+    letterSpacing?: number;
+    fitMode?: "auto" | "shrink" | "fixed";
+}
+
 export interface Bubble {
     bubbleId: string;
     /** @deprecated Use bubbleId for canonical content v2. */
@@ -138,6 +153,8 @@ export interface Bubble {
     lang?: string;
     flags?: ContentFlags;
     metadata?: ContentPublicMetadata;
+    textLayout?: BubbleTextLayout;
+    textStyle?: BubbleTextStyle;
     bbox: BoundingBox;
 }
 
@@ -301,6 +318,8 @@ export interface PackEntry {
     note?: string;
     sourceProposalId?: string;
     metadata?: Record<string, unknown>;
+    textLayout?: BubbleTextLayout;
+    textStyle?: BubbleTextStyle;
 }
 
 export interface PackSummary {

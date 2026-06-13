@@ -111,6 +111,53 @@ function mergeMetadata(existing: unknown, incoming: unknown): unknown {
     return merged;
 }
 
+function bubbleKeyOf(value: any): string {
+    return String(value?.bubbleId ?? value?.id ?? "");
+}
+
+function collectExistingLetteringByBubbleId(existingEpisode: unknown): Map<string, { textLayout?: unknown; textStyle?: unknown }> {
+    const lettering = new Map<string, { textLayout?: unknown; textStyle?: unknown }>();
+    if (!isRecord(existingEpisode) || !Array.isArray(existingEpisode.pages)) return lettering;
+    for (const page of existingEpisode.pages) {
+        if (!isRecord(page)) continue;
+        const pages = [migrateLegacyPageBubbles(page as any)];
+        for (const normalizedPage of pages) {
+            for (const bubble of normalizedPage.bubbles ?? []) {
+                const bubbleId = bubbleKeyOf(bubble);
+                if (!bubbleId) continue;
+                const textLayout = (bubble as any).textLayout;
+                const textStyle = (bubble as any).textStyle;
+                if (textLayout !== undefined || textStyle !== undefined) {
+                    lettering.set(bubbleId, {
+                        ...(textLayout !== undefined && { textLayout }),
+                        ...(textStyle !== undefined && { textStyle }),
+                    });
+                }
+            }
+        }
+    }
+    return lettering;
+}
+
+function preserveExistingLettering(pages: any[], existingEpisode: unknown): Episode["pages"] {
+    const letteringByBubbleId = collectExistingLetteringByBubbleId(existingEpisode);
+    return pages.map((page) => {
+        const migrated = migrateLegacyPageBubbles(page as any);
+        return {
+            ...migrated,
+            bubbles: (migrated.bubbles ?? []).map((bubble: any) => {
+                const { textLayout: _incomingTextLayout, textStyle: _incomingTextStyle, ...nextBubble } = bubble;
+                const existing = letteringByBubbleId.get(bubbleKeyOf(bubble));
+                return {
+                    ...nextBubble,
+                    ...(existing?.textLayout !== undefined && { textLayout: existing.textLayout }),
+                    ...(existing?.textStyle !== undefined && { textStyle: existing.textStyle }),
+                };
+            }),
+        };
+    }) as Episode["pages"];
+}
+
 export class FileContentWriter implements ContentWriteRepository {
     constructor(
         private contentsDir: string,
@@ -257,6 +304,10 @@ export class FileContentWriter implements ContentWriteRepository {
         if (!existsSync(manifestPath)) {
             return { success: false, error: `Series "${seriesId}" not found` };
         }
+        const existingEpisodePath = join(seriesDir, input.id, "episode.json");
+        const existingEpisode = existsSync(existingEpisodePath)
+            ? JSON.parse(readFileSync(existingEpisodePath, "utf-8"))
+            : null;
 
         // Validate episode
         const epData = {
@@ -271,7 +322,7 @@ export class FileContentWriter implements ContentWriteRepository {
             ...(input.purchaseUrl !== undefined && { purchaseUrl: input.purchaseUrl }),
             ...(input.redeemUrl !== undefined && { redeemUrl: input.redeemUrl }),
             ...(input.metadata !== undefined && { metadata: input.metadata }),
-            pages: (input.pages ?? []).map((page) => migrateLegacyPageBubbles(page as any)),
+            pages: preserveExistingLettering(input.pages ?? [], existingEpisode),
         };
 
         const epResult = EpisodeSchema.safeParse(epData);

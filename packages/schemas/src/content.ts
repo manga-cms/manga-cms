@@ -31,6 +31,22 @@ export const BubbleTypeSchema = z.enum(["speech", "thought", "narration", "sfx",
 export const TextDirectionSchema = z.enum(["horizontal", "vertical"]);
 export const SpeakerConfidenceSchema = z.enum(["confirmed", "inferred", "unknown"]);
 export const ContentEntityStatusSchema = z.enum(["active", "deprecated", "deleted", "merged"]);
+export const BubbleTextLayoutSchema = z.object({
+    lines: z.array(z.string()).min(1).optional(),
+    inlineAlign: z.enum(["start", "center", "end"]).optional(),
+    blockAlign: z.enum(["start", "center", "end"]).optional(),
+    source: z.enum(["manual", "imported", "ocr"]).optional(),
+}).strict();
+
+export const BubbleTextStyleSchema = z.object({
+    fontSizePx: z.number().positive().max(512).optional(),
+    fontWeight: z.number().int().min(100).max(900).refine((value) => value % 100 === 0, {
+        message: "fontWeight must be a multiple of 100",
+    }).optional(),
+    lineHeight: z.number().positive().max(4).optional(),
+    letterSpacing: z.number().finite().min(-64).max(64).optional(),
+    fitMode: z.enum(["auto", "shrink", "fixed"]).optional(),
+}).strict();
 
 export const ContentFlagsSchema = z.object({
     shareable: z.boolean().default(true),
@@ -131,6 +147,8 @@ const BubbleInputSchema = z.object({
     lang: z.string().optional(),
     flags: ContentFlagsSchema.optional(),
     metadata: ContentPublicMetadataSchema.optional(),
+    textLayout: BubbleTextLayoutSchema.optional(),
+    textStyle: BubbleTextStyleSchema.optional(),
     bbox: BoundingBoxSchema,
 });
 
@@ -284,6 +302,70 @@ export interface ContentLintWarning {
     source?: "schema" | "content-lint" | "ingestion" | "cms";
 }
 
+function normalizedTextForLayoutCompare(value: string) {
+    return value.replace(/\s+/gu, "");
+}
+
+function isCjkLanguage(language: string | undefined) {
+    const normalized = String(language ?? "ja").toLowerCase();
+    return normalized === "ja" || normalized.startsWith("ja-") ||
+        normalized === "zh" || normalized.startsWith("zh-") ||
+        normalized === "ko" || normalized.startsWith("ko-");
+}
+
+function joinedLayoutLines(lines: string[], language: string | undefined) {
+    return isCjkLanguage(language) ? lines.join("") : lines.join(" ");
+}
+
+function addTextStyleWarnings(args: {
+    warnings: ContentLintWarning[];
+    textStyle?: { fontSizePx?: number; fitMode?: "auto" | "shrink" | "fixed" };
+    path: Array<string | number>;
+    pageId?: string;
+    bubbleId?: string;
+    panelId?: string | null;
+}) {
+    if (!args.textStyle || args.textStyle.fontSizePx != null) return;
+    if (args.textStyle.fitMode !== "shrink" && args.textStyle.fitMode !== "fixed") return;
+    args.warnings.push({
+        severity: "warning",
+        code: "TEXT_STYLE_FITMODE_WITHOUT_FONT_SIZE",
+        message: "textStyle.fitMode shrink/fixed requires fontSizePx; Reader falls back to auto fit.",
+        path: [...args.path, "textStyle", "fitMode"],
+        pageId: args.pageId,
+        panelId: args.panelId ?? undefined,
+        bubbleId: args.bubbleId,
+        source: "content-lint",
+    });
+}
+
+function addTextLayoutWarnings(args: {
+    warnings: ContentLintWarning[];
+    textLayout?: { lines?: string[] };
+    expectedText?: string;
+    language?: string;
+    path: Array<string | number>;
+    pageId?: string;
+    bubbleId?: string;
+    panelId?: string | null;
+}) {
+    const lines = args.textLayout?.lines;
+    if (!lines || lines.length === 0) return;
+    const layoutText = normalizedTextForLayoutCompare(joinedLayoutLines(lines, args.language));
+    const expectedText = normalizedTextForLayoutCompare(args.expectedText ?? "");
+    if (!layoutText || !expectedText || layoutText === expectedText) return;
+    args.warnings.push({
+        severity: "warning",
+        code: "TEXT_LAYOUT_TEXT_MISMATCH",
+        message: "textLayout.lines may be stale because joined lines do not match the source text.",
+        path: [...args.path, "textLayout", "lines"],
+        pageId: args.pageId,
+        panelId: args.panelId ?? undefined,
+        bubbleId: args.bubbleId,
+        source: "content-lint",
+    });
+}
+
 export function lintPageContent(page: PageData): ContentLintWarning[] {
     const warnings: ContentLintWarning[] = [];
     const panelsById = new Map(page.panels.map((panel) => [panel.panelId, panel]));
@@ -344,6 +426,24 @@ export function lintPageContent(page: PageData): ContentLintWarning[] {
     });
 
     page.bubbles.forEach((bubble, i) => {
+        addTextStyleWarnings({
+            warnings,
+            textStyle: bubble.textStyle,
+            path: ["bubbles", i],
+            pageId: page.pageId,
+            panelId: bubble.panelId,
+            bubbleId: bubble.bubbleId,
+        });
+        addTextLayoutWarnings({
+            warnings,
+            textLayout: bubble.textLayout,
+            expectedText: bubble.textOriginal,
+            language: bubble.lang ?? "ja",
+            path: ["bubbles", i],
+            pageId: page.pageId,
+            panelId: bubble.panelId,
+            bubbleId: bubble.bubbleId,
+        });
         checkPageBounds(bubble.bbox, ["bubbles", i], `Bubble ${bubble.bubbleId}`, {
             panelId: bubble.panelId ?? undefined,
             bubbleId: bubble.bubbleId,
@@ -476,6 +576,8 @@ export const PackEntrySchema = z.object({
     note: z.string().optional(),
     sourceProposalId: z.string().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    textLayout: BubbleTextLayoutSchema.optional(),
+    textStyle: BubbleTextStyleSchema.optional(),
 });
 
 export const PackManifestSchema = z.object({
@@ -517,3 +619,29 @@ export type PanelData = z.infer<typeof PanelSchema>;
 export type BubbleData = z.infer<typeof BubbleSchema>;
 export type PackManifest = z.infer<typeof PackManifestSchema>;
 export type PublishedPack = z.infer<typeof PublishedPackSchema>;
+
+export function lintPackContent(pack: PackManifest): ContentLintWarning[] {
+    const warnings: ContentLintWarning[] = [];
+    pack.entries.forEach((entry, index) => {
+        const path = ["entries", index];
+        addTextStyleWarnings({
+            warnings,
+            textStyle: entry.textStyle,
+            path,
+            bubbleId: entry.target.bubbleId,
+            panelId: entry.target.panelId,
+            pageId: entry.target.pageId,
+        });
+        addTextLayoutWarnings({
+            warnings,
+            textLayout: entry.textLayout,
+            expectedText: entry.text,
+            language: entry.language ?? pack.language,
+            path,
+            bubbleId: entry.target.bubbleId,
+            panelId: entry.target.panelId,
+            pageId: entry.target.pageId,
+        });
+    });
+    return warnings;
+}
