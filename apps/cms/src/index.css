@@ -96,6 +96,19 @@ a:hover {
     flex-wrap: wrap;
 }
 
+.app-login-form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: min(100%, 22rem);
+}
+
+.app-login-form input {
+    min-width: 12rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.78rem;
+}
+
 .locale-switcher {
     display: inline-flex;
     padding: 0.15rem;
@@ -2645,6 +2658,16 @@ textarea {
         justify-content: flex-start;
         min-width: 0;
         order: 3;
+    }
+
+    .app-login-form {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .app-login-form input {
+        min-width: 0;
+        flex: 1 1 12rem;
     }
 
     .app-main {

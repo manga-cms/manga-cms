@@ -1,4 +1,5 @@
 import { Routes, Route, Link } from "react-router-dom";
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import Dashboard from "./pages/Dashboard";
 import CreateWork from "./pages/CreateWork";
@@ -20,14 +21,19 @@ import TranslationDraftImport from "./pages/TranslationDraftImport";
 import GitHubHandoffList from "./pages/GitHubHandoffList";
 import GitHubIdentityVerifications from "./pages/GitHubIdentityVerifications";
 import RightsManager from "./pages/RightsManager";
-import { devLogin, getMe } from "./api";
+import { devLogin, getMe, requestLoginLink } from "./api";
 import { LocaleSwitcher } from "./i18n/LocaleSwitcher";
 import { useTranslation } from "./i18n/I18nProvider";
+
+const devLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_CMS_ENABLE_DEV_LOGIN === "true";
 
 export default function App() {
     const { t } = useTranslation();
     const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
     const [loginError, setLoginError] = useState("");
+    const [loginNotice, setLoginNotice] = useState("");
+    const [loginEmail, setLoginEmail] = useState("");
+    const [loginSubmitting, setLoginSubmitting] = useState(false);
     const [navOpen, setNavOpen] = useState(false);
 
     useEffect(() => {
@@ -36,11 +42,29 @@ export default function App() {
 
     const loginAsDevAdmin = async () => {
         setLoginError("");
+        setLoginNotice("");
         try {
             const session = await devLogin("dev-admin", "Dev Admin");
             setUser(session.user);
         } catch (error) {
             setLoginError((error as Error).message);
+        }
+    };
+
+    const sendLoginLink = async (event: FormEvent) => {
+        event.preventDefault();
+        const email = loginEmail.trim();
+        if (!email) return;
+        setLoginError("");
+        setLoginNotice("");
+        setLoginSubmitting(true);
+        try {
+            const result = await requestLoginLink(email);
+            setLoginNotice(result.message || t("app.session.loginLinkSent"));
+        } catch (error) {
+            setLoginError((error as Error).message);
+        } finally {
+            setLoginSubmitting(false);
         }
     };
 
@@ -101,14 +125,28 @@ export default function App() {
                     <LocaleSwitcher />
                     {user ? (
                         <span className="badge badge-ok">{user.name} · {user.role}</span>
-                    ) : (
+                    ) : devLoginEnabled ? (
                         <button type="button" className="btn btn-outline btn-compact" onClick={loginAsDevAdmin}>
                             {t("app.session.devLogin")}
                         </button>
+                    ) : (
+                        <form className="app-login-form" onSubmit={sendLoginLink}>
+                            <input
+                                type="email"
+                                value={loginEmail}
+                                onChange={(event) => setLoginEmail(event.target.value)}
+                                placeholder={t("app.session.emailPlaceholder")}
+                                aria-label={t("app.session.emailPlaceholder")}
+                            />
+                            <button type="submit" className="btn btn-outline btn-compact" disabled={loginSubmitting || !loginEmail.trim()}>
+                                {loginSubmitting ? t("app.session.sending") : t("app.session.sendLoginLink")}
+                            </button>
+                        </form>
                     )}
                 </div>
             </header>
             {loginError && <div className="app-banner error-msg">{loginError}</div>}
+            {loginNotice && <div className="app-banner success-msg">{loginNotice}</div>}
             <main className="app-main">
                 <Routes>
                     <Route path="/" element={<Dashboard />} />

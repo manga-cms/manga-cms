@@ -1416,6 +1416,18 @@ export async function cancelJob(jobId: string) {
 // Auth
 // ---------------------------------------------------------------------------
 
+async function jsonOrEmpty(res: Response) {
+    try {
+        return await res.json();
+    } catch {
+        return {};
+    }
+}
+
+function apiErrorMessage(data: any, fallback: string) {
+    return data?.error?.message ?? data?.message ?? fallback;
+}
+
 export async function devLogin(userId?: string, name?: string, role?: string) {
     const res = await fetch(`${API}/auth/dev-login`, {
         method: "POST",
@@ -1423,9 +1435,21 @@ export async function devLogin(userId?: string, name?: string, role?: string) {
         credentials: "include",
         body: JSON.stringify({ userId, name, role }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error("Login failed");
+    const data = await jsonOrEmpty(res);
+    if (!res.ok) throw new Error(apiErrorMessage(data, "Login failed"));
     return data as { token: string; user: { id: string; name: string; role: string } };
+}
+
+export async function requestLoginLink(email: string) {
+    const res = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email }),
+    });
+    const data = await jsonOrEmpty(res);
+    if (!res.ok) throw new Error(apiErrorMessage(data, "Login link request failed"));
+    return data as { ok: true; message: string };
 }
 
 export async function getMe() {

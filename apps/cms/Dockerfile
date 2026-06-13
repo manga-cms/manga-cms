@@ -23,6 +23,9 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 
+ARG VITE_CMS_ENABLE_DEV_LOGIN="true"
+ENV VITE_CMS_ENABLE_DEV_LOGIN="${VITE_CMS_ENABLE_DEV_LOGIN}"
+
 COPY apps/cms apps/cms
 COPY packages/schemas packages/schemas
 

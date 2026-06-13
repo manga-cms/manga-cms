@@ -6,6 +6,8 @@ import {
     type EntitlementItem, type SeriesItem,
 } from "../api";
 
+const devLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_CMS_ENABLE_DEV_LOGIN === "true";
+
 export default function Entitlements() {
     const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
     const [works, setWorks] = useState<SeriesItem[]>([]);
@@ -69,7 +71,11 @@ export default function Entitlements() {
                 ) : (
                     <div>
                         <p style={{ color: "var(--muted)", marginBottom: "0.5rem" }}>Not logged in</p>
-                        <button onClick={doLogin} className="btn btn-primary" disabled={busy}>Dev Login (Admin)</button>
+                        {devLoginEnabled ? (
+                            <button onClick={doLogin} className="btn btn-primary" disabled={busy}>Dev Login (Admin)</button>
+                        ) : (
+                            <p className="card-meta">Use the header login form to request a magic link.</p>
+                        )}
                     </div>
                 )}
             </div>
