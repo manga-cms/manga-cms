@@ -9,5 +9,6 @@ export * from "./providers/index.js";
 export * from "./schemas/index.js";
 export * from "./source-text/index.js";
 export * from "./svg/index.js";
+export * from "./translation/index.js";
 export * from "./types/index.js";
 export * from "./utils/index.js";
