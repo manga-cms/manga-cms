@@ -25,6 +25,16 @@ function isActiveStatus(status?: string): boolean {
     return status === undefined || status === "active";
 }
 
+function hasValidUniqueOrder<T>(items: T[], orderOf: (item: T) => number): boolean {
+    const seen = new Set<number>();
+    for (const item of items) {
+        const order = orderOf(item);
+        if (!Number.isFinite(order) || order <= 0 || seen.has(order)) return false;
+        seen.add(order);
+    }
+    return true;
+}
+
 function bubbleToScriptBubble(bubble: Bubble): TranslationPageScriptBubble {
     return {
         bubbleId: bubbleIdOf(bubble),
@@ -38,6 +48,12 @@ function bubbleToScriptBubble(bubble: Bubble): TranslationPageScriptBubble {
 
 function orderedPanels(page: Page): Panel[] {
     const activePanels = page.panels.filter((panel) => isActiveStatus(panel.status));
+    if (hasValidUniqueOrder(activePanels, (panel) => panel.panelNumber)) {
+        return [...activePanels].sort((a, b) =>
+            a.panelNumber - b.panelNumber ||
+            panelIdOf(a).localeCompare(panelIdOf(b)),
+        );
+    }
     const panelsById = new Map(activePanels.map((panel) => [panelIdOf(panel), panel]));
     return estimatePanelReadingOrder(activePanels.map((panel) => ({
         panelId: panelIdOf(panel),
@@ -49,6 +65,12 @@ function orderedBubbles(page: Page): Bubble[] {
     const activePanels = page.panels.filter((panel) => isActiveStatus(panel.status));
     const activePanelIds = new Set(activePanels.map(panelIdOf));
     const activeBubbles = page.bubbles.filter((bubble) => isActiveStatus(bubble.status));
+    if (hasValidUniqueOrder(activeBubbles, (bubble) => bubble.bubbleNumber)) {
+        return [...activeBubbles].sort((a, b) =>
+            a.bubbleNumber - b.bubbleNumber ||
+            bubbleIdOf(a).localeCompare(bubbleIdOf(b)),
+        );
+    }
     const bubblesById = new Map(activeBubbles.map((bubble) => [bubbleIdOf(bubble), bubble]));
     return estimateBubbleReadingOrder({
         width: page.width,
