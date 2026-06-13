@@ -22,7 +22,7 @@ type PanelBubbleListsProps = {
     onSelectPanel: (index: number) => void;
     onSelectBubbleCandidate: (panelIndex: number | null, bubbleIndex: number) => void;
     onMovePanel: (index: number, direction: -1 | 1) => void;
-    onMoveBubbleCandidate: (panelIndex: number | null, bubbleIndex: number, direction: -1 | 1) => void;
+    onMoveBubbleCandidate: (bubbleId: string, direction: -1 | 1) => void;
 };
 
 const decisionLabelKey = (decision: string | undefined): MessageKey => `decision.${decision ?? "pending"}` as MessageKey;
@@ -71,7 +71,6 @@ export function PanelBubbleLists({
 }: PanelBubbleListsProps) {
     const { t } = useTranslation();
     const bubbleCandidates = getBubbleCandidates(page, reviewDecisions, textComparisonOverlays);
-    const pageLevelCandidateCount = bubbleCandidates.filter((candidate) => candidate.panelIndex === null).length;
 
     return (
         <>
@@ -81,7 +80,7 @@ export function PanelBubbleLists({
                     {bubbleCandidates.length === 0 && (
                         <p className="card-meta">{t("structure.sidebar.noBubbles")}</p>
                     )}
-                    {bubbleCandidates.map((candidate) => (
+                    {bubbleCandidates.map((candidate, candidateIndex) => (
                         <div
                             key={bubbleIdOf(candidate.bubble)}
                             className={`structure-list-row ${selectedPanelIndex === candidate.panelIndex && selectedBubbleIndex === candidate.bubbleIndex ? "is-active" : ""}`}
@@ -127,8 +126,8 @@ export function PanelBubbleLists({
                                 )}
                             </button>
                             <div className="order-controls">
-                                <button type="button" onClick={() => onMoveBubbleCandidate(candidate.panelIndex, candidate.bubbleIndex, -1)} disabled={candidate.bubbleIndex === 0} aria-label={t("structure.sidebar.moveBubbleEarlier")}>↑</button>
-                                <button type="button" onClick={() => onMoveBubbleCandidate(candidate.panelIndex, candidate.bubbleIndex, 1)} disabled={candidate.panel ? candidate.bubbleIndex === candidate.panel.bubbles.length - 1 : candidate.bubbleIndex === pageLevelCandidateCount - 1} aria-label={t("structure.sidebar.moveBubbleLater")}>↓</button>
+                                <button type="button" onClick={() => onMoveBubbleCandidate(bubbleIdOf(candidate.bubble), -1)} disabled={candidateIndex === 0} aria-label={t("structure.sidebar.moveBubbleEarlier")}>↑</button>
+                                <button type="button" onClick={() => onMoveBubbleCandidate(bubbleIdOf(candidate.bubble), 1)} disabled={candidateIndex === bubbleCandidates.length - 1} aria-label={t("structure.sidebar.moveBubbleLater")}>↓</button>
                             </div>
                         </div>
                     ))}

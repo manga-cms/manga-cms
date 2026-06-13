@@ -20,6 +20,7 @@ import { StructureReviewFooter } from "../components/structure-review/StructureR
 import { StructureReviewHeader } from "../components/structure-review/StructureReviewHeader";
 import { useTranslation } from "../i18n/I18nProvider";
 import { summarizeStructureChanges } from "../lib/structure-review/changeSummary";
+import { moveBubbleByGlobalReadingOrder } from "../lib/structure-review/bubbleOrdering";
 import {
     clearAutosave,
     confirmStructureReviewLeave,
@@ -621,45 +622,18 @@ export default function PageStructureReview() {
         updatePage({ ...page, bubbles: [...assignedBubbles, ...reorderedPageLevel] });
     };
 
-    const moveBubble = (fromIndex: number, direction: -1 | 1) => {
-        if (!page) return;
-        if (!selectedPanel || selectedPanelIndex === null) {
-            const toIndex = fromIndex + direction;
-            if (toIndex < 0 || toIndex >= pageLevelBubbles.length) return;
-            reorderPageLevelBubble(fromIndex, toIndex);
-            setSelectedBubbleIndex(toIndex);
-            return;
-        }
-        const toIndex = fromIndex + direction;
-        if (toIndex < 0 || toIndex >= selectedPanel.bubbles.length) return;
-        const bubbles = [...selectedPanel.bubbles];
-        [bubbles[fromIndex], bubbles[toIndex]] = [bubbles[toIndex], bubbles[fromIndex]];
-        const nextPanel = renumberPanelBubbles(page, { ...selectedPanel, bubbles });
-        updatePanel(selectedPanelIndex, nextPanel);
-        setSelectedBubbleIndex(toIndex);
-    };
-
     const selectBubbleCandidate = (panelIndex: number | null, bubbleIndex: number) => {
         setSelectedPanelIndex(panelIndex);
         setSelectedBubbleIndex(bubbleIndex);
     };
 
-    const moveBubbleCandidate = (panelIndex: number | null, bubbleIndex: number, direction: -1 | 1) => {
+    const moveBubbleCandidate = (bubbleId: string, direction: -1 | 1) => {
         if (!page) return;
-        if (panelIndex === null) {
-            setSelectedPanelIndex(null);
-            moveBubble(bubbleIndex, direction);
-            return;
-        }
-        const panel = page.panels[panelIndex];
-        if (!panel) return;
-        const toIndex = bubbleIndex + direction;
-        if (toIndex < 0 || toIndex >= panel.bubbles.length) return;
-        const bubbles = [...panel.bubbles];
-        [bubbles[bubbleIndex], bubbles[toIndex]] = [bubbles[toIndex], bubbles[bubbleIndex]];
-        updatePanel(panelIndex, renumberPanelBubbles(page, { ...panel, bubbles }));
-        setSelectedPanelIndex(panelIndex);
-        setSelectedBubbleIndex(toIndex);
+        const result = moveBubbleByGlobalReadingOrder(page, bubbleId, direction);
+        if (!result.changed) return;
+        updatePage(result.page);
+        setSelectedPanelIndex(result.selectedPanelIndex);
+        setSelectedBubbleIndex(result.selectedBubbleIndex);
     };
 
     const acceptPanel = (panel: PanelData) => {
