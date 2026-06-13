@@ -8,4 +8,5 @@ export * from "./github-identity-verification.js";
 export * from "./import-result.js";
 export * from "./pack-draft.js";
 export * from "./translation-import.js";
+export * from "./translation-batch.js";
 export * from "./rights.js";

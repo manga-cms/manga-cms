@@ -1,4 +1,4 @@
-import type { Bubble, Episode, Page, Panel } from "@manga/domain";
+import type { Bubble, Episode, Page, Panel, TranslationPackDraftImportEntryInput } from "@manga/domain";
 
 export type TranslationDiagnosticLevel = "info" | "warning" | "error";
 export type TranslationValidationIssueKind =
@@ -121,3 +121,42 @@ export type TranslationScriptSource = {
     page: Page;
     panelsById: Map<string, Panel>;
 };
+
+export type TranslationBatchPageStatus =
+    | "applied"
+    | "dry_run"
+    | "skipped";
+
+export interface TranslationBatchPageResult {
+    pageId: string;
+    pageNumber: number;
+    status: TranslationBatchPageStatus;
+    rowCount: number;
+    diagnostics: TranslationDiagnostic[];
+    validationIssues: TranslationValidationIssue[];
+    skippedReason?: string;
+}
+
+export interface TranslationBatchRunnerInput {
+    episode: Episode;
+    pageNumbers: number[];
+    targetLocale: string;
+    provider: TranslationProvider;
+    sourceLocale?: string;
+    glossary?: TranslationGlossaryTerm[];
+    characterVoices?: TranslationCharacterVoiceNote[];
+}
+
+export interface TranslationBatchRunnerResult {
+    rows: TranslationPackDraftImportEntryInput[];
+    pages: TranslationBatchPageResult[];
+    summary: {
+        requested_pages: number;
+        processed_pages: number;
+        applied_pages: number;
+        skipped_pages: number;
+        generated_rows: number;
+        error_count: number;
+        warning_count: number;
+    };
+}

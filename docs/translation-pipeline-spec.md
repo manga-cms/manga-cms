@@ -188,7 +188,13 @@ No Pack Draft writes are required in the first implementation of this phase.
   them through the existing translation-import route or service.
 - Keep public Reader unreachable from this runner.
 - Reuse existing fit guidance and import mismatch checks.
-- Add cost/rate limits for explicit batch jobs.
+- Require explicit Page selection and cap each request to a bounded number of
+  Pages.
+- Treat provider output as page-level all-or-nothing: a Page with missing,
+  extra, duplicate, or malformed Bubble IDs is skipped, while other valid Pages
+  in the same request may still become Pack Draft import rows.
+- If no provider is configured, return actionable diagnostics and do not mutate
+  the Pack Draft.
 
 ### Phase 4: CMS Human Review
 

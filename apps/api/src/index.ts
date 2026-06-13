@@ -34,10 +34,17 @@ import {
     ProposalStatusUpdateInputSchema,
     RightsGrantCreateInputSchema,
     RightsPermissionCheckInputSchema,
+    TranslationBatchRunInputSchema,
     TranslationPackDraftImportInputSchema,
     type GitHubHandoffSyncDryRunInputData,
 } from "@manga/schemas";
-import { buildPreparedDirectoryDraft, readImageDimensionsFromFile } from "@manga/ingestion";
+import {
+    buildPreparedDirectoryDraft,
+    FixtureTranslationProvider,
+    NoopTranslationProvider,
+    readImageDimensionsFromFile,
+    runTranslationBatchToImportRows,
+} from "@manga/ingestion";
 import {
     FileContentRepository,
     createFileWriter,
@@ -1536,6 +1543,115 @@ app.post("/admin/pack-drafts/:packDraftId/translation-import", async (c) => {
     return c.json({ applied: true, result, record: addResult.record });
 });
 
+app.post("/admin/pack-drafts/:packDraftId/translation-batch", async (c) => {
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = TranslationBatchRunInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const access = await requireSeriesPermission(c, parsed.data.series_id, SERIES_TRANSLATION_WRITE_PERMISSIONS, { allowRestrictedScopes: true });
+    if ("response" in access) return access.response;
+
+    const draft = packDraftRepo.get(c.req.param("packDraftId"));
+    if (!draft) return c.json({ error: { code: "NOT_FOUND", message: "Pack draft not found" } }, 404);
+    if (draft.type !== "TRANSLATION") {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Translation batch can only target TRANSLATION pack drafts" } }, 400);
+    }
+    if (!["draft", "in_review"].includes(draft.status)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Only draft or in_review pack drafts can accept machine translation rows" } }, 400);
+    }
+    if (!isGlobalAdmin(access.user)) {
+        if (draft.target_series_id !== parsed.data.series_id) {
+            return c.json({ error: { code: "FORBIDDEN", message: "Series-scoped users can only run batches for Pack drafts scoped to their Series" } }, 403);
+        }
+        if (draft.target_episode_id && draft.target_episode_id !== parsed.data.episode_id) {
+            return c.json({ error: { code: "FORBIDDEN", message: "Series-scoped users can only run batches for matching Episode-scoped Pack drafts" } }, 403);
+        }
+    }
+
+    const series = readRepo.getSeries(parsed.data.series_id);
+    const ep = readRepo.getEpisode(parsed.data.series_id, parsed.data.episode_id);
+    if (!series || !ep) return c.json({ error: { code: "NOT_FOUND", message: "Series or Episode not found" } }, 404);
+
+    const providerMode = parsed.data.provider_mode ?? "noop";
+    if (providerMode === "fixture" && IS_PRODUCTION) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Fixture translation provider is unavailable in production" } }, 400);
+    }
+    const provider = providerMode === "fixture" ? new FixtureTranslationProvider() : new NoopTranslationProvider();
+    const episode = attachEpisodePanelBubbles(ep);
+    const batch = await runTranslationBatchToImportRows({
+        episode,
+        pageNumbers: parsed.data.page_numbers,
+        targetLocale: parsed.data.lang,
+        sourceLocale: parsed.data.source_locale ?? "ja",
+        provider,
+    });
+    const shouldApply = parsed.data.apply ?? true;
+    const responseBatch = shouldApply ? batch : {
+        ...batch,
+        pages: batch.pages.map((page) => page.status === "applied" ? { ...page, status: "dry_run" as const } : page),
+    };
+
+    if (batch.pages.some((page) => page.skippedReason === "page_not_found")) {
+        return c.json({
+            error: {
+                code: "VALIDATION_ERROR",
+                message: "Translation batch requested a page that does not exist",
+            },
+            applied: false,
+            batch: responseBatch,
+        }, 400);
+    }
+
+    if (batch.rows.length === 0) {
+        return c.json({ applied: false, batch: responseBatch, result: null });
+    }
+
+    const user = getUser(c);
+    const result = buildTranslationPackDraftImportPlan({
+        draft,
+        episode,
+        input: {
+            series_id: parsed.data.series_id,
+            episode_id: parsed.data.episode_id,
+            lang: parsed.data.lang,
+            source_format: "json",
+            entries: batch.rows,
+            apply: shouldApply,
+        },
+        importedBy: user?.id ?? null,
+    });
+
+    if (!shouldApply) {
+        return c.json({ applied: false, batch: responseBatch, result });
+    }
+    if (!result.can_apply) {
+        return c.json({
+            error: {
+                code: "VALIDATION_ERROR",
+                message: "Translation batch generated rows with blocking import issues or no entries to apply",
+            },
+            applied: false,
+            batch: responseBatch,
+            result,
+        }, 400);
+    }
+
+    const addResult = packDraftRepo.addEntries(c.req.param("packDraftId"), result.planned_entries);
+    if (!addResult.success) {
+        const statusCode = addResult.error.includes("not found") ? 404 : 400;
+        return c.json({ error: { code: statusCode === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: addResult.error } }, statusCode);
+    }
+    return c.json({ applied: true, batch: responseBatch, result, record: addResult.record });
+});
+
 app.post("/admin/pack-drafts/:packDraftId/export", async (c) => {
     const denied = requireAdmin(c); if (denied) return denied;
     let body: unknown;
@@ -2041,6 +2157,7 @@ const SERIES_ADMIN_PERMISSIONS: RightsPermission[] = [
 ];
 
 const SERIES_CONTENT_WRITE_PERMISSIONS: RightsPermission[] = ["edit_structure", "manage_rights"];
+const SERIES_TRANSLATION_WRITE_PERMISSIONS: RightsPermission[] = ["edit_translation", "manage_rights"];
 
 function isGlobalAdmin(user: DevUser | null): boolean {
     return user?.role === "admin";

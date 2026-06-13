@@ -121,3 +121,6 @@ jobs:
 
       - name: Run API rights smoke
         run: bash scripts/smoke-test-api-rights.sh
+
+      - name: Run API translation batch smoke
+        run: bash scripts/smoke-test-api-translation-batch.sh

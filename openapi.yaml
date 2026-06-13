@@ -1258,6 +1258,45 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /admin/pack-drafts/{packDraftId}/translation-batch:
+    post:
+      tags: [PackManager]
+      summary: Run an admin machine-translation batch into a Translation Pack draft
+      description: >
+        Builds Page scripts for explicitly selected Pages, calls the configured
+        translation provider, validates provider Bubble IDs, converts valid
+        Page output to machine-origin translation import rows, and applies them
+        through the same runtime Translation Pack draft import service. The
+        route is admin-only and never mutates canonical Episode JSON or public
+        Reader payloads. `noop` provider mode returns diagnostics without
+        changing the Pack draft; `fixture` is for local smoke tests and is not
+        available in production.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranslationBatchRunInput"
+      responses:
+        "200":
+          description: Translation batch result and Pack draft when applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslationBatchRunResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /admin/pack-drafts/{packDraftId}/export:
     post:
       tags: [PackManager]
@@ -4679,6 +4718,153 @@ components:
           type: boolean
         result:
           $ref: "#/components/schemas/TranslationPackDraftImportResult"
+        record:
+          $ref: "#/components/schemas/PackDraftRecord"
+
+    TranslationBatchProviderMode:
+      type: string
+      enum: [noop, fixture]
+
+    TranslationBatchRunInput:
+      type: object
+      required: [series_id, episode_id, lang, page_numbers]
+      properties:
+        series_id:
+          type: string
+        episode_id:
+          type: string
+        lang:
+          type: string
+          maxLength: 16
+        page_numbers:
+          type: array
+          minItems: 1
+          maxItems: 10
+          uniqueItems: true
+          description: Explicit Page numbers to process. Whole-Episode expansion is not implicit.
+          items:
+            type: integer
+            minimum: 1
+        source_locale:
+          type: string
+          maxLength: 16
+          default: ja
+        provider_mode:
+          $ref: "#/components/schemas/TranslationBatchProviderMode"
+        apply:
+          type: boolean
+          default: true
+
+    TranslationBatchDiagnostic:
+      type: object
+      required: [level, code, message]
+      properties:
+        level:
+          type: string
+          enum: [info, warning, error]
+        code:
+          type: string
+        message:
+          type: string
+        bubbleId:
+          type: string
+
+    TranslationBatchValidationIssue:
+      type: object
+      required: [kind, severity, message]
+      properties:
+        kind:
+          type: string
+          enum: [missing_bubble, extra_bubble, duplicate_bubble, malformed_translation]
+        severity:
+          type: string
+          enum: [error, warning]
+        bubbleId:
+          type: string
+        message:
+          type: string
+
+    TranslationBatchPageResult:
+      type: object
+      required: [pageId, pageNumber, status, rowCount, diagnostics, validationIssues]
+      properties:
+        pageId:
+          type: string
+        pageNumber:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [applied, dry_run, skipped]
+        rowCount:
+          type: integer
+          minimum: 0
+        skippedReason:
+          type: string
+          enum: [page_not_found, provider_unconfigured, provider_validation_failed]
+        diagnostics:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranslationBatchDiagnostic"
+        validationIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranslationBatchValidationIssue"
+
+    TranslationBatchSummary:
+      type: object
+      required: [requested_pages, processed_pages, applied_pages, skipped_pages, generated_rows, error_count, warning_count]
+      properties:
+        requested_pages:
+          type: integer
+          minimum: 0
+        processed_pages:
+          type: integer
+          minimum: 0
+        applied_pages:
+          type: integer
+          minimum: 0
+        skipped_pages:
+          type: integer
+          minimum: 0
+        generated_rows:
+          type: integer
+          minimum: 0
+        error_count:
+          type: integer
+          minimum: 0
+        warning_count:
+          type: integer
+          minimum: 0
+
+    TranslationBatchResult:
+      type: object
+      required: [rows, pages, summary]
+      properties:
+        rows:
+          type: array
+          description: Generated import rows. Empty for noop or fully skipped batches.
+          items:
+            $ref: "#/components/schemas/TranslationPackDraftImportEntry"
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranslationBatchPageResult"
+        summary:
+          $ref: "#/components/schemas/TranslationBatchSummary"
+
+    TranslationBatchRunResponse:
+      type: object
+      required: [applied, batch]
+      properties:
+        applied:
+          type: boolean
+        batch:
+          $ref: "#/components/schemas/TranslationBatchResult"
+        result:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TranslationPackDraftImportResult"
         record:
           $ref: "#/components/schemas/PackDraftRecord"
 

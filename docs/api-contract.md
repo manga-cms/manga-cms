@@ -1027,6 +1027,7 @@ Base path: `/api/v1`
 | `PUT` | `/admin/pack-drafts/{packDraftId}/status` | Update Pack draft review status |
 | `POST` | `/admin/pack-drafts/{packDraftId}/adopt-proposal` | Adopt an accepted Proposal into a Pack draft |
 | `POST` | `/admin/pack-drafts/{packDraftId}/translation-import` | Validate/apply Bubble-level translation rows into a Translation Pack draft |
+| `POST` | `/admin/pack-drafts/{packDraftId}/translation-batch` | Run an explicit admin machine-translation batch into a Translation Pack draft |
 | `POST` | `/admin/pack-drafts/{packDraftId}/export` | Export an approved/published Pack draft to `packs/{packId}/pack.json` |
 | `GET` | `/admin/rights/grants` | List runtime Rights grants |
 | `POST` | `/admin/rights/grants` | Create a runtime Rights grant |
@@ -1055,6 +1056,9 @@ Current Series-scoped enforcement:
 - Rights grant list/create/revoke is global-admin-only for broad scopes, and
   Series managers with `manage_rights` can manage grants bounded to their own
   `scope.series_id`.
+- Translation batch runs for a Pack draft require a global admin or
+  `edit_translation`/`manage_rights` for the requested Series. Series-scoped
+  users can only run batches against Pack drafts already scoped to that Series.
 
 Current unscoped admin surfaces remain global-admin-only: Pack draft,
 feedback, proposal, ingestion, GitHub handoff, entitlement, and identity
@@ -1505,6 +1509,59 @@ with summary counts, issues, and `planned_entries` but does not mutate the Pack
 draft. When `apply: true`, the API writes all `planned_entries` atomically to
 the runtime Pack draft only if there are no error issues and at least one
 planned entry. Error issues return 400 with the same `result` payload.
+
+### Translation Batch Runner
+
+`POST /admin/pack-drafts/{packDraftId}/translation-batch` runs the Phase 3
+admin batch pipeline for selected Pages and applies generated rows through the
+same Pack Draft import service described above. It is an admin CMS route only;
+there is no public Reader path to the runner and it never mutates canonical
+Episode JSON or `Bubble.textOriginal`.
+
+Request body:
+
+```json
+{
+  "series_id": "oumaga-dokidoki",
+  "episode_id": "ep01",
+  "lang": "en",
+  "page_numbers": [1],
+  "provider_mode": "noop",
+  "apply": true
+}
+```
+
+`page_numbers` is required and is limited to at most 10 Page numbers per
+request. This keeps cost and rate control explicit; clients must schedule
+additional requests instead of expanding an entire Episode implicitly.
+
+Provider behavior:
+
+- `noop` is the default provider mode. It returns actionable diagnostics and
+  produces no rows, so the Pack Draft is not changed.
+- `fixture` is a deterministic local smoke-test provider and is rejected in
+  production. It is not a real machine translation provider.
+- Real provider wiring is future work and must keep API keys in environment
+  variables or secret stores, never in repository files.
+
+The runner builds a Page script, calls the configured provider, validates
+provider Bubble IDs, converts valid output to `translation_origin: "machine"`
+import rows, then passes those rows to the existing translation-import plan.
+It reuses the import route's target matching, duplicate detection, existing
+entry conflict checks, `source_text_mismatch` warnings, and fit/review
+guidance surfaces; it does not reimplement those checks.
+
+Partial adoption policy is page-level all-or-nothing. If a Page provider output
+contains missing, extra, duplicate, or malformed Bubble IDs, that Page is
+skipped and its issues are returned as warnings/errors in the batch result.
+Other requested Pages may still apply if their provider output is valid. Missing
+coverage for skipped Pages may still appear as non-blocking `missing_bubble`
+warnings in the import plan.
+
+Machine-origin rows enter the runtime Pack Draft as unreviewed candidates.
+They are review provenance only; Pack Draft entry metadata such as provider,
+model, confidence, and generated timestamp must not appear in published Reader
+Pack payloads.
 
 CMS caller alignment:
 

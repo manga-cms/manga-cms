@@ -4,11 +4,13 @@ import { TranslationPackDraftImportEntrySchema } from "@manga/schemas";
 import {
     buildTranslationPageScript,
     convertValidatedTranslationOutputToImportRows,
+    FixtureTranslationProvider,
     NoopTranslationProvider,
+    runTranslationBatchToImportRows,
     validateTranslationProviderOutput,
 } from "../dist/index.js";
 import type { Episode } from "@manga/domain";
-import type { TranslationProviderOutput } from "../src/translation/types.ts";
+import type { TranslationProvider, TranslationProviderInput, TranslationProviderOutput } from "../src/translation/types.ts";
 
 function episode(): Episode {
     return {
@@ -218,4 +220,66 @@ test("NoopTranslationProvider returns actionable diagnostics without translation
     assert.equal(output.providerId, "noop");
     assert.equal(output.translations.length, 0);
     assert.equal(output.diagnostics[0]?.code, "NOOP_TRANSLATION_PROVIDER");
+});
+
+test("runTranslationBatchToImportRows does not create rows for noop provider", async () => {
+    const result = await runTranslationBatchToImportRows({
+        episode: episode(),
+        pageNumbers: [1],
+        targetLocale: "en",
+        provider: new NoopTranslationProvider(),
+    });
+
+    assert.equal(result.rows.length, 0);
+    assert.equal(result.pages[0]?.status, "skipped");
+    assert.equal(result.pages[0]?.skippedReason, "provider_unconfigured");
+    assert.equal(result.summary.generated_rows, 0);
+});
+
+test("runTranslationBatchToImportRows creates machine import rows with fixture provider", async () => {
+    const result = await runTranslationBatchToImportRows({
+        episode: episode(),
+        pageNumbers: [1],
+        targetLocale: "en",
+        provider: new FixtureTranslationProvider(),
+    });
+
+    assert.equal(result.pages[0]?.status, "applied");
+    assert.equal(result.rows.length, 3);
+    assert.equal(result.rows[0]?.translation_origin, "machine");
+    assert.equal(result.rows[0]?.provider, "fixture");
+    assert.equal(result.rows[0]?.text?.startsWith("[en] "), true);
+    assert.doesNotThrow(() => result.rows.forEach((row) => TranslationPackDraftImportEntrySchema.parse(row)));
+});
+
+class MissingOneProvider implements TranslationProvider {
+    readonly providerId = "missing-one";
+    readonly model = "test";
+    readonly promptVersion = "translation-page-v1";
+
+    async translatePage(input: TranslationProviderInput): Promise<TranslationProviderOutput> {
+        return providerOutput({
+            providerId: this.providerId,
+            model: this.model,
+            promptVersion: input.script.promptVersion,
+            translations: input.script.bubbleOrder.slice(0, 1).map((bubbleId) => ({
+                bubbleId,
+                text: "Only one translated bubble",
+            })),
+        });
+    }
+}
+
+test("runTranslationBatchToImportRows rejects invalid provider output at page granularity", async () => {
+    const result = await runTranslationBatchToImportRows({
+        episode: episode(),
+        pageNumbers: [1],
+        targetLocale: "en",
+        provider: new MissingOneProvider(),
+    });
+
+    assert.equal(result.rows.length, 0);
+    assert.equal(result.pages[0]?.status, "skipped");
+    assert.equal(result.pages[0]?.skippedReason, "provider_validation_failed");
+    assert.ok(result.pages[0]?.validationIssues.some((issue) => issue.kind === "missing_bubble"));
 });
