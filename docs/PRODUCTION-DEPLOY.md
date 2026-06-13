@@ -183,12 +183,11 @@ fly deploy . \
 Docker build uses `packages/db/prisma/schema.postgres.prisma`. Staging keeps
 using `PRISMA_PROVIDER=sqlite` and `packages/db/prisma/schema.prisma`.
 
-Production Postgres is being moved from `prisma db push` to Prisma
-`migrate deploy` with a baseline-first process. The current `Dockerfile.api`
-still runs `db:push:postgres` for production by design. Do not switch that
-startup command to `db:migrate:deploy:postgres` until the existing production
-database has been backed up, drift-checked, and baselined as described in
-`docs/PRODUCTION-POSTGRES-MIGRATIONS.md`.
+Production Postgres uses Prisma `migrate deploy` after the baseline-first
+process. `Dockerfile.api` runs `db:migrate:deploy:postgres` when
+`PRISMA_PROVIDER=postgresql`. Existing production databases that were
+initialized with `db:push:postgres` must be backed up, drift-checked, and
+baselined as described in `docs/PRODUCTION-POSTGRES-MIGRATIONS.md`.
 
 After deploy:
 
