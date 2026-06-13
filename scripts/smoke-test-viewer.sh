@@ -12,6 +12,7 @@
 set -euo pipefail
 
 VIEWER="${1:-http://localhost:4321}"
+VIEWER_HOME_EXPECTED_STATUS="${VIEWER_HOME_EXPECTED_STATUS:-200}"
 PASS=0
 FAIL=0
 
@@ -39,7 +40,7 @@ echo ""
 echo "1️⃣  SEO & Discoverability"
 check_status "Robots.txt" "$VIEWER/robots.txt" "200"
 check_status "Sitemap" "$VIEWER/sitemap.xml" "200"
-check_status "Homepage" "$VIEWER/" "200"
+check_status "Homepage" "$VIEWER/" "$VIEWER_HOME_EXPECTED_STATUS"
 
 # ---- 2. Works Directory ----
 echo "2️⃣  Works Directory"
