@@ -63,6 +63,7 @@ cp .env.example .env
 | `DEV_AUTH_SECRET` | HMAC secret for session tokens (≥32 chars) |
 | `DELIVERY_SECRET` | HMAC secret for delivery tokens (≥32 chars) |
 | `APP_URL` | Public-facing API URL (e.g. `https://app.example.com/api/v1`) |
+| `CMS_ORIGIN` | Optional CMS origin used after magic-link verification (defaults to `APP_URL` without `/api/v1`) |
 | `API_BASE` | Internal API URL for viewer SSR |
 | `DELIVERY_PUBLIC_ORIGIN` | Optional public API origin for signed image URLs when different from `API_BASE` |
 | `FEEDBACK_DIR` | Private runtime JSONL storage for reader feedback |
@@ -88,6 +89,10 @@ Magic-link users not listed in `CMS_ADMIN_EMAILS` authenticate with the `user`
 role and cannot call admin endpoints. Use this allowlist for the production CMS
 MVP; per-Series creator/editor permissions are a later runtime governance
 layer.
+
+Browser magic-link verification redirects to `CMS_ORIGIN` after setting the
+session cookie. API clients can request the JSON verification response with
+`/auth/verify?token=...&format=json`.
 
 **Public Viewer launch env gates:**
 

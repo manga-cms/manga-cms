@@ -115,6 +115,23 @@ function roleForMagicLinkEmail(email: string): "admin" | "user" {
     return CMS_ADMIN_EMAILS.has(email.trim().toLowerCase()) ? "admin" : "user";
 }
 
+function cmsOriginFromAppUrl(appUrl: string | undefined): string | null {
+    if (!appUrl) return null;
+    try {
+        const url = new URL(appUrl);
+        url.pathname = url.pathname.replace(/\/api\/v1\/?$/, "/");
+        url.search = "";
+        url.hash = "";
+        return url.toString().replace(/\/$/, "");
+    } catch {
+        return null;
+    }
+}
+
+function cmsRedirectUrl(): string | null {
+    return process.env.CMS_ORIGIN ?? cmsOriginFromAppUrl(process.env.APP_URL);
+}
+
 // ---------------------------------------------------------------------------
 // Production fail-fast — validate required config before serving
 // ---------------------------------------------------------------------------
@@ -2590,6 +2607,7 @@ app.post("/auth/login", async (c) => {
 // GET /auth/verify — Verify and consume a magic link token, issue session cookie.
 app.get("/auth/verify", async (c) => {
     const token = c.req.query("token");
+    const wantsJson = c.req.query("format") === "json";
     if (!token) {
         return c.json({ error: { code: "BAD_REQUEST", message: "token required" } }, 400);
     }
@@ -2614,6 +2632,10 @@ app.get("/auth/verify", async (c) => {
     };
     const sessionToken = generateAuthToken(user);
     setSessionCookie(c, sessionToken);
+    if (!wantsJson) {
+        const redirectUrl = cmsRedirectUrl();
+        if (redirectUrl) return c.redirect(redirectUrl, 303);
+    }
     return c.json({ authenticated: true, user });
 });
 
