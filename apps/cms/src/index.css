@@ -2101,6 +2101,59 @@ textarea {
     padding: 1px 6px;
 }
 
+@media (min-width: 1101px) {
+    .page-review-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.35rem;
+    }
+
+    .page-review-card {
+        justify-items: center;
+        gap: 0.25rem;
+        grid-template-columns: 1fr;
+        min-height: 0;
+        padding: 0.35rem 0.25rem;
+    }
+
+    .page-review-thumb {
+        width: 34px;
+        border-radius: 5px;
+    }
+
+    .page-review-card-body {
+        width: 100%;
+        align-items: center;
+        gap: 0.2rem;
+    }
+
+    .page-review-card-body strong {
+        max-width: 100%;
+        font-size: 0.68rem;
+        line-height: 1.15;
+        text-align: center;
+    }
+
+    .page-review-counts {
+        display: none;
+    }
+
+    .page-review-badges {
+        justify-content: center;
+        gap: 0.18rem;
+        min-height: 0.45rem;
+    }
+
+    .page-review-badges .badge {
+        width: 0.42rem;
+        height: 0.42rem;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 999px;
+        color: transparent;
+        white-space: nowrap;
+    }
+}
+
 .page-content-row {
     display: grid;
     gap: 0.2rem;
