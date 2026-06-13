@@ -256,27 +256,19 @@ function serializePageForSave(input: any): any {
 
 export async function listSeries(): Promise<SeriesItem[]> {
     const res = await fetch(`${API}/admin/series`, { credentials: "include" });
-    if (!res.ok) return listPublicSeries();
     const data = await res.json();
-    return data.items ?? [];
-}
-
-async function listPublicSeries(): Promise<SeriesItem[]> {
-    const res = await fetch(`${API}/series`);
-    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Admin login or Series permission required");
     return data.items ?? [];
 }
 
 export async function getSeries(id: string): Promise<SeriesDetail | null> {
     const res = await fetch(`${API}/admin/series/${id}`, { credentials: "include" });
-    if (!res.ok) return getPublicSeries(id);
-    return res.json();
-}
-
-async function getPublicSeries(id: string): Promise<SeriesDetail | null> {
-    const res = await fetch(`${API}/series/${id}`);
-    if (!res.ok) return null;
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error(data.error?.message ?? "Admin login or Series permission required");
+    }
+    return data;
 }
 
 export async function createSeries(input: {

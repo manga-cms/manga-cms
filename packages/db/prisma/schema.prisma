@@ -47,6 +47,37 @@ model IngestionJob {
 }
 
 // ---------------------------------------------------------------------------
+// Rights Grants
+// Runtime production permissions. Canonical manga content remains in contents/.
+// ---------------------------------------------------------------------------
+
+model RightsGrant {
+  grantId         String    @id
+  subjectUserId   String
+  role            String
+  permissionsJson String    // JSON array of RightsPermission
+  scopeJson       String    // JSON object of RightsScope
+  seriesId        String?
+  episodeId       String?
+  language        String?
+  packId          String?
+  territory       String?
+  usageJson       String?   // JSON array of RightsUsage
+  startsAt        DateTime?
+  endsAt          DateTime?
+  grantedBy       String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  revokedAt       DateTime?
+
+  @@index([subjectUserId])
+  @@index([seriesId])
+  @@index([subjectUserId, seriesId])
+  @@index([revokedAt])
+}
+
+// ---------------------------------------------------------------------------
 // API Keys (production auth)
 // ---------------------------------------------------------------------------
 

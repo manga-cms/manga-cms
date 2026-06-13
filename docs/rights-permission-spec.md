@@ -24,23 +24,40 @@ entitlement, publish Packs, or mutate canonical content.
 
 ## Roles
 
+Global admin is not a Series grant role. It is an operational auth role
+resolved from the current session/API key and is used for bootstrap and
+cross-Series administration. In the production magic-link MVP, global admins
+come from `CMS_ADMIN_EMAILS`; this is a bootstrap allowlist, not the long-term
+rights model.
+
 Minimum product roles:
 
+- global_admin
 - owner
 - editor
 - translator
 - reviewer
-- contributor
-- moderator
-- viewer
 
 Expanded roles:
 
+- contributor
+- moderator
+- viewer
 - original_rights_holder
 - translation_reviewer
 - footnote_contributor
 - pack_maintainer
 - publisher
+
+Series grant roles:
+
+- owner
+- editor
+- translator
+- reviewer
+
+Roles are labels for UX and audit. Enforcement should check explicit
+permissions, not infer capability from the role string alone.
 
 ## Permissions
 
@@ -79,6 +96,55 @@ permissions:
   - edit_translation
   - submit_for_review
 ```
+
+## Runtime Storage
+
+Series permissions are runtime state. They belong in `packages/db`, not in
+canonical `contents/`, and must not move Series/Episode/Page/Panel/Bubble
+source data into the DB.
+
+Current storage policy:
+
+- With `DATABASE_URL`, Rights grants are stored in the Prisma `RightsGrant`
+  model.
+- Without `DATABASE_URL`, local development uses file-backed
+  `RIGHTS_DIR/rights-grants.json`.
+- Both implementations use the same provider-neutral contract:
+  `subject_user_id`, `role`, `permissions[]`, and `scope`.
+- `scope.series_id` is the MVP boundary for CMS Series administration. Narrower
+  `episode_id`, language, Pack, usage, and territory scopes are already part of
+  the contract for future workflows.
+
+Provider-specific identity data, such as email or GitHub login, may be used to
+authenticate or verify a person, but permission grants should target only the
+resolved `subject_user_id`.
+
+## Minimal CMS Enforcement
+
+The minimum implementation is:
+
+- global admin can manage all Series and bootstrap grants.
+- a user with an active Series grant can operate only on that Series.
+- users without a global admin role or matching Series grant receive 401/403 on
+  admin operations.
+- Series content writes require `edit_structure` or `manage_rights`.
+- Series admin reads can use any active Series admin permission, including
+  translation/review permissions, so the CMS can open only assigned Series.
+- Rights grant delegation requires `manage_rights` and must remain bounded to
+  the delegator's own `scope.series_id`.
+
+Suggested role-to-permission defaults:
+
+- global_admin: all Series permissions, all Series scopes, operational only.
+- owner: `edit_structure`, `edit_translation`, `review_translation`,
+  `review_footnote`, `approve_translation`, `approve_footnote`, `publish_pack`,
+  `manage_rights`, `moderate_proposals`.
+- editor: `edit_structure`, `edit_translation`, `review_translation`,
+  `review_footnote`, `approve_translation`, `approve_footnote`, `publish_pack`,
+  `moderate_proposals`.
+- translator: `edit_translation` scoped to a Series and optionally language.
+- reviewer: `review_translation`, `review_footnote`, `approve_translation`,
+  `approve_footnote` scoped to a Series and optionally language.
 
 ## Future Hierarchical Scope Model
 
@@ -173,6 +239,12 @@ Initial MVP can stay simple:
 - Commercial use requires explicit grant.
 - Language-specific grants must not imply all-language grants.
 - Pack-specific grants must not imply original-content rights.
+- Hosted tenant onboarding, creator self-registration, paid checkout, payouts,
+  revenue share, and custom-domain SaaS routing are private/commercial product
+  surfaces and are out of scope for the OSS permission core.
+- The OSS core may expose provider-neutral runtime rights primitives, but
+  provider-specific customer, billing, payout, and tenant automation must stay
+  outside this contract until explicitly designed.
 
 ## Audit Requirements
 

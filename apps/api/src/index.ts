@@ -92,7 +92,9 @@ import {
     type DraftPayload,
     type IngestionRepository,
     type PublishedPack,
+    type RightsRepository,
     type RightsPermission,
+    type RightsScope,
 } from "@manga/domain";
 
 // ---------------------------------------------------------------------------
@@ -212,7 +214,7 @@ const PACKS_DIR = process.env.PACKS_DIR ?? join(__dirname, "../../../packs");
 const packRepo = createFilePackRepository(PACKS_DIR);
 const packWriter = createFilePackWriter(PACKS_DIR);
 const RIGHTS_DIR = process.env.RIGHTS_DIR ?? join(__dirname, "../../../rights");
-const rightsRepo = createFileRightsRepository(RIGHTS_DIR);
+let rightsRepo: RightsRepository = createFileRightsRepository(RIGHTS_DIR);
 
 const accessPolicy = new DefaultAccessPolicy();
 
@@ -253,13 +255,14 @@ let dbHealthy = false;
 
 if (process.env.DATABASE_URL) {
     try {
-        const { getPrisma, DbEntitlementRepository, checkDbHealth } = await import("@manga/db");
+        const { getPrisma, DbEntitlementRepository, DbRightsRepository, checkDbHealth } = await import("@manga/db");
         const prisma = getPrisma();
         entitlements = new DbEntitlementRepository(prisma);
+        rightsRepo = new DbRightsRepository(prisma);
         dbHealthy = await checkDbHealth();
-        console.log(`✅ DB-backed entitlements (healthy: ${dbHealthy})`);
+        console.log(`✅ DB-backed entitlements and rights grants (healthy: ${dbHealthy})`);
     } catch (e) {
-        console.warn("⚠ DATABASE_URL set but @manga/db import failed, falling back to file-backed:", (e as Error).message);
+        console.warn("⚠ DATABASE_URL set but @manga/db import failed, falling back to file-backed runtime state:", (e as Error).message);
         const ENTITLEMENTS_DIR = process.env.ENTITLEMENTS_DIR ?? join(__dirname, "../../../entitlements");
         entitlements = createFileEntitlementRepository(ENTITLEMENTS_DIR);
     }
@@ -1585,32 +1588,44 @@ app.post("/admin/pack-drafts/:packDraftId/export", async (c) => {
 // Runtime governance state only. Separate from reading entitlements.
 // ===========================================================================
 
-app.get("/admin/rights/grants", (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
+app.get("/admin/rights/grants", async (c) => {
+    const auth = requireAuthenticatedUser(c); if ("response" in auth) return auth.response;
     const permission = c.req.query("permission") as RightsPermission | undefined;
     const includeRevoked = c.req.query("includeRevoked") === "true";
+    const seriesId = c.req.query("seriesId");
 
-    if (permission && ![
-        "propose_translation",
-        "propose_footnote",
-        "edit_structure",
-        "edit_translation",
-        "review_translation",
-        "review_footnote",
-        "approve_translation",
-        "approve_footnote",
-        "publish_pack",
-        "manage_rights",
-        "moderate_proposals",
-        "commercial_use",
-    ].includes(permission)) {
+    if (permission && !RIGHTS_PERMISSION_VALUES.includes(permission)) {
         return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid rights permission" } }, 400);
     }
 
+    if (!isGlobalAdmin(auth.user)) {
+        if (seriesId) {
+            if (!await canManageRightsForScope(auth.user, { series_id: seriesId })) {
+                return c.json({ error: { code: "FORBIDDEN", message: `manage_rights permission required for ${seriesId}` } }, 403);
+            }
+        } else {
+            const allItems = await rightsRepo.listGrants({
+                userId: c.req.query("userId"),
+                permission,
+                includeRevoked,
+            });
+            const visibleItems = [];
+            for (const item of allItems) {
+                if (item.scope.series_id && await canManageRightsForScope(auth.user, item.scope)) {
+                    visibleItems.push(item);
+                }
+            }
+            if (visibleItems.length === 0) {
+                return c.json({ error: { code: "FORBIDDEN", message: "No manageable rights scopes" } }, 403);
+            }
+            return c.json({ items: visibleItems });
+        }
+    }
+
     return c.json({
-        items: rightsRepo.listGrants({
+        items: await rightsRepo.listGrants({
             userId: c.req.query("userId"),
-            seriesId: c.req.query("seriesId"),
+            seriesId,
             permission,
             includeRevoked,
         }),
@@ -1618,7 +1633,7 @@ app.get("/admin/rights/grants", (c) => {
 });
 
 app.post("/admin/rights/grants", async (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
+    const auth = requireAuthenticatedUser(c); if ("response" in auth) return auth.response;
     let body: unknown;
     try {
         body = await c.req.json();
@@ -1630,18 +1645,27 @@ app.post("/admin/rights/grants", async (c) => {
     if (!parsed.success) {
         return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
     }
+    if (!await canManageRightsForScope(auth.user, parsed.data.scope)) {
+        return c.json({ error: { code: "FORBIDDEN", message: "manage_rights permission required for this grant scope" } }, 403);
+    }
 
-    const user = getUser(c);
-    const record = rightsRepo.createGrant({
+    const record = await rightsRepo.createGrant({
         ...parsed.data,
-        granted_by: parsed.data.granted_by ?? user?.id ?? null,
+        granted_by: parsed.data.granted_by ?? auth.user.id,
     });
     return c.json(record, 201);
 });
 
-app.post("/admin/rights/grants/:grantId/revoke", (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
-    const result = rightsRepo.revokeGrant(c.req.param("grantId"));
+app.post("/admin/rights/grants/:grantId/revoke", async (c) => {
+    const auth = requireAuthenticatedUser(c); if ("response" in auth) return auth.response;
+    const existing = await rightsRepo.getGrant(c.req.param("grantId"));
+    if (!existing) {
+        return c.json({ error: { code: "NOT_FOUND", message: "Rights grant not found" } }, 404);
+    }
+    if (!await canManageRightsForScope(auth.user, existing.scope)) {
+        return c.json({ error: { code: "FORBIDDEN", message: "manage_rights permission required for this grant scope" } }, 403);
+    }
+    const result = await rightsRepo.revokeGrant(c.req.param("grantId"));
     if (!result.success) {
         return c.json({ error: { code: "NOT_FOUND", message: result.error } }, 404);
     }
@@ -1649,7 +1673,7 @@ app.post("/admin/rights/grants/:grantId/revoke", (c) => {
 });
 
 app.post("/admin/rights/check", async (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
+    const auth = requireAuthenticatedUser(c); if ("response" in auth) return auth.response;
     let body: unknown;
     try {
         body = await c.req.json();
@@ -1661,8 +1685,11 @@ app.post("/admin/rights/check", async (c) => {
     if (!parsed.success) {
         return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
     }
+    if (!isGlobalAdmin(auth.user) && parsed.data.user_id !== auth.user.id) {
+        return c.json({ error: { code: "FORBIDDEN", message: "Cannot check another user's permissions" } }, 403);
+    }
 
-    return c.json(rightsRepo.checkPermission(parsed.data));
+    return c.json(await rightsRepo.checkPermission(parsed.data));
 });
 
 // ---------------------------------------------------------------------------
@@ -1982,29 +2009,145 @@ app.get("/reactions", (c) => {
 
 // ===========================================================================
 // ADMIN — Write Endpoints (CMS)
-// Guarded: require authenticated admin user.
+// Guarded by global admin or Series-scoped Rights grants.
 // ===========================================================================
+
+const RIGHTS_PERMISSION_VALUES: RightsPermission[] = [
+    "propose_translation",
+    "propose_footnote",
+    "edit_structure",
+    "edit_translation",
+    "review_translation",
+    "review_footnote",
+    "approve_translation",
+    "approve_footnote",
+    "publish_pack",
+    "manage_rights",
+    "moderate_proposals",
+    "commercial_use",
+];
+
+const SERIES_ADMIN_PERMISSIONS: RightsPermission[] = [
+    "edit_structure",
+    "edit_translation",
+    "review_translation",
+    "review_footnote",
+    "approve_translation",
+    "approve_footnote",
+    "publish_pack",
+    "manage_rights",
+    "moderate_proposals",
+    "commercial_use",
+];
+
+const SERIES_CONTENT_WRITE_PERMISSIONS: RightsPermission[] = ["edit_structure", "manage_rights"];
+
+function isGlobalAdmin(user: DevUser | null): boolean {
+    return user?.role === "admin";
+}
 
 function requireAdmin(c: any): Response | null {
     const user = getUser(c);
     if (!user) return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
-    if (user.role !== "admin") return c.json({ error: { code: "FORBIDDEN", message: "Admin role required" } }, 403);
+    if (!isGlobalAdmin(user)) return c.json({ error: { code: "FORBIDDEN", message: "Global admin role required" } }, 403);
     return null;
 }
 
-// POST /admin/series — Create a new series
-app.get("/admin/series", (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
-    return c.json({ items: readRepo.listSeries().map(adminSeriesSummary) });
+function requireAuthenticatedUser(c: any): { user: DevUser } | { response: Response } {
+    const user = getUser(c);
+    if (!user) return { response: c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401) };
+    return { user };
+}
+
+function isActiveRightsGrant(record: { starts_at?: string; ends_at?: string | null; revoked_at?: string | null }): boolean {
+    const nowMs = Date.now();
+    if (record.revoked_at) return false;
+    if (record.starts_at && Date.parse(record.starts_at) > nowMs) return false;
+    if (record.ends_at && Date.parse(record.ends_at) <= nowMs) return false;
+    return true;
+}
+
+async function userHasAnySeriesPermission(
+    user: DevUser,
+    seriesId: string,
+    permissions: RightsPermission[],
+    options: { allowRestrictedScopes?: boolean } = {},
+): Promise<boolean> {
+    if (isGlobalAdmin(user)) return true;
+    if (options.allowRestrictedScopes) {
+        const grants = await rightsRepo.listGrants({ userId: user.id, seriesId });
+        return grants.some((grant) =>
+            isActiveRightsGrant(grant) &&
+            permissions.some((permission) => grant.permissions.includes(permission)),
+        );
+    }
+    for (const permission of permissions) {
+        const check = await rightsRepo.checkPermission({
+            user_id: user.id,
+            permission,
+            scope: { series_id: seriesId },
+        });
+        if (check.allowed) return true;
+    }
+    return false;
+}
+
+async function requireSeriesPermission(
+    c: any,
+    seriesId: string,
+    permissions: RightsPermission[],
+    options: { allowRestrictedScopes?: boolean } = {},
+): Promise<{ user: DevUser } | { response: Response }> {
+    const auth = requireAuthenticatedUser(c);
+    if ("response" in auth) return auth;
+    if (await userHasAnySeriesPermission(auth.user, seriesId, permissions, options)) return auth;
+    return {
+        response: c.json({
+            error: {
+                code: "FORBIDDEN",
+                message: `Series permission required for ${seriesId}`,
+            },
+        }, 403),
+    };
+}
+
+async function filterManageableSeriesForUser(user: DevUser, series: any[]): Promise<any[]> {
+    if (isGlobalAdmin(user)) return series;
+    const allowed: any[] = [];
+    for (const item of series) {
+        if (await userHasAnySeriesPermission(user, item.id, SERIES_ADMIN_PERMISSIONS, { allowRestrictedScopes: true })) {
+            allowed.push(item);
+        }
+    }
+    return allowed;
+}
+
+async function canManageRightsForScope(user: DevUser, scope: RightsScope): Promise<boolean> {
+    if (isGlobalAdmin(user)) return true;
+    if (!scope.series_id) return false;
+    return userHasAnySeriesPermission(user, scope.series_id, ["manage_rights"]);
+}
+
+// GET /admin/series — List manageable Series.
+app.get("/admin/series", async (c) => {
+    const auth = requireAuthenticatedUser(c); if ("response" in auth) return auth.response;
+    const items = await filterManageableSeriesForUser(auth.user, readRepo.listSeries());
+    if (!isGlobalAdmin(auth.user) && items.length === 0) {
+        return c.json({ error: { code: "FORBIDDEN", message: "No manageable Series permissions" } }, 403);
+    }
+    return c.json({ items: items.map(adminSeriesSummary) });
 });
 
-app.get("/admin/series/:id", (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
+app.get("/admin/series/:id", async (c) => {
+    const access = await requireSeriesPermission(c, c.req.param("id"), SERIES_ADMIN_PERMISSIONS, { allowRestrictedScopes: true });
+    if ("response" in access) return access.response;
     const series = readRepo.getSeries(c.req.param("id"));
     if (!series) return c.json({ error: { code: "NOT_FOUND", message: "Series not found" } }, 404);
     return c.json(adminSeriesDetail(series));
 });
 
+// POST /admin/series — Create a new Series. Global admin only because no
+// Series scope exists before creation.
 app.post("/admin/series", async (c) => {
     const denied = requireAdmin(c); if (denied) return denied;
     const body = await c.req.json();
@@ -2017,8 +2160,9 @@ app.post("/admin/series", async (c) => {
 
 // PUT /admin/series/:id — Update series metadata
 app.put("/admin/series/:id", async (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
     const seriesId = c.req.param("id");
+    const access = await requireSeriesPermission(c, seriesId, SERIES_CONTENT_WRITE_PERMISSIONS);
+    if ("response" in access) return access.response;
     const body = await c.req.json();
     const result = writer.updateSeries(seriesId, body);
     if (!result.success) {
@@ -2029,8 +2173,9 @@ app.put("/admin/series/:id", async (c) => {
 
 // POST /admin/series/:id/episodes — Create or update an episode
 app.post("/admin/series/:id/episodes", async (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
     const seriesId = c.req.param("id");
+    const access = await requireSeriesPermission(c, seriesId, SERIES_CONTENT_WRITE_PERMISSIONS);
+    if ("response" in access) return access.response;
     const body = await c.req.json();
     const result = writer.saveEpisode(seriesId, body);
     if (!result.success) {
@@ -2041,8 +2186,9 @@ app.post("/admin/series/:id/episodes", async (c) => {
 
 // PUT /admin/series/:id/episodes/:epId — Update episode
 app.put("/admin/series/:id/episodes/:epId", async (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
     const seriesId = c.req.param("id");
+    const access = await requireSeriesPermission(c, seriesId, SERIES_CONTENT_WRITE_PERMISSIONS);
+    if ("response" in access) return access.response;
     const epId = c.req.param("epId");
     const body = await c.req.json();
     const result = writer.saveEpisode(seriesId, { ...body, id: epId });
@@ -2053,9 +2199,10 @@ app.put("/admin/series/:id/episodes/:epId", async (c) => {
 });
 
 // GET /admin/series/:id/episodes/:epId — Read full episode (bypasses gating for CMS)
-app.get("/admin/series/:id/episodes/:epId", (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
+app.get("/admin/series/:id/episodes/:epId", async (c) => {
     const seriesId = c.req.param("id");
+    const access = await requireSeriesPermission(c, seriesId, SERIES_ADMIN_PERMISSIONS, { allowRestrictedScopes: true });
+    if ("response" in access) return access.response;
     const epId = c.req.param("epId");
     const ep = readRepo.getEpisode(seriesId, epId);
     if (!ep) return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
@@ -2063,9 +2210,10 @@ app.get("/admin/series/:id/episodes/:epId", (c) => {
 });
 
 // GET /admin/series/:id/episodes/:epId/pages/:pageNumber/image — CMS preview image
-app.get("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
+app.get("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", async (c) => {
     const seriesId = c.req.param("id");
+    const access = await requireSeriesPermission(c, seriesId, SERIES_ADMIN_PERMISSIONS, { allowRestrictedScopes: true });
+    if ("response" in access) return access.response;
     const epId = c.req.param("epId");
     const pageNumber = requireInt(c, c.req.param("pageNumber"), "pageNumber");
     if (pageNumber instanceof Response) return pageNumber;
@@ -2119,8 +2267,9 @@ app.get("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", (c) => {
 
 // POST /admin/series/:id/episodes/:epId/pages/:pageNumber/image — Upload Page image
 app.post("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", async (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
     const seriesId = c.req.param("id");
+    const access = await requireSeriesPermission(c, seriesId, SERIES_CONTENT_WRITE_PERMISSIONS);
+    if ("response" in access) return access.response;
     const epId = c.req.param("epId");
     const pageNumber = requireInt(c, c.req.param("pageNumber"), "pageNumber");
     if (pageNumber instanceof Response) return pageNumber;
@@ -2180,8 +2329,9 @@ app.post("/admin/series/:id/episodes/:epId/pages/:pageNumber/image", async (c) =
 });
 
 // POST /admin/series/:id/publish — Reload read cache
-app.post("/admin/series/:id/publish", (c) => {
-    const denied = requireAdmin(c); if (denied) return denied;
+app.post("/admin/series/:id/publish", async (c) => {
+    const access = await requireSeriesPermission(c, c.req.param("id"), SERIES_CONTENT_WRITE_PERMISSIONS);
+    if ("response" in access) return access.response;
     writer.reload();
     const series = readRepo.getSeries(c.req.param("id"));
     if (!series) {

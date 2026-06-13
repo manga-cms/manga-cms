@@ -85,28 +85,30 @@ export default function App() {
             label: t("app.nav.groupEdit"),
             links: [
                 { to: "/", label: t("app.nav.dashboard") },
-                { to: "/works/new", label: t("app.nav.newWork") },
-                { to: "/ingestion", label: t("app.nav.ingestion") },
+                ...(user?.role === "admin" ? [
+                    { to: "/works/new", label: t("app.nav.newWork") },
+                    { to: "/ingestion", label: t("app.nav.ingestion") },
+                ] : []),
             ],
         },
         {
             label: t("app.nav.groupReview"),
-            links: [
+            links: user?.role === "admin" ? [
                 { to: "/feedback", label: t("app.nav.feedback") },
                 { to: "/proposals", label: t("app.nav.proposals") },
                 { to: "/pack-drafts", label: t("app.nav.packDrafts") },
-            ],
+            ] : [],
         },
         {
             label: t("app.nav.groupAdmin"),
-            links: [
+            links: user?.role === "admin" ? [
                 { to: "/github-handoffs", label: t("app.nav.githubHandoffs") },
                 { to: "/github-identities", label: t("app.nav.githubIdentities") },
                 { to: "/rights", label: t("app.nav.rights") },
                 { to: "/entitlements", label: t("app.nav.entitlements") },
-            ],
+            ] : [],
         },
-    ];
+    ].filter((group) => group.links.length > 0);
 
     return (
         <div className="app">

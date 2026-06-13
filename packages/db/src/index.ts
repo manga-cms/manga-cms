@@ -52,3 +52,4 @@ export { PurchaseRepository } from "./purchase-repository.js";
 export type { PurchaseInfo, RedeemCodeInfo } from "./purchase-repository.js";
 export { MagicLinkRepository } from "./magic-link-repository.js";
 export type { MagicLinkResult, MagicLinkVerifyResult } from "./magic-link-repository.js";
+export { DbRightsRepository } from "./rights-repository.js";

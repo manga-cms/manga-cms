@@ -17,12 +17,14 @@ export interface RightsGrantListFilters {
     includeRevoked?: boolean;
 }
 
+export type MaybePromise<T> = T | Promise<T>;
+
 export interface RightsRepository {
-    createGrant(input: RightsGrantCreateInput): RightsGrantRecord;
-    listGrants(filters?: RightsGrantListFilters): RightsGrantRecord[];
-    getGrant(grantId: string): RightsGrantRecord | undefined;
-    revokeGrant(grantId: string): { success: true; record: RightsGrantRecord } | { success: false; error: string };
-    checkPermission(input: RightsPermissionCheckInput): RightsPermissionCheckResponse;
+    createGrant(input: RightsGrantCreateInput): MaybePromise<RightsGrantRecord>;
+    listGrants(filters?: RightsGrantListFilters): MaybePromise<RightsGrantRecord[]>;
+    getGrant(grantId: string): MaybePromise<RightsGrantRecord | undefined>;
+    revokeGrant(grantId: string): MaybePromise<{ success: true; record: RightsGrantRecord } | { success: false; error: string }>;
+    checkPermission(input: RightsPermissionCheckInput): MaybePromise<RightsPermissionCheckResponse>;
 }
 
 export class FileRightsRepository implements RightsRepository {

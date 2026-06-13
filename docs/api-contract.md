@@ -987,7 +987,7 @@ Base path: `/api/v1`
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/admin/series` | List all Series for CMS editing, including hidden/scheduled/expired content |
+| `GET` | `/admin/series` | List manageable Series for CMS editing, including hidden/scheduled/expired content |
 | `POST` | `/admin/series` | Create Series |
 | `GET` | `/admin/series/{id}` | Read Series for CMS editing, including all Episode summaries |
 | `PUT` | `/admin/series/{id}` | Update Series metadata |
@@ -1033,8 +1033,28 @@ Base path: `/api/v1`
 | `POST` | `/admin/rights/grants/{grantId}/revoke` | Revoke a runtime Rights grant |
 | `POST` | `/admin/rights/check` | Check whether a user has a Rights permission |
 
-Admin endpoints require authenticated admin access. Browser CMS calls should
-send credentials so the `manga_auth` cookie is included.
+Admin endpoints require authenticated CMS access. Global admins are identified
+by the auth session/API key role `admin` and can operate on all Series. Series
+scoped CMS content endpoints also accept authenticated users with an active
+Rights grant for that `scope.series_id`. Browser CMS calls should send
+credentials so the `manga_auth` cookie is included.
+
+Current Series-scoped enforcement:
+
+- `GET /admin/series` returns all Series for global admins and only manageable
+  Series for users with active Series grants.
+- `GET /admin/series/{id}`, admin Episode reads, and admin Page image previews
+  require any active Series admin permission, such as `edit_structure`,
+  `edit_translation`, `review_translation`, `approve_translation`,
+  `publish_pack`, `manage_rights`, or `moderate_proposals`.
+- `PUT /admin/series/{id}`, Episode writes, Page image upload, and
+  `/admin/series/{id}/publish` require `edit_structure` or `manage_rights` for
+  that Series unless the user is a global admin.
+- `POST /admin/series` remains global-admin-only because a new Series has no
+  pre-existing Series scope.
+- Rights grant list/create/revoke is global-admin-only for broad scopes, and
+  Series managers with `manage_rights` can manage grants bounded to their own
+  `scope.series_id`.
 
 ### CMS Content Editing Contract
 
@@ -1493,10 +1513,17 @@ The initial contract is defined by `packages/domain/src/rights-types.ts`,
 `packages/domain/src/rights-repository.ts`, `packages/schemas/src/rights.ts`,
 and the `Rights*` component schemas in `openapi.yaml`.
 
-Rights grants are file-backed by default under `RIGHTS_DIR` or `rights/`, and
-that directory is ignored by Git. The current admin API supports list, create,
-revoke, and explicit permission checks. These APIs do not grant reading
-entitlement, do not publish Packs, and do not mutate canonical content.
+Rights grants are DB-backed when `DATABASE_URL` is configured, using
+`packages/db` runtime state. Local/no-DB development falls back to file-backed
+storage under `RIGHTS_DIR` or `rights/`, and that directory is ignored by Git.
+The current admin API supports list, create, revoke, and explicit permission
+checks. These APIs do not grant reading entitlement, do not publish Packs, and
+do not mutate canonical content.
+
+The subject identifier is provider-neutral: grants target `subject_user_id`,
+not email, GitHub login, Stripe customer, or another provider-specific account
+key. Login providers may map to a stable `subject_user_id`, but permission
+checks only consume the resolved user ID.
 
 Rights roles:
 
