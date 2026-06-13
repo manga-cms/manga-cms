@@ -118,3 +118,6 @@ jobs:
 
       - name: Run API roundtrip smoke
         run: bash scripts/smoke-test-api-roundtrip.sh
+
+      - name: Run API rights smoke
+        run: bash scripts/smoke-test-api-rights.sh
