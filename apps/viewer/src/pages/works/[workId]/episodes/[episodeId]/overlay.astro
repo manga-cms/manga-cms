@@ -119,7 +119,12 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
   ogType="article"
   loadDefaultFonts={false}
 >
-  <main class="text-overlay-page" aria-labelledby="text-overlay-title" data-overlay-fit-root>
+  <main
+    class="text-overlay-page"
+    aria-labelledby="text-overlay-title"
+    data-overlay-fit-root
+    data-overlay-language={overlayLanguage}
+  >
     <nav class="text-overlay-nav container" aria-label="Reader navigation">
       <a href={readerHref}>画像Readerへ戻る</a>
       <a href={textHref}>テキスト版</a>
@@ -149,7 +154,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
                   id={bubble.id}
                   class:list={[
                     "overlay-bubble",
-                    `is-${bubble.textDirection === "vertical" ? "vertical" : "horizontal"}`,
+                    `is-${bubble.displayDirection}`,
                     `is-${bubble.bubbleType ?? "speech"}`,
                   ]}
                   style={bubble.style}
@@ -190,6 +195,15 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     font-style: normal;
     font-weight: 400;
     src: url("/fonts/shippori-antique/shippori-antique-japanese-400-normal.woff2") format("woff2");
+    unicode-range: U+3000-30FF, U+31F0-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+  }
+
+  @font-face {
+    font-family: "Noto Sans SC";
+    font-display: swap;
+    font-style: normal;
+    font-weight: 400;
+    src: url("/fonts/noto-sans-sc/noto-sans-sc-chinese-simplified-400-normal.woff2") format("woff2");
     unicode-range: U+3000-30FF, U+31F0-31FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
   }
 
@@ -286,7 +300,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     box-sizing: border-box;
     color: #151515;
     display: block;
-    font-family: "Shippori Antique", "Noto Sans JP", sans-serif;
+    font-family: "Shippori Antique", "Noto Sans JP", "Noto Sans SC", sans-serif;
     font-size: clamp(8px, calc(var(--overlay-base-size, 3.4cqw) * var(--overlay-fit, 1) * var(--overlay-refit, 1)), 24px);
     font-weight: 400;
     line-break: strict;
@@ -300,6 +314,10 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     text-wrap: pretty;
     white-space: pre-line;
     word-break: normal;
+  }
+
+  .text-overlay-page[data-overlay-language^="zh"] .overlay-bubble {
+    font-family: "Noto Sans SC", "Shippori Antique", "Noto Sans JP", sans-serif;
   }
 
   .overlay-bubble.is-horizontal {

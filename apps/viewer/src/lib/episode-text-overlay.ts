@@ -9,6 +9,7 @@ export interface OverlayBubble {
   speaker?: string | null;
   bubbleType?: string;
   textDirection?: string;
+  displayDirection: "horizontal" | "vertical";
   text: string;
   bbox: { x: number; y: number; width: number; height: number };
   style: string;
@@ -92,6 +93,19 @@ const publicBubbleAllowed = (bubble: any) => {
 const normalizeLanguage = (value: unknown) =>
   String(value ?? "ja").trim().toLowerCase() || "ja";
 
+const isSourceOverlayLanguage = (language: string) =>
+  language === "ja" || language === "ja-jp";
+
+const displayDirectionForBubble = (bubble: any, language: string): "horizontal" | "vertical" => {
+  // Source-locale overlays preserve the canonical lettering direction. Reviewed
+  // translations default to horizontal until a future Series/Episode/language
+  // override is added.
+  if (isSourceOverlayLanguage(language)) {
+    return bubble.textDirection === "vertical" ? "vertical" : "horizontal";
+  }
+  return "horizontal";
+};
+
 const publishedTranslationForBubble = (packs: PublishedPack[], bubbleId: string, language: string): string | undefined => {
   for (const pack of packs) {
     if (!pack.isPublished || pack.type !== "TRANSLATION") continue;
@@ -173,10 +187,10 @@ const estimateOverlayCapacity = (
 const estimateOverlayFit = (input: {
   text: string;
   bbox: { width?: number; height?: number };
-  textDirection?: string;
+  displayDirection: "horizontal" | "vertical";
   pageWidth: number;
 }) => {
-  const direction = input.textDirection === "vertical" ? "vertical" : "horizontal";
+  const direction = input.displayDirection;
   const characterCount = countFitCharacters(input.text);
   const estimatedCapacity = estimateOverlayCapacity(input.bbox, direction, input.pageWidth);
   const ratio = estimatedCapacity === 0 ? 0 : characterCount / estimatedCapacity;
@@ -188,13 +202,13 @@ const estimateOverlayFit = (input: {
   return { characterCount, estimatedCapacity, ratio, scale };
 };
 
-const bubbleStyle = (bubble: any, page: any) => {
+const bubbleStyle = (bubble: any, page: any, displayDirection: "horizontal" | "vertical") => {
   const bbox = bubble.bbox ?? { x: 0, y: 0, width: 0, height: 0 };
   const text = String(bubble.__overlayText ?? bubble.textOriginal ?? "");
   const fit = estimateOverlayFit({
     text,
     bbox,
-    textDirection: bubble.textDirection,
+    displayDirection,
     pageWidth: Number(page.width ?? 1200),
   });
   return [
@@ -226,13 +240,14 @@ export const buildTextOverlayPages = (
           bubbleIdOf(a).localeCompare(bubbleIdOf(b)),
         )
         .map((bubble: any): OverlayBubble => {
+          const displayDirection = displayDirectionForBubble(bubble, language);
           const text = renderTextForOverlay(overlayTextForBubble(bubble, packs, language), {
             spaceAsBreak: spaceAsBreak && language === "ja",
           });
           const fit = estimateOverlayFit({
             text,
             bbox: bubble.bbox ?? {},
-            textDirection: bubble.textDirection,
+            displayDirection,
             pageWidth: Number(page.width ?? 1200),
           });
           return {
@@ -243,9 +258,10 @@ export const buildTextOverlayPages = (
             speaker: bubble.speaker ?? null,
             bubbleType: bubble.bubbleType,
             textDirection: bubble.textDirection,
+            displayDirection,
             text,
             bbox: bubble.bbox,
-            style: bubbleStyle({ ...bubble, __overlayText: text }, page),
+            style: bubbleStyle({ ...bubble, __overlayText: text }, page, displayDirection),
             fit,
           };
         });
