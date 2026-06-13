@@ -211,6 +211,15 @@ and source selection before broad rollout.
   as Japanese句点/読点 boundaries. Explicit `\n` line breaks should be added
   during translation/review when a Bubble needs a deliberate break; the overlay
   preserves those breaks with `white-space: pre-line`.
+- Treating spaces as line-break hints must remain an Episode-scoped display
+  option, not a content contract rule. Some manga scripts use half-width spaces
+  as punctuation or rhythm marks, so a global "space means line break" rule
+  would corrupt authorial intent. For experiments, `READER_TEXT_OVERLAY_SPACE_AS_BREAK`
+  may opt in specific Series/Episode keys and normalize inline spaces to `\n`
+  only in source-locale rendered overlay text. Do not apply this to translated
+  text by default because spaces are ordinary word separators in English,
+  Swedish, and many other target languages. `textOriginal` and Translation Pack
+  text must remain unchanged.
 - Any fallback from vertical to horizontal writing for wide Bubbles is deferred
   until the author chooses a policy. Do not add automatic writing-mode switching
   without an explicit A/B/C review decision.

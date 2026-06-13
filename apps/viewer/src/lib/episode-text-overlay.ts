@@ -58,6 +58,19 @@ const envEnablesOverlay = (seriesId: string, episodeId: string) => {
   return seriesFlags.includes(seriesId) || episodeFlags.some((item) => episodeKeys.has(item));
 };
 
+const envEnablesSpaceAsBreak = (seriesId: string, episodeId: string) => {
+  const flags = splitEnvList(processEnv().READER_TEXT_OVERLAY_SPACE_AS_BREAK);
+  const episodeKeys = new Set([
+    "*",
+    "true",
+    seriesId,
+    episodeId,
+    `${seriesId}/${episodeId}`,
+    `${seriesId}:${episodeId}`,
+  ]);
+  return flags.some((item) => episodeKeys.has(item.toLowerCase() === "true" ? "true" : item));
+};
+
 export const isTextOverlayEnabled = (input: {
   series: any;
   episode: any;
@@ -100,6 +113,16 @@ const overlayTextForBubble = (bubble: any, packs: PublishedPack[], language: str
     if (translated) return translated;
   }
   return bubble.textOriginal;
+};
+
+const renderTextForOverlay = (text: string, options: { spaceAsBreak: boolean }) => {
+  if (!options.spaceAsBreak) return text;
+  // Display-only source-locale experiment: preserve authored/new review line
+  // breaks, but let selected Episodes treat inline spaces as overlay line-break
+  // hints. Do not apply this to translated text because spaces are ordinary word
+  // separators in many target languages. This does not change canonical
+  // textOriginal or published Pack text.
+  return text.replace(/[ \t\f\v\u00a0\u3000]+/g, "\n");
 };
 
 const blankImageCandidates = (language: string) => [
@@ -182,8 +205,15 @@ const bubbleStyle = (bubble: any, page: any) => {
   ].join(";");
 };
 
-export const buildTextOverlayPages = (pages: any[], languageInput: string): OverlayPage[] => {
+export const buildTextOverlayPages = (
+  pages: any[],
+  languageInput: string,
+  options: { seriesId?: string; episodeId?: string } = {},
+): OverlayPage[] => {
   const language = normalizeLanguage(languageInput);
+  const spaceAsBreak = options.seriesId && options.episodeId
+    ? envEnablesSpaceAsBreak(options.seriesId, options.episodeId)
+    : false;
   return [...(pages ?? [])]
     .sort((a, b) => Number(a.pageNumber ?? 0) - Number(b.pageNumber ?? 0))
     .map((page: any) => {
@@ -195,7 +225,9 @@ export const buildTextOverlayPages = (pages: any[], languageInput: string): Over
           bubbleIdOf(a).localeCompare(bubbleIdOf(b)),
         )
         .map((bubble: any): OverlayBubble => {
-          const text = overlayTextForBubble(bubble, packs, language);
+          const text = renderTextForOverlay(overlayTextForBubble(bubble, packs, language), {
+            spaceAsBreak: spaceAsBreak && language === "ja",
+          });
           const fit = estimateOverlayFit({
             text,
             bbox: bubble.bbox ?? {},

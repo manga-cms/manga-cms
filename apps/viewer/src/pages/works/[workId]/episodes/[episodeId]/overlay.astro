@@ -71,7 +71,10 @@ if (!isTextOverlayEnabled({ series, episode, seriesId: workId, episodeId })) {
   return new Response(null, { status: 404, statusText: "Not Found" });
 }
 
-const overlayPages = buildTextOverlayPages(episode.pages, overlayLanguage);
+const overlayPages = buildTextOverlayPages(episode.pages, overlayLanguage, {
+  seriesId: workId,
+  episodeId,
+});
 if (overlayPages.length === 0) {
   return new Response(null, { status: 404, statusText: "Not Found" });
 }
@@ -280,14 +283,14 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
   }
 
   .overlay-bubble {
-    align-items: center;
+    align-items: flex-start;
     box-sizing: border-box;
     color: #151515;
     display: flex;
     font-family: "Shippori Antique", "Noto Sans JP", sans-serif;
     font-size: clamp(8px, calc(var(--overlay-base-size, 3.4cqw) * var(--overlay-fit, 1) * var(--overlay-refit, 1)), 24px);
     font-weight: 400;
-    justify-content: center;
+    justify-content: flex-start;
     line-break: strict;
     line-height: 1.2;
     margin: 0;
@@ -295,7 +298,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     overscroll-behavior: contain;
     padding: 0.4cqw;
     position: absolute;
-    text-align: center;
+    text-align: start;
     text-wrap: pretty;
     white-space: pre-line;
     word-break: normal;

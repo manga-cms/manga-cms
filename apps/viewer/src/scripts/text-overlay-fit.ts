@@ -1,35 +1,29 @@
 const MIN_REFIT_SCALE = 0.32;
 const MAX_STEPS = 8;
 const FIT_EPSILON = 1;
+const TARGET_FILL_RATIO = 0.86;
 
 const overflows = (element: HTMLElement) =>
   element.scrollHeight > element.clientHeight + FIT_EPSILON
   || element.scrollWidth > element.clientWidth + FIT_EPSILON;
 
+const exceedsTargetFill = (element: HTMLElement) =>
+  element.scrollHeight > element.clientHeight * TARGET_FILL_RATIO + FIT_EPSILON
+  || element.scrollWidth > element.clientWidth * TARGET_FILL_RATIO + FIT_EPSILON;
+
 const setRefitScale = (element: HTMLElement, scale: number) => {
   element.style.setProperty("--overlay-refit", scale.toFixed(4));
 };
 
-const refitBubble = (element: HTMLElement) => {
-  element.dataset.overflow = "fit";
-  setRefitScale(element, 1);
-
-  if (!overflows(element)) return;
-
+const findLargestScaleThatFits = (element: HTMLElement, predicate: (element: HTMLElement) => boolean) => {
   let low = MIN_REFIT_SCALE;
   let high = 1;
   let best = MIN_REFIT_SCALE;
 
-  setRefitScale(element, low);
-  if (overflows(element)) {
-    element.dataset.overflow = "scroll";
-    return;
-  }
-
   for (let step = 0; step < MAX_STEPS; step += 1) {
     const mid = (low + high) / 2;
     setRefitScale(element, mid);
-    if (overflows(element)) {
+    if (predicate(element)) {
       high = mid;
     } else {
       best = mid;
@@ -37,6 +31,31 @@ const refitBubble = (element: HTMLElement) => {
     }
   }
 
+  return best;
+};
+
+const refitBubble = (element: HTMLElement) => {
+  element.dataset.overflow = "fit";
+  setRefitScale(element, 1);
+
+  if (!exceedsTargetFill(element)) return;
+
+  setRefitScale(element, MIN_REFIT_SCALE);
+  if (exceedsTargetFill(element)) {
+    if (overflows(element)) {
+      element.dataset.overflow = "scroll";
+      return;
+    }
+    // The preferred whitespace target is impossible for this Bubble. Use the
+    // largest readable scale that avoids actual clipping instead of forcing the
+    // global lower bound, then fall back to scroll only if even that clips.
+    const fallbackScale = findLargestScaleThatFits(element, overflows);
+    setRefitScale(element, fallbackScale);
+    element.dataset.overflow = overflows(element) ? "scroll" : "fit";
+    return;
+  }
+
+  const best = findLargestScaleThatFits(element, exceedsTargetFill);
   setRefitScale(element, best);
   element.dataset.overflow = overflows(element) ? "scroll" : "fit";
 };
