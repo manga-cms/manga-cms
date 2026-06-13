@@ -22,6 +22,22 @@ export const prerender = false;
 const { workId, episodeId } = Astro.params;
 const overlayLanguage = String(Astro.url.searchParams.get("lang") ?? "ja").trim().toLowerCase() || "ja";
 const layoutLocale = normalizeViewerLocale(overlayLanguage);
+const normalizeOverlayLanguage = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
+const overlayLanguageLabels: Record<string, string> = {
+  ja: "日本語",
+  en: "English",
+  "zh-hans": "简体中文",
+  sv: "Svenska",
+};
+const overlayLanguageUrlValue = (language: string) => language === "zh-hans" ? "zh-Hans" : language;
+const overlayLanguageSortValue = (language: string) => {
+  const order = ["ja", "en", "zh-hans", "sv"];
+  const index = order.indexOf(language);
+  return index === -1 ? 100 + language.charCodeAt(0) : index;
+};
 
 if (!workId || !episodeId) {
   return new Response(null, { status: 404, statusText: "Not Found" });
@@ -79,6 +95,30 @@ if (overlayPages.length === 0) {
   return new Response(null, { status: 404, statusText: "Not Found" });
 }
 
+const availableOverlayLanguages = new Set<string>(["ja"]);
+for (const page of episode.pages ?? []) {
+  for (const pack of page.availablePacks ?? []) {
+    if (!pack?.isPublished || pack?.type !== "TRANSLATION") continue;
+    const packLanguage = normalizeOverlayLanguage(pack.language);
+    if (packLanguage) availableOverlayLanguages.add(packLanguage);
+    for (const entry of pack.entries ?? []) {
+      if (typeof entry?.text !== "string" || entry.text.trim().length === 0) continue;
+      const entryLanguage = normalizeOverlayLanguage(entry.language ?? pack.language);
+      if (entryLanguage) availableOverlayLanguages.add(entryLanguage);
+    }
+  }
+}
+availableOverlayLanguages.add(normalizeOverlayLanguage(overlayLanguage) || "ja");
+const overlayLanguageLinks = Array.from(availableOverlayLanguages)
+  .filter(Boolean)
+  .sort((a, b) => overlayLanguageSortValue(a) - overlayLanguageSortValue(b) || a.localeCompare(b))
+  .map((language) => ({
+    language,
+    label: overlayLanguageLabels[language] ?? language,
+    href: `/works/${encodeURIComponent(workId)}/episodes/${encodeURIComponent(episodeId)}/overlay${language === "ja" ? "" : `?lang=${encodeURIComponent(overlayLanguageUrlValue(language))}`}`,
+    active: normalizeOverlayLanguage(language) === normalizeOverlayLanguage(overlayLanguage),
+  }));
+
 const publicationType = series?.publicationType ?? "serial";
 const isSingleEpisode = Array.isArray(series?.episodes) ? series.episodes.length === 1 : !prev && !next;
 const localizedSeriesTitle = seriesDisplayTitle(series, layoutLocale) || series?.title || workId;
@@ -128,6 +168,21 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     <nav class="text-overlay-nav container" aria-label="Reader navigation">
       <a href={readerHref}>画像Readerへ戻る</a>
       <a href={textHref}>テキスト版</a>
+    </nav>
+
+    <nav class="text-overlay-language container" aria-label="Overlay language">
+      <span>Language</span>
+      <div class="text-overlay-language-options">
+        {overlayLanguageLinks.map((language) => (
+          <a
+            href={language.href}
+            class:list={["text-overlay-language-link", { "is-active": language.active }]}
+            aria-current={language.active ? "page" : undefined}
+          >
+            {language.label}
+          </a>
+        ))}
+      </div>
     </nav>
 
     <header class="text-overlay-header container">
@@ -227,6 +282,48 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     text-decoration: underline;
     text-decoration-color: var(--color-border);
     text-underline-offset: 0.25em;
+  }
+
+  .text-overlay-language {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 0.85rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .text-overlay-language span {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .text-overlay-language-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: center;
+  }
+
+  .text-overlay-language-link {
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1;
+    min-width: 4.4rem;
+    padding: 0.55rem 0.7rem;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .text-overlay-language-link.is-active {
+    background: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-surface);
   }
 
   .text-overlay-header {
