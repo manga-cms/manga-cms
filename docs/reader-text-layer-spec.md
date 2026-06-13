@@ -200,6 +200,11 @@ and source selection before broad rollout.
   vertical/horizontal writing modes, ruby/punctuation/ellipsis behavior, mobile
   viewport layout, and consistency with the separate `/text` accessibility
   view.
+- Wide horizontal Bubbles with vertical Japanese text may remain cramped even
+  after refitting. The first implementation should respect canonical
+  `textDirection`; automatic vertical-to-horizontal fallback is a review
+  decision for a later pass because it changes the authored typesetting
+  interpretation.
 
 ### Step 4: CMS Review Workflow
 

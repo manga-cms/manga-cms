@@ -115,7 +115,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
   robots="noindex,follow"
   ogType="article"
 >
-  <main class="text-overlay-page" aria-labelledby="text-overlay-title">
+  <main class="text-overlay-page" aria-labelledby="text-overlay-title" data-overlay-fit-root>
     <nav class="text-overlay-nav container" aria-label="Reader navigation">
       <a href={readerHref}>画像Readerへ戻る</a>
       <a href={textHref}>テキスト版</a>
@@ -152,6 +152,10 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
                   data-bubble-id={bubble.id}
                   data-panel-id={bubble.panelId ?? undefined}
                   data-bubble-type={bubble.bubbleType}
+                  data-overlay-bubble
+                  data-fit-characters={bubble.fit.characterCount}
+                  data-fit-capacity={bubble.fit.estimatedCapacity}
+                  data-fit-ratio={bubble.fit.ratio.toFixed(3)}
                   title={bubble.displayRef ?? bubble.id}
                 >
                   {bubble.speaker && <span class="sr-only">{bubble.speaker}: </span>}
@@ -262,29 +266,40 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     color: #151515;
     display: flex;
     font-family: "Noto Sans JP", system-ui, sans-serif;
-    font-size: clamp(10px, 3.4cqw, 24px);
+    font-size: clamp(8px, calc(var(--overlay-base-size, 3.4cqw) * var(--overlay-fit, 1) * var(--overlay-refit, 1)), 24px);
     font-weight: 700;
     justify-content: center;
-    line-height: 1.35;
+    line-break: strict;
+    line-height: 1.32;
     margin: 0;
     overflow: hidden;
+    overflow-wrap: anywhere;
+    overscroll-behavior: contain;
     padding: 0.9cqw;
     position: absolute;
     text-align: center;
+    text-wrap: pretty;
     white-space: pre-line;
-    word-break: keep-all;
+    word-break: normal;
   }
 
   .overlay-bubble.is-vertical {
-    font-size: clamp(10px, 3cqw, 22px);
+    --overlay-base-size: 3cqw;
     line-height: 1.45;
     text-orientation: mixed;
     writing-mode: vertical-rl;
   }
 
   .overlay-bubble.is-sfx {
-    font-size: clamp(11px, 4cqw, 30px);
+    --overlay-base-size: 4cqw;
     font-weight: 900;
+  }
+
+  .overlay-bubble[data-overflow="scroll"] {
+    outline: 1px dashed rgba(21, 21, 21, 0.22);
+    overflow: auto;
+    pointer-events: auto;
+    scrollbar-width: thin;
   }
 
   .sr-only {
@@ -307,3 +322,7 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     }
   }
 </style>
+
+<script>
+  import "../../../../../scripts/text-overlay-fit";
+</script>

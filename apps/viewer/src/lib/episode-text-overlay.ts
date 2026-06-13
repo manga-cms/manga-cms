@@ -12,6 +12,12 @@ export interface OverlayBubble {
   text: string;
   bbox: { x: number; y: number; width: number; height: number };
   style: string;
+  fit: {
+    characterCount: number;
+    estimatedCapacity: number;
+    ratio: number;
+    scale: number;
+  };
 }
 
 export interface OverlayPage {
@@ -116,13 +122,63 @@ const overlayImageSrc = (page: any, language: string) => {
 const pct = (value: number, total: number) =>
   `${((value / Math.max(total, 1)) * 100).toFixed(4)}%`;
 
+const countFitCharacters = (text: string) =>
+  Array.from(text.replace(/\s+/g, "")).length;
+
+const estimateOverlayCapacity = (
+  bbox: { width?: number; height?: number },
+  direction: "horizontal" | "vertical",
+  pageWidth: number,
+) => {
+  const width = Math.max(1, Number(bbox.width ?? 1));
+  const height = Math.max(1, Number(bbox.height ?? 1));
+  // Canonical bbox coordinates are page-pixel based. Match the CMS fit
+  // heuristic's 1200px baseline until textStyle.fontSizePx exists.
+  const scale = Math.max(0.25, pageWidth / 1200);
+  const lineStep = (direction === "horizontal" ? 24 : 26) * scale;
+  const charStep = (direction === "horizontal" ? 15 : 18) * scale;
+  const charsPerLine = direction === "horizontal"
+    ? Math.max(4, Math.floor(width / charStep))
+    : Math.max(4, Math.floor(height / charStep));
+  const lines = direction === "horizontal"
+    ? Math.max(1, Math.floor(height / lineStep))
+    : Math.max(1, Math.floor(width / lineStep));
+  return Math.max(8, charsPerLine * lines);
+};
+
+const estimateOverlayFit = (input: {
+  text: string;
+  bbox: { width?: number; height?: number };
+  textDirection?: string;
+  pageWidth: number;
+}) => {
+  const direction = input.textDirection === "vertical" ? "vertical" : "horizontal";
+  const characterCount = countFitCharacters(input.text);
+  const estimatedCapacity = estimateOverlayCapacity(input.bbox, direction, input.pageWidth);
+  const ratio = estimatedCapacity === 0 ? 0 : characterCount / estimatedCapacity;
+  // Initial SSR fit only avoids obviously too-large first paint. The browser
+  // refitter measures actual scroll bounds and sets --overlay-refit.
+  const scale = ratio <= 0.85
+    ? 1
+    : Math.max(0.58, Math.min(1, Math.sqrt(1 / Math.max(ratio, 0.01)) * 0.96));
+  return { characterCount, estimatedCapacity, ratio, scale };
+};
+
 const bubbleStyle = (bubble: any, page: any) => {
   const bbox = bubble.bbox ?? { x: 0, y: 0, width: 0, height: 0 };
+  const text = String(bubble.__overlayText ?? bubble.textOriginal ?? "");
+  const fit = estimateOverlayFit({
+    text,
+    bbox,
+    textDirection: bubble.textDirection,
+    pageWidth: Number(page.width ?? 1200),
+  });
   return [
     `left:${pct(Number(bbox.x ?? 0), Number(page.width ?? 1))}`,
     `top:${pct(Number(bbox.y ?? 0), Number(page.height ?? 1))}`,
     `width:${pct(Number(bbox.width ?? 0), Number(page.width ?? 1))}`,
     `height:${pct(Number(bbox.height ?? 0), Number(page.height ?? 1))}`,
+    `--overlay-fit:${fit.scale.toFixed(4)}`,
   ].join(";");
 };
 
@@ -138,18 +194,28 @@ export const buildTextOverlayPages = (pages: any[], languageInput: string): Over
           Number(a.bubbleNumber ?? 0) - Number(b.bubbleNumber ?? 0) ||
           bubbleIdOf(a).localeCompare(bubbleIdOf(b)),
         )
-        .map((bubble: any): OverlayBubble => ({
-          id: bubbleIdOf(bubble),
-          panelId: bubble.panelId ?? null,
-          bubbleNumber: Number(bubble.bubbleNumber ?? 0),
-          displayRef: bubble.displayRef ?? bubble.shortId,
-          speaker: bubble.speaker ?? null,
-          bubbleType: bubble.bubbleType,
-          textDirection: bubble.textDirection,
-          text: overlayTextForBubble(bubble, packs, language),
-          bbox: bubble.bbox,
-          style: bubbleStyle(bubble, page),
-        }));
+        .map((bubble: any): OverlayBubble => {
+          const text = overlayTextForBubble(bubble, packs, language);
+          const fit = estimateOverlayFit({
+            text,
+            bbox: bubble.bbox ?? {},
+            textDirection: bubble.textDirection,
+            pageWidth: Number(page.width ?? 1200),
+          });
+          return {
+            id: bubbleIdOf(bubble),
+            panelId: bubble.panelId ?? null,
+            bubbleNumber: Number(bubble.bubbleNumber ?? 0),
+            displayRef: bubble.displayRef ?? bubble.shortId,
+            speaker: bubble.speaker ?? null,
+            bubbleType: bubble.bubbleType,
+            textDirection: bubble.textDirection,
+            text,
+            bbox: bubble.bbox,
+            style: bubbleStyle({ ...bubble, __overlayText: text }, page),
+            fit,
+          };
+        });
       return {
         id: pageIdOf(page),
         pageNumber: Number(page.pageNumber ?? 0),
