@@ -65,6 +65,18 @@ layout hint, not canonical text.
 Adding optional layout/style fields does not require `schemaVersion: 3` while
 old content remains valid and writers/readers can ignore the fields safely.
 
+Blank-bubble page images should be represented without changing existing
+burned-in Reader images. For the first implementation, prefer a backward-
+compatible image variant key on `Page.images`, such as `ja-blank`,
+`en-blank`, `blank-ja`, or `blank`. This keeps the ordinary `ja` / `en`
+localized image selection intact while letting the overlay route choose the
+blank-bubble asset. A future edition model can replace this convention if
+multiple rendered editions need stronger lifecycle semantics.
+
+Clip Studio Paint or other authoring tools may export blank-bubble page images
+by hiding text layers. Those source files remain outside the public contract;
+the canonical content only references the exported public image assets.
+
 ## Rendering Model
 
 The proposed rendering model is:
@@ -125,7 +137,33 @@ The text layer must only render when all of these are true:
 
 When in doubt, the Reader should fall back to image-only rendering.
 
+Official Translation Pack text is allowed only when it comes from published
+Pack manifests (`isPublished: true`). Runtime Pack Draft entries, unreviewed
+machine-origin rows, provider metadata, confidence scores, and import
+diagnostics must never be rendered by the public overlay route. The overlay is
+an image-plus-text experiment and is separate from the structured `/text`
+accessibility route; each route must have its own feature flag and rollout
+decision.
+
+Early overlay routes should emit `noindex,follow` and must stay out of
+`sitemap.xml`. The feature exposes full Bubble text in HTML and therefore
+increases scraping and indexing surface. Search indexing can be revisited after
+the rendering model, translation source policy, and QA checklist are stable.
+
 ## Implementation Plan
+
+### Experiment Scope
+
+Start with one Episode and roughly three to five Bubbles. The preferred corpus
+contains at least:
+
+- a very short line and a long line;
+- a vertical, horizontal, and small Bubble;
+- a narration/caption frame;
+- an SFX or non-dialogue Bubble.
+
+This first scope is intentionally small so QA can focus on fit, reading order,
+and source selection before broad rollout.
 
 ### Step 1: Contract Preparation
 
@@ -134,6 +172,8 @@ When in doubt, the Reader should fall back to image-only rendering.
 - Keep existing content valid without these fields.
 - Add content-lint warnings, not hard validation failures, for layout/source
   mismatches.
+- For the initial blank-bubble experiment, use backward-compatible `Page.images`
+  variant keys instead of changing the content schema.
 
 ### Step 2: Viewer Prototype
 
@@ -142,6 +182,13 @@ When in doubt, the Reader should fall back to image-only rendering.
 - Render only selected test content with reviewed Bubble text.
 - Verify selection, search, anchor links, reading order, and responsive
   positioning.
+- Prefer blank-bubble image variants when present, but preserve normal Reader
+  image selection when no variant exists.
+- Render `Bubble.textOriginal` for the source locale and published Translation
+  Pack text for target locales. Do not render Pack Draft or machine-origin
+  metadata.
+- Keep the overlay route `noindex` and excluded from the sitemap during the
+  experiment.
 
 ### Step 3: Translation And Overflow QA
 
@@ -149,6 +196,10 @@ When in doubt, the Reader should fall back to image-only rendering.
 - Keep it separate from the main Reader navigation script.
 - Test Chrome, Safari, and Google Translate paths where possible.
 - Record browser/version and observed translation signals in QA notes.
+- QA should cover bbox fit, line-break readability, font autosizing limits,
+  vertical/horizontal writing modes, ruby/punctuation/ellipsis behavior, mobile
+  viewport layout, and consistency with the separate `/text` accessibility
+  view.
 
 ### Step 4: CMS Review Workflow
 
@@ -165,4 +216,3 @@ When in doubt, the Reader should fall back to image-only rendering.
 - What minimum accessibility behavior is required before launch?
 - Should search indexing include text-layer pages, or should the feature remain
   `noindex` for early experiments?
-

@@ -76,6 +76,34 @@ else
     echo "  ⏭️  Set STRUCTURED_TEXT_SMOKE_PATH to verify /text ON/OFF behavior."
 fi
 
+# ---- 4. Optional Text Overlay View ----
+echo "4️⃣  Text Overlay View"
+if [ -n "${TEXT_OVERLAY_SMOKE_PATH:-}" ]; then
+    overlay_url="$VIEWER$TEXT_OVERLAY_SMOKE_PATH"
+    expected="${TEXT_OVERLAY_SMOKE_EXPECT:-enabled}"
+    if [ "$expected" = "enabled" ]; then
+        check_status "Text overlay view enabled" "$overlay_url" "200"
+        overlay_html="$(curl -s "$overlay_url")"
+        robots="$(printf '%s' "$overlay_html" | grep -i '<meta name="robots" content="noindex,follow"' || true)"
+        if [ -n "$robots" ]; then
+            pass "Text overlay view is noindex"
+        else
+            fail "Text overlay view robots" "missing noindex,follow meta tag"
+        fi
+        if printf '%s' "$overlay_html" | grep -qE 'translation_origin|fixture-deterministic|NOOP_TRANSLATION_PROVIDER'; then
+            fail "Text overlay metadata leak" "private Pack Draft/provider metadata appeared in HTML"
+        else
+            pass "Text overlay hides Pack Draft/provider metadata"
+        fi
+    elif [ "$expected" = "disabled" ]; then
+        check_status "Text overlay view disabled" "$overlay_url" "404"
+    else
+        fail "Text overlay config" "TEXT_OVERLAY_SMOKE_EXPECT must be enabled or disabled"
+    fi
+else
+    echo "  ⏭️  Set TEXT_OVERLAY_SMOKE_PATH to verify /overlay ON/OFF behavior."
+fi
+
 # ---- Summary ----
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

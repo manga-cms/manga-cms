@@ -1,0 +1,309 @@
+---
+import BaseLayout from "../../../../../layouts/BaseLayout.astro";
+import { fetchEpisode, isApiConfigured } from "../../../../../lib/api-client";
+import { getAdjacentEpisodes, getEpisode, getSeries } from "../../../../../data/content";
+import {
+  buildTextOverlayPages,
+  isTextOverlayEnabled,
+} from "../../../../../lib/episode-text-overlay";
+import {
+  descriptionWithTitleAndAuthor,
+  episodeDisplayTitle,
+  joinedSeriesEpisodeTitle,
+  localizedDescription,
+  normalizeViewerLocale,
+  publicAuthorLabel,
+  seriesDisplayTitle,
+} from "../../../../../lib/localized-metadata";
+import { siteConfig } from "../../../../../lib/site-config";
+
+export const prerender = false;
+
+const { workId, episodeId } = Astro.params;
+const overlayLanguage = String(Astro.url.searchParams.get("lang") ?? "ja").trim().toLowerCase() || "ja";
+const layoutLocale = normalizeViewerLocale(overlayLanguage);
+
+if (!workId || !episodeId) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+if (siteConfig.mode === "official" && !siteConfig.content.demoSeriesIds.includes(workId)) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+let series: any = null;
+let episode: any = null;
+let prev: { id: string; title: string; episodeNumber: number } | null = null;
+let next: { id: string; title: string; episodeNumber: number } | null = null;
+let isGated = false;
+
+const requestCookies = Astro.request.headers.get("cookie") ?? undefined;
+const apiConfigured = isApiConfigured();
+
+if (apiConfigured) {
+  const result = await fetchEpisode(workId, episodeId, requestCookies);
+  if (!result.data || (result.data as any).gated === true) {
+    return new Response(null, { status: 404, statusText: "Not Found" });
+  }
+  series = result.data.series;
+  episode = result.data.episode;
+  prev = result.data.prev;
+  next = result.data.next;
+} else {
+  const localSeries = getSeries(workId);
+  const localEpisode = getEpisode(workId, episodeId);
+  if (!localSeries || !localEpisode) {
+    return new Response(null, { status: 404, statusText: "Not Found" });
+  }
+  series = localSeries;
+  episode = localEpisode;
+  const adjacent = getAdjacentEpisodes(workId, episodeId);
+  prev = adjacent.prev ? { id: adjacent.prev.id, title: adjacent.prev.title, episodeNumber: adjacent.prev.episodeNumber } : null;
+  next = adjacent.next ? { id: adjacent.next.id, title: adjacent.next.title, episodeNumber: adjacent.next.episodeNumber } : null;
+  isGated = localEpisode.episodeNumber > 1;
+}
+
+if (isGated || !episode?.pages?.length) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+if (!isTextOverlayEnabled({ series, episode, seriesId: workId, episodeId })) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+const overlayPages = buildTextOverlayPages(episode.pages, overlayLanguage);
+if (overlayPages.length === 0) {
+  return new Response(null, { status: 404, statusText: "Not Found" });
+}
+
+const publicationType = series?.publicationType ?? "serial";
+const isSingleEpisode = Array.isArray(series?.episodes) ? series.episodes.length === 1 : !prev && !next;
+const localizedSeriesTitle = seriesDisplayTitle(series, layoutLocale) || series?.title || workId;
+const localizedEpisodeTitle = episodeDisplayTitle({
+  series,
+  episode,
+  locale: layoutLocale,
+  publicationType,
+  isSingleEpisode,
+}) || episode.title;
+const localizedPageTitle = joinedSeriesEpisodeTitle({
+  seriesTitle: localizedSeriesTitle,
+  episodeTitle: localizedEpisodeTitle,
+  publicationType,
+  isSingleEpisode,
+});
+const localizedAuthorLabel = publicAuthorLabel(series, layoutLocale);
+const description = descriptionWithTitleAndAuthor({
+  title: `${localizedPageTitle} text overlay`,
+  authorLabel: localizedAuthorLabel,
+  description: localizedDescription(episode, layoutLocale)
+    || localizedDescription(series, layoutLocale)
+    || series?.description
+    || "Blank-bubble image with reviewed Bubble text rendered as an experimental HTML overlay.",
+  locale: layoutLocale,
+});
+const readerHref = `/works/${encodeURIComponent(workId)}/episodes/${encodeURIComponent(episodeId)}${overlayLanguage === "ja" ? "" : `?lang=${encodeURIComponent(overlayLanguage)}`}`;
+const textHref = `/works/${encodeURIComponent(workId)}/episodes/${encodeURIComponent(episodeId)}/text${overlayLanguage === "ja" ? "" : `?lang=${encodeURIComponent(overlayLanguage)}`}`;
+const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURIComponent(episodeId)}/overlay${overlayLanguage === "ja" ? "" : `?lang=${encodeURIComponent(overlayLanguage)}`}`;
+---
+
+<BaseLayout
+  title={`${localizedPageTitle} text overlay`}
+  description={description}
+  locale={layoutLocale}
+  canonicalUrl={canonicalPath}
+  robots="noindex,follow"
+  ogType="article"
+>
+  <main class="text-overlay-page" aria-labelledby="text-overlay-title">
+    <nav class="text-overlay-nav container" aria-label="Reader navigation">
+      <a href={readerHref}>画像Readerへ戻る</a>
+      <a href={textHref}>テキスト版</a>
+    </nav>
+
+    <header class="text-overlay-header container">
+      <p class="text-overlay-kicker">Experimental text overlay</p>
+      <h1 id="text-overlay-title">{localizedPageTitle}</h1>
+      <p>
+        空フキダシ画像の上に、公開済み Pack または原文のフキダシテキストを重ねて表示しています。
+        この実験ページは検索インデックス対象外です。
+      </p>
+    </header>
+
+    <ol class="overlay-page-list" aria-label="Overlay pages">
+      {overlayPages.map((page) => (
+        <li class="overlay-page-item">
+          <figure
+            class="overlay-stage"
+            style={`--page-aspect:${page.width} / ${page.height};`}
+            aria-label={`Page ${page.pageNumber}`}
+          >
+            <img src={page.imageSrc} alt={`Page ${page.pageNumber}`} loading="lazy" decoding="async" />
+            <div class="overlay-bubble-layer" aria-label={`Page ${page.pageNumber} Bubble text`}>
+              {page.bubbles.map((bubble) => (
+                <p
+                  id={bubble.id}
+                  class:list={[
+                    "overlay-bubble",
+                    `is-${bubble.textDirection === "vertical" ? "vertical" : "horizontal"}`,
+                    `is-${bubble.bubbleType ?? "speech"}`,
+                  ]}
+                  style={bubble.style}
+                  data-bubble-id={bubble.id}
+                  data-panel-id={bubble.panelId ?? undefined}
+                  data-bubble-type={bubble.bubbleType}
+                  title={bubble.displayRef ?? bubble.id}
+                >
+                  {bubble.speaker && <span class="sr-only">{bubble.speaker}: </span>}
+                  {bubble.text}
+                </p>
+              ))}
+            </div>
+          </figure>
+        </li>
+      ))}
+    </ol>
+  </main>
+</BaseLayout>
+
+<style>
+  .text-overlay-page {
+    background: #f5f2ec;
+    min-height: 100vh;
+    padding-block: clamp(1rem, 4vw, 2.5rem) clamp(3rem, 7vw, 5rem);
+  }
+
+  .text-overlay-nav {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .text-overlay-nav a {
+    color: var(--color-text);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: var(--color-border);
+    text-underline-offset: 0.25em;
+  }
+
+  .text-overlay-header {
+    margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+    max-width: 760px;
+    text-align: center;
+  }
+
+  .text-overlay-kicker {
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+  }
+
+  .text-overlay-header h1 {
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    line-height: 1.2;
+    margin-bottom: 0.85rem;
+  }
+
+  .text-overlay-header p {
+    color: var(--color-text-muted);
+    line-height: 1.8;
+  }
+
+  .overlay-page-list {
+    display: grid;
+    gap: clamp(1.5rem, 5vw, 3rem);
+    list-style: none;
+    margin: 0 auto;
+    max-width: min(100%, 920px);
+    padding: 0 clamp(0.75rem, 3vw, 2rem);
+  }
+
+  .overlay-page-item {
+    margin: 0;
+  }
+
+  .overlay-stage {
+    aspect-ratio: var(--page-aspect);
+    background: #fff;
+    box-shadow: 0 18px 55px rgba(24, 20, 16, 0.16);
+    container-type: inline-size;
+    margin: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .overlay-stage img,
+  .overlay-bubble-layer {
+    inset: 0;
+    position: absolute;
+  }
+
+  .overlay-stage img {
+    display: block;
+    height: 100%;
+    object-fit: contain;
+    width: 100%;
+  }
+
+  .overlay-bubble-layer {
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .overlay-bubble {
+    align-items: center;
+    box-sizing: border-box;
+    color: #151515;
+    display: flex;
+    font-family: "Noto Sans JP", system-ui, sans-serif;
+    font-size: clamp(10px, 3.4cqw, 24px);
+    font-weight: 700;
+    justify-content: center;
+    line-height: 1.35;
+    margin: 0;
+    overflow: hidden;
+    padding: 0.9cqw;
+    position: absolute;
+    text-align: center;
+    white-space: pre-line;
+    word-break: keep-all;
+  }
+
+  .overlay-bubble.is-vertical {
+    font-size: clamp(10px, 3cqw, 22px);
+    line-height: 1.45;
+    text-orientation: mixed;
+    writing-mode: vertical-rl;
+  }
+
+  .overlay-bubble.is-sfx {
+    font-size: clamp(11px, 4cqw, 30px);
+    font-weight: 900;
+  }
+
+  .sr-only {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  @media (max-width: 700px) {
+    .text-overlay-page {
+      padding-top: 0.75rem;
+    }
+
+    .overlay-page-list {
+      padding-inline: 0.35rem;
+    }
+  }
+</style>
