@@ -69,3 +69,40 @@ test("applyEstimatedReadingOrder reorders panels and clears reading-order warnin
     assert.equal(result.page.panels[1]?.panelNumber, 2);
     assert.deepEqual(getPageReviewWarnings(result.page), []);
 });
+
+test("applyEstimatedReadingOrder keeps v2 page bubbles attached to their panels", () => {
+    const page = makePage();
+    const leftBubble = page.panels[0]!.bubbles[0]!;
+    const rightBubble = page.panels[1]!.bubbles[0]!;
+    const v2Page: PageData = {
+        ...page,
+        panels: page.panels.map((panel) => ({ ...panel, bubbles: [] })),
+        bubbles: [leftBubble, rightBubble],
+    };
+
+    const result = applyEstimatedReadingOrder(v2Page);
+
+    assert.equal(result.changedPanelCount, 2);
+    assert.equal(result.changedBubbleCount, 2);
+    assert.deepEqual(result.page.bubbles.map((bubble) => bubble.textOriginal), ["right", "left"]);
+    assert.deepEqual(result.page.panels.map((panel) => panel.bubbles.map((bubble) => bubble.textOriginal)), [["right"], ["left"]]);
+    assert.equal(result.page.bubbles[0]?.panelId, "p01-k002");
+    assert.equal(result.page.bubbles[0]?.displayRef, "p1-k1-f1");
+});
+
+test("applyEstimatedReadingOrder reports metadata-only renumbering changes", () => {
+    const page = makePage();
+    const orderedPage: PageData = {
+        ...page,
+        panels: [page.panels[1]!, page.panels[0]!],
+        bubbles: [],
+    };
+
+    const result = applyEstimatedReadingOrder(orderedPage);
+
+    assert.equal(result.changedPanelCount, 2);
+    assert.equal(result.changedBubbleCount, 2);
+    assert.equal(result.page.panels[0]?.panelNumber, 1);
+    assert.equal(result.page.panels[1]?.panelNumber, 2);
+    assert.equal(result.page.panels[0]?.bubbles[0]?.displayRef, "p1-k1-f1");
+});

@@ -1,5 +1,5 @@
 import type { BubbleData, PageData, PanelData } from "../../api";
-import { bubbleIdOf, makeBubbleShortId, panelIdOf } from "./ids";
+import { bubbleIdOf, makeBubbleShortId, panelIdOf } from "./ids.ts";
 
 function normalizePanelBubble(page: PageData, panel: PanelData, bubble: BubbleData, localIndex: number): BubbleData {
     const bubbleId = bubbleIdOf(bubble);

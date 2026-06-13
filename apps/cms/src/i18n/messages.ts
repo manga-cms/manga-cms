@@ -132,7 +132,7 @@ export const messages = {
         "structure.clearConfirm": "このページのコマ / フキダシ構造をすべて削除します。続行しますか？",
         "structure.pageWarnings.title": "確認が必要な項目",
         "structure.readingOrder.confirm": "読み順の推定により、コマ {panelCount} 件、フキダシ {bubbleCount} 件の順序が変わります。適用後も保存前に確認してください。続行しますか？",
-        "structure.readingOrder.noChanges": "推定読み順との差分はありません。",
+        "structure.readingOrder.noChanges": "推定読み順との差分はありません。コマの分割・結合やコマ枠そのものの修正は手動で確認してください。",
 
         "structure.sidebar.page": "ページ",
         "structure.sidebar.groupPage": "ページ",
@@ -418,7 +418,7 @@ export const messages = {
         "structure.clearConfirm": "Delete all Panel / Bubble structure on this page?",
         "structure.pageWarnings.title": "Items to review",
         "structure.readingOrder.confirm": "The reading-order estimate will change {panelCount} Panel positions and {bubbleCount} Bubble positions. Review the result before publishing. Continue?",
-        "structure.readingOrder.noChanges": "No differences from the estimated reading order.",
+        "structure.readingOrder.noChanges": "No differences from the estimated reading order. Panel splits, merges, and bbox edits still need manual review.",
 
         "structure.sidebar.page": "Page",
         "structure.sidebar.groupPage": "Page",
