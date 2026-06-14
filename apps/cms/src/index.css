@@ -2612,6 +2612,26 @@ textarea {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.24);
 }
 
+.lettering-position-handle {
+    position: absolute;
+    z-index: 3;
+    width: 0.85rem;
+    height: 0.85rem;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #2563eb;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
+    cursor: grab;
+    touch-action: none;
+    transform: translate(-50%, -50%);
+}
+
+.lettering-position-handle.is-dragging,
+.lettering-position-handle:active {
+    cursor: grabbing;
+    transform: translate(-50%, -50%) scale(1.15);
+}
+
 .lettering-inline-editor {
     display: inline-block;
     max-width: 100%;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type CompositionEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type CompositionEvent, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { buildLetteringRender, displayDirectionForLanguage } from "@manga/lettering";
 import { refitLetteringNow, startLetteringRefit } from "@manga/lettering/refit";
@@ -164,6 +164,34 @@ function alignFromRatio(value: number): AlignValue {
     return "center";
 }
 
+function alignRatio(value: AlignValue | undefined) {
+    if (value === "center") return 50;
+    if (value === "end") return 88;
+    return 12;
+}
+
+function anchorHandleStyle(bubble: BubbleData): CSSProperties {
+    const inlineAlign = bubble.textLayout?.inlineAlign;
+    const blockAlign = bubble.textLayout?.blockAlign;
+    if (displayDirectionForLanguage(bubble.textDirection, "ja") === "vertical") {
+        const left = blockAlign === "start" ? 88 : blockAlign === "center" ? 50 : 12;
+        return { left: `${left}%`, top: `${alignRatio(inlineAlign)}%` };
+    }
+    return { left: `${alignRatio(inlineAlign)}%`, top: `${alignRatio(blockAlign)}%` };
+}
+
+function insertTextAtSelection(text: string) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return false;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(document.createTextNode(text));
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return true;
+}
+
 export default function LetteringWorkspace({ currentUser }: LetteringWorkspaceProps) {
     const { t } = useTranslation();
     const { id: seriesId, epId } = useParams<{ id: string; epId: string }>();
@@ -185,6 +213,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const [resetToAutoBubbleId, setResetToAutoBubbleId] = useState("");
     const [editorActive, setEditorActive] = useState(false);
     const [isComposing, setIsComposing] = useState(false);
+    const [draggingAnchorBubbleId, setDraggingAnchorBubbleId] = useState("");
 
     useEffect(() => {
         if (!seriesId || !epId) return;
@@ -295,6 +324,11 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         const currentDomText = editableTextFromElement(editor);
         if (currentDomText !== editorText) {
             editor.innerText = editorText;
+            if (!editorHasFocus) {
+                requestAnimationFrame(() => {
+                    if (overlayRef.current) refitLetteringNow(overlayRef.current);
+                });
+            }
         }
         editorDomKeyRef.current = nextKey;
         editorDomTextRef.current = editorText;
@@ -329,12 +363,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const updateTextLayout = (patch: Partial<BubbleTextLayout>) => {
         if (!selectedBubble || !canManageLettering) return;
         setResetToAutoBubbleId("");
-        const textStylePatch = selectedBubble.textStyle?.fontSizePx != null && selectedBubble.textStyle.fitMode !== "fixed"
-            ? { textStyle: { ...selectedBubble.textStyle, fitMode: "fixed" as const } }
-            : {};
         patchSelectedBubble({
             textLayout: completeTextLayout(selectedBubble.textLayout, patch),
-            ...textStylePatch,
         });
     };
 
@@ -346,12 +376,10 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         });
     };
 
-    const snapSelectedBubbleAlign = (event: MouseEvent<HTMLElement>, bubble: BubbleData) => {
+    const snapSelectedBubbleAlignAtPoint = (clientX: number, clientY: number, bubble: BubbleData, rect: DOMRect) => {
         if (!canManageLettering || bubbleIdOf(bubble) !== selectedBubbleId) return;
-        if (event.target instanceof HTMLElement && event.target.closest("[data-lettering-inline-editor]")) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        const xRatio = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(rect.width, 1)));
-        const yRatio = Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(rect.height, 1)));
+        const xRatio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(rect.width, 1)));
+        const yRatio = Math.max(0, Math.min(1, (clientY - rect.top) / Math.max(rect.height, 1)));
         const displayDirection = displayDirectionForLanguage(bubble.textDirection, "ja");
         if (displayDirection === "vertical") {
             updateTextLayout({
@@ -364,6 +392,17 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             inlineAlign: alignFromRatio(xRatio),
             blockAlign: alignFromRatio(yRatio),
         });
+    };
+
+    const snapSelectedBubbleAlign = (event: MouseEvent<HTMLElement>, bubble: BubbleData) => {
+        if (event.target instanceof HTMLElement && event.target.closest("[data-lettering-inline-editor], [data-lettering-anchor-handle]")) return;
+        snapSelectedBubbleAlignAtPoint(event.clientX, event.clientY, bubble, event.currentTarget.getBoundingClientRect());
+    };
+
+    const snapSelectedBubbleAnchor = (event: PointerEvent<HTMLElement>, bubble: BubbleData) => {
+        const hit = event.currentTarget.closest<HTMLElement>("[data-lettering-bubble-hit]");
+        if (!hit) return;
+        snapSelectedBubbleAlignAtPoint(event.clientX, event.clientY, bubble, hit.getBoundingClientRect());
     };
 
     const resetSelectedBubble = () => {
@@ -411,10 +450,21 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         setEditorActive(false);
         composingRef.current = false;
         setIsComposing(false);
+        setDraggingAnchorBubbleId("");
         setSelectedBubbleId(bubbleId);
     };
 
     const onEditorKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+        if (event.key === "Enter" && event.currentTarget.isContentEditable && !composingRef.current) {
+            event.preventDefault();
+            if (insertTextAtSelection("\n")) {
+                const nextText = editableTextFromElement(event.currentTarget);
+                editorDomTextRef.current = nextText;
+                setEditorText(nextText);
+                applyEditorText(nextText);
+            }
+            return;
+        }
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
             event.preventDefault();
             if (!composingRef.current) {
@@ -444,6 +494,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         setEditorActive(false);
         composingRef.current = false;
         setIsComposing(false);
+        setDraggingAnchorBubbleId("");
         setPageIndex(nextIndex);
         const nextBubble = activeBubblesOf(episode?.pages[nextIndex] ?? null)[0]?.bubble;
         setSelectedBubbleId(nextBubble ? bubbleIdOf(nextBubble) : "");
@@ -576,6 +627,38 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                     <span data-overlay-bubble-text>{render.text}</span>
                                                 )}
                                             </span>
+                                            {selected && canManageLettering && (
+                                                <span
+                                                    className={`lettering-position-handle ${draggingAnchorBubbleId === bubbleId ? "is-dragging" : ""}`}
+                                                    data-lettering-anchor-handle
+                                                    role="slider"
+                                                    tabIndex={0}
+                                                    aria-label={t("lettering.workspace.positionHandle")}
+                                                    aria-valuetext={`${bubble.textLayout?.blockAlign ?? "start"} ${bubble.textLayout?.inlineAlign ?? "start"}`}
+                                                    style={anchorHandleStyle(bubble)}
+                                                    onPointerDown={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        event.currentTarget.setPointerCapture(event.pointerId);
+                                                        setDraggingAnchorBubbleId(bubbleId);
+                                                        snapSelectedBubbleAnchor(event, bubble);
+                                                    }}
+                                                    onPointerMove={(event) => {
+                                                        if (draggingAnchorBubbleId !== bubbleId) return;
+                                                        event.preventDefault();
+                                                        snapSelectedBubbleAnchor(event, bubble);
+                                                    }}
+                                                    onPointerUp={(event) => {
+                                                        event.preventDefault();
+                                                        snapSelectedBubbleAnchor(event, bubble);
+                                                        setDraggingAnchorBubbleId("");
+                                                        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                                                            event.currentTarget.releasePointerCapture(event.pointerId);
+                                                        }
+                                                    }}
+                                                    onPointerCancel={() => setDraggingAnchorBubbleId("")}
+                                                />
+                                            )}
                                         </div>
                                     );
                                 })}
