@@ -158,6 +158,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const { id: seriesId, epId } = useParams<{ id: string; epId: string }>();
     const overlayRef = useRef<HTMLDivElement | null>(null);
     const composingRef = useRef(false);
+    const seededEditorKeyRef = useRef("");
     const [episode, setEpisode] = useState<EpisodeData | null>(null);
     const [pageIndex, setPageIndex] = useState(0);
     const [selectedBubbleId, setSelectedBubbleId] = useState("");
@@ -234,14 +235,19 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     }, [page]);
 
     useEffect(() => {
+        const nextKey = selectedBubble ? `${pageIndex}:${bubbleIdOf(selectedBubble)}` : "";
+        if (seededEditorKeyRef.current === nextKey) return;
+        seededEditorKeyRef.current = nextKey;
         if (!selectedBubble) {
             setEditorText("");
+            setDirty(false);
+            setSaved(false);
             return;
         }
         setEditorText(lineTextForEditor(selectedBubble, renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal));
         setDirty(false);
         setSaved(false);
-    }, [renderForBubble, selectedBubbleId]);
+    }, [pageIndex, renderForBubble, selectedBubble]);
 
     useEffect(() => {
         if (!overlayRef.current) return;
@@ -308,23 +314,37 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     };
 
     const saveSelectedBubble = async () => {
-        if (!seriesId || !episode || !page || !selectedBubble || !canManageLettering) return;
+        if (!seriesId || !episode || !page || !selectedBubble || !canManageLettering) return false;
         const nextTextLayout = textLayoutFromEditorText(editorText, selectedBubble.textLayout);
         setSaving(true);
         setError("");
         try {
             const nextEpisode = await patchBubbleLettering(seriesId, episode.id, page.pageId ?? page.id, bubbleIdOf(selectedBubble), {
                 textLayout: nextTextLayout,
-                ...(selectedBubble.textStyle !== undefined && { textStyle: selectedBubble.textStyle }),
+                textStyle: selectedBubble.textStyle ?? {},
             });
             setEpisode(nextEpisode);
             setDirty(false);
             setSaved(true);
+            return true;
         } catch (e) {
             setError((e as Error).message);
+            return false;
         } finally {
             setSaving(false);
         }
+    };
+
+    const flushPendingEdit = async () => {
+        if (!dirty) return true;
+        if (saving || composingRef.current) return false;
+        return saveSelectedBubble();
+    };
+
+    const selectBubble = async (bubbleId: string) => {
+        if (bubbleId === selectedBubbleId) return;
+        if (!(await flushPendingEdit())) return;
+        setSelectedBubbleId(bubbleId);
     };
 
     const onEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -346,7 +366,9 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         applyEditorText(event.currentTarget.value);
     };
 
-    const selectPage = (nextIndex: number) => {
+    const selectPage = async (nextIndex: number) => {
+        if (nextIndex === pageIndex) return;
+        if (!(await flushPendingEdit())) return;
         setPageIndex(nextIndex);
         const nextBubble = activeBubblesOf(episode?.pages[nextIndex] ?? null)[0]?.bubble;
         setSelectedBubbleId(nextBubble ? bubbleIdOf(nextBubble) : "");
@@ -388,7 +410,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                             type="button"
                             key={item.pageId ?? item.id}
                             className={`lettering-page-button ${index === pageIndex ? "is-active" : ""}`}
-                            onClick={() => selectPage(index)}
+                            onClick={() => void selectPage(index)}
                         >
                             <span>{item.displayRef ?? `p${item.pageNumber}`}</span>
                             <span className="badge">{activeBubblesOf(item).length}</span>
@@ -424,13 +446,13 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                 if (selected) {
                                                     snapSelectedBubbleAlign(event, bubble);
                                                 } else {
-                                                    setSelectedBubbleId(bubbleId);
+                                                    void selectBubble(bubbleId);
                                                 }
                                             }}
                                             onKeyDown={(event) => {
                                                 if (event.key === "Enter" || event.key === " ") {
                                                     event.preventDefault();
-                                                    setSelectedBubbleId(bubbleId);
+                                                    void selectBubble(bubbleId);
                                                 }
                                             }}
                                             title={`${bubble.displayRef ?? bubble.shortId ?? readingOrder}: ${bubble.textOriginal}`}
