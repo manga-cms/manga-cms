@@ -2390,7 +2390,7 @@ textarea {
     color: #111827;
     font-family: "Shippori Antique", "Noto Sans JP", "Noto Sans SC", sans-serif;
     font-weight: var(--overlay-font-weight, 400);
-    font-size: clamp(8px, calc(var(--overlay-manual-font-size, var(--overlay-base-size, 3.4cqw)) * var(--overlay-fit, 1) * var(--overlay-refit, 1)), 24px);
+    font-size: calc(var(--overlay-manual-font-size, var(--overlay-base-size, 3.4cqw)) * var(--overlay-fit, 1) * var(--overlay-refit, 1));
     line-height: var(--overlay-line-height, 1.2);
     letter-spacing: var(--overlay-letter-spacing, 0);
     line-break: strict;
