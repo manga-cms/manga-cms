@@ -695,10 +695,17 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                     disabled={!canManageLettering}
                                     onChange={(event) => {
                                         setEditorTextValue(event.target.value);
-                                        if (!composingRef.current) applyEditorText(event.target.value);
+                                        setResetToAutoBubbleId("");
+                                        setDirty(true);
+                                        setSaved(false);
                                     }}
+                                    onFocus={() => setEditorActive(true)}
                                     onBlur={(event) => {
+                                        setEditorActive(false);
                                         if (!composingRef.current) applyEditorText(event.currentTarget.value);
+                                        requestAnimationFrame(() => {
+                                            if (overlayRef.current) refitLetteringNow(overlayRef.current);
+                                        });
                                     }}
                                     onKeyDown={onEditorKeyDown}
                                     onCompositionStart={onCompositionStart}
