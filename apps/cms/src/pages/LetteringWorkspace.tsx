@@ -201,6 +201,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const seededEditorKeyRef = useRef("");
     const editorDomKeyRef = useRef("");
     const editorDomTextRef = useRef("");
+    const editorTextRef = useRef("");
     const [episode, setEpisode] = useState<EpisodeData | null>(null);
     const [pageIndex, setPageIndex] = useState(0);
     const [selectedBubbleId, setSelectedBubbleId] = useState("");
@@ -214,6 +215,11 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const [editorActive, setEditorActive] = useState(false);
     const [isComposing, setIsComposing] = useState(false);
     const [draggingAnchorBubbleId, setDraggingAnchorBubbleId] = useState("");
+
+    const setEditorTextValue = (value: string) => {
+        editorTextRef.current = value;
+        setEditorText(value);
+    };
 
     useEffect(() => {
         if (!seriesId || !epId) return;
@@ -285,7 +291,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         if (seededEditorKeyRef.current === nextKey) return;
         seededEditorKeyRef.current = nextKey;
         if (!selectedBubble) {
-            setEditorText("");
+            setEditorTextValue("");
             setDirty(false);
             setSaved(false);
             setResetToAutoBubbleId("");
@@ -294,7 +300,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             setIsComposing(false);
             return;
         }
-        setEditorText(lineTextForEditor(selectedBubble, renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal));
+        setEditorTextValue(lineTextForEditor(selectedBubble, renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal));
         setDirty(false);
         setSaved(false);
         setResetToAutoBubbleId("");
@@ -409,7 +415,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         if (!selectedBubble || !canManageLettering) return;
         setResetToAutoBubbleId(bubbleIdOf(selectedBubble));
         patchSelectedBubble({ textLayout: undefined, textStyle: undefined });
-        setEditorText(renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal);
+        setEditorTextValue(renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal);
     };
 
     const saveSelectedBubble = async () => {
@@ -417,7 +423,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         const isResettingToAuto = resetToAutoBubbleId === bubbleIdOf(selectedBubble);
         const nextTextLayout = isResettingToAuto
             ? {}
-            : textLayoutFromEditorText(editorText, selectedBubble.textLayout);
+            : textLayoutFromEditorText(editorTextRef.current, selectedBubble.textLayout);
         setSaving(true);
         setError("");
         try {
@@ -460,15 +466,17 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             if (insertTextAtSelection("\n")) {
                 const nextText = editableTextFromElement(event.currentTarget);
                 editorDomTextRef.current = nextText;
-                setEditorText(nextText);
-                applyEditorText(nextText);
+                setEditorTextValue(nextText);
+                setResetToAutoBubbleId("");
+                setDirty(true);
+                setSaved(false);
             }
             return;
         }
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
             event.preventDefault();
             if (!composingRef.current) {
-                applyEditorText(editorText);
+                applyEditorText(textFromEditorTarget(event.currentTarget));
                 void saveSelectedBubble();
             }
         }
@@ -606,8 +614,11 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                         suppressContentEditableWarning
                                                         onInput={(event) => {
                                                             const nextText = editableTextFromElement(event.currentTarget);
-                                                            setEditorText(nextText);
-                                                            if (!composingRef.current) applyEditorText(nextText);
+                                                            editorDomTextRef.current = nextText;
+                                                            setEditorTextValue(nextText);
+                                                            setResetToAutoBubbleId("");
+                                                            setDirty(true);
+                                                            setSaved(false);
                                                         }}
                                                         onFocus={() => setEditorActive(true)}
                                                         onBlur={(event) => {
@@ -683,7 +694,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                     value={editorText}
                                     disabled={!canManageLettering}
                                     onChange={(event) => {
-                                        setEditorText(event.target.value);
+                                        setEditorTextValue(event.target.value);
                                         if (!composingRef.current) applyEditorText(event.target.value);
                                     }}
                                     onBlur={(event) => {
