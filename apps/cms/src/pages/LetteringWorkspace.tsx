@@ -128,6 +128,17 @@ function linesFromEditorText(value: string) {
         .map((line) => line.trimEnd());
 }
 
+function editableTextFromElement(element: HTMLElement) {
+    return element.innerText
+        .replace(/\u00a0/gu, " ")
+        .replace(/\r\n?/gu, "\n");
+}
+
+function textFromEditorTarget(target: HTMLElement & { value?: string }) {
+    if (typeof target.value === "string") return target.value;
+    return editableTextFromElement(target);
+}
+
 function isEmptyEditorText(value: string) {
     return value.replace(/\s+/gu, "").length === 0;
 }
@@ -157,6 +168,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const { t } = useTranslation();
     const { id: seriesId, epId } = useParams<{ id: string; epId: string }>();
     const overlayRef = useRef<HTMLDivElement | null>(null);
+    const inlineEditorRef = useRef<HTMLDivElement | null>(null);
     const composingRef = useRef(false);
     const seededEditorKeyRef = useRef("");
     const [episode, setEpisode] = useState<EpisodeData | null>(null);
@@ -254,6 +266,22 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         refitLetteringNow(overlayRef.current);
     }, [episode, pageIndex, selectedBubbleId]);
 
+    useEffect(() => {
+        const editor = inlineEditorRef.current;
+        if (!editor) return;
+        if (typeof document !== "undefined" && document.activeElement === editor) return;
+        if (editableTextFromElement(editor) !== editorText) {
+            editor.innerText = editorText;
+        }
+    }, [editorText, selectedBubbleId]);
+
+    useEffect(() => {
+        const editor = inlineEditorRef.current;
+        if (!editor || !canManageLettering) return;
+        editor.innerText = editorText;
+        requestAnimationFrame(() => editor.focus());
+    }, [canManageLettering, pageIndex, selectedBubbleId]);
+
     const patchSelectedBubble = (patch: Partial<BubbleData>) => {
         if (!episode || !selectedBubble) return;
         setEpisode(patchBubbleInEpisode(episode, pageIndex, bubbleIdOf(selectedBubble), patch));
@@ -289,7 +317,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     const snapSelectedBubbleAlign = (event: MouseEvent<HTMLElement>, bubble: BubbleData) => {
         if (!canManageLettering || bubbleIdOf(bubble) !== selectedBubbleId) return;
-        if (event.target instanceof HTMLElement && event.target.closest("textarea")) return;
+        if (event.target instanceof HTMLElement && event.target.closest("[data-lettering-inline-editor]")) return;
         const rect = event.currentTarget.getBoundingClientRect();
         const xRatio = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(rect.width, 1)));
         const yRatio = Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(rect.height, 1)));
@@ -347,7 +375,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         setSelectedBubbleId(bubbleId);
     };
 
-    const onEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    const onEditorKeyDown = (event: KeyboardEvent<HTMLElement>) => {
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
             event.preventDefault();
             if (!composingRef.current) {
@@ -357,13 +385,13 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         }
     };
 
-    const onCompositionStart = (_event: CompositionEvent<HTMLTextAreaElement>) => {
+    const onCompositionStart = (_event: CompositionEvent<HTMLElement>) => {
         composingRef.current = true;
     };
 
-    const onCompositionEnd = (event: CompositionEvent<HTMLTextAreaElement>) => {
+    const onCompositionEnd = (event: CompositionEvent<HTMLElement>) => {
         composingRef.current = false;
-        applyEditorText(event.currentTarget.value);
+        applyEditorText(textFromEditorTarget(event.currentTarget));
     };
 
     const selectPage = async (nextIndex: number) => {
@@ -458,21 +486,26 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                             title={`${bubble.displayRef ?? bubble.shortId ?? readingOrder}: ${bubble.textOriginal}`}
                                         >
                                             {selected && canManageLettering ? (
-                                                <textarea
+                                                <div
+                                                    ref={inlineEditorRef}
                                                     className={`lettering-inline-editor ${displayDirection === "vertical" ? "is-vertical" : "is-horizontal"}`}
-                                                    value={editorText}
-                                                    onChange={(event) => {
-                                                        setEditorText(event.target.value);
-                                                        if (!composingRef.current) applyEditorText(event.target.value);
+                                                    contentEditable="plaintext-only"
+                                                    role="textbox"
+                                                    aria-multiline="true"
+                                                    data-lettering-inline-editor
+                                                    suppressContentEditableWarning
+                                                    onInput={(event) => {
+                                                        const nextText = editableTextFromElement(event.currentTarget);
+                                                        setEditorText(nextText);
+                                                        if (!composingRef.current) applyEditorText(nextText);
                                                     }}
                                                     onBlur={(event) => {
-                                                        if (!composingRef.current) applyEditorText(event.currentTarget.value);
+                                                        if (!composingRef.current) applyEditorText(editableTextFromElement(event.currentTarget));
                                                     }}
                                                     onKeyDown={onEditorKeyDown}
                                                     onCompositionStart={onCompositionStart}
                                                     onCompositionEnd={onCompositionEnd}
                                                     aria-label={t("lettering.workspace.inlineEditorLabel")}
-                                                    autoFocus
                                                 />
                                             ) : (
                                                 <span
