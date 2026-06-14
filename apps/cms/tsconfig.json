@@ -12,7 +12,16 @@
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "isolatedModules": true
+        "isolatedModules": true,
+        "baseUrl": ".",
+        "paths": {
+            "@manga/lettering": [
+                "../../packages/lettering/src/index.ts"
+            ],
+            "@manga/lettering/*": [
+                "../../packages/lettering/src/*"
+            ]
+        }
     },
     "include": [
         "src"

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+    checkRightsPermission,
     getAdminEpisode,
     getAdminPageImageUrl,
     getReviewCandidates,
+    patchBubbleLettering,
     saveEpisode,
     type BoundingBox,
     type BubbleData,
+    type BubbleTextLayout,
+    type BubbleTextStyle,
     type EpisodeData,
     type IngestionReviewCandidate,
     type PageData,
@@ -45,7 +49,7 @@ const MIN_STRUCTURE_ZOOM = 0.35;
 const MAX_STRUCTURE_ZOOM = 3;
 
 type PageStructureReviewProps = {
-    currentUser?: { role: string } | null;
+    currentUser?: { id: string; role: string } | null;
 };
 const MAX_HISTORY_LENGTH = 80;
 
@@ -89,6 +93,11 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
     const [redoStack, setRedoStack] = useState<StructureReviewSnapshot[]>([]);
     const [reviewCandidates, setReviewCandidates] = useState<IngestionReviewCandidate[]>([]);
     const [reviewCandidateError, setReviewCandidateError] = useState("");
+    const [letteringMode, setLetteringMode] = useState(false);
+    const [canManageLettering, setCanManageLettering] = useState(false);
+    const [letteringSaving, setLetteringSaving] = useState(false);
+    const [letteringSaved, setLetteringSaved] = useState(false);
+    const [letteringDirty, setLetteringDirty] = useState(false);
     const [structureViewport, setStructureViewport] = useState<StructureViewport>({
         zoom: 1,
         panX: 0,
@@ -209,6 +218,30 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
 
     useEffect(() => {
         let cancelled = false;
+        setCanManageLettering(false);
+        if (!seriesId || !currentUser) return;
+        if (currentUser.role === "admin") {
+            setCanManageLettering(true);
+            return;
+        }
+        checkRightsPermission({
+            user_id: currentUser.id,
+            permission: "manage_rights",
+            scope: { series_id: seriesId },
+        })
+            .then((result) => {
+                if (!cancelled) setCanManageLettering(result.allowed);
+            })
+            .catch(() => {
+                if (!cancelled) setCanManageLettering(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [currentUser, seriesId]);
+
+    useEffect(() => {
+        let cancelled = false;
         setReviewCandidateError("");
         if (!ingestionJobId) {
             setReviewCandidates([]);
@@ -249,6 +282,12 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
         });
     }, [episode, ingestionJobId, reviewCandidates]);
     const selectedBubbleTextComparison = selectedBubble ? textComparisonOverlays?.get(bubbleIdOf(selectedBubble)) : undefined;
+    const selectedBubbleId = selectedBubble ? bubbleIdOf(selectedBubble) : "";
+
+    useEffect(() => {
+        setLetteringDirty(false);
+        setLetteringSaved(false);
+    }, [selectedBubbleId]);
 
     const imageUrl = useMemo(() => {
         if (!seriesId || !epId || !page) return "";
@@ -722,6 +761,50 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
         updatePanel(selectedPanelIndex, { ...selectedPanel, bubbles });
     };
 
+    const previewSelectedBubbleLettering = (patch: { textLayout?: BubbleTextLayout; textStyle?: BubbleTextStyle }) => {
+        if (!page || !selectedBubble) return;
+        const targetBubbleId = bubbleIdOf(selectedBubble);
+        const nextPage: PageData = {
+            ...page,
+            bubbles: (page.bubbles ?? []).map((bubble) =>
+                bubbleIdOf(bubble) === targetBubbleId ? applyBubblePatch(bubble, patch) : bubble,
+            ),
+            panels: page.panels.map((panel) => ({
+                ...panel,
+                bubbles: panel.bubbles.map((bubble) =>
+                    bubbleIdOf(bubble) === targetBubbleId ? applyBubblePatch(bubble, patch) : bubble,
+                ),
+            })),
+        };
+        setEpisode((current) => {
+            if (!current) return current;
+            const pages = [...current.pages];
+            pages[pageIndex] = syncPageBubbles(nextPage);
+            return { ...current, pages };
+        });
+        setLetteringDirty(true);
+        setLetteringSaved(false);
+    };
+
+    const saveSelectedBubbleLettering = async () => {
+        if (!seriesId || !episode || !page || !selectedBubble) return;
+        setLetteringSaving(true);
+        setError("");
+        try {
+            await patchBubbleLettering(seriesId, episode.id, page.pageId ?? page.id, bubbleIdOf(selectedBubble), {
+                ...(selectedBubble.textLayout !== undefined && { textLayout: selectedBubble.textLayout }),
+                ...(selectedBubble.textStyle !== undefined && { textStyle: selectedBubble.textStyle }),
+            });
+            setLetteringDirty(false);
+            setLetteringSaved(true);
+            setSaved(true);
+        } catch (e) {
+            setError((e as Error).message);
+        } finally {
+            setLetteringSaving(false);
+        }
+    };
+
     const updateSelectedBubbleReadingOrder = (readingOrder: number) => {
         if (!page || selectedBubbleIndex === null) return;
         if (!selectedPanel || selectedPanelIndex === null) {
@@ -980,6 +1063,7 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
                 <CanvasOverlayEditor
                     page={page}
                     imageUrl={imageUrl}
+                    letteringMode={letteringMode}
                     stageRef={stageRef}
                     canvasRef={canvasRef}
                     viewport={structureViewport}
@@ -1005,9 +1089,17 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
                     selectedBubbleTextComparison={selectedBubbleTextComparison}
                     selectedPanelDecision={selectedPanelDecision}
                     selectedBubbleDecision={selectedBubbleDecision}
+                    letteringMode={letteringMode}
+                    canManageLettering={canManageLettering}
+                    letteringSaving={letteringSaving}
+                    letteringSaved={letteringSaved}
+                    letteringDirty={letteringDirty}
+                    onToggleLetteringMode={() => setLetteringMode((current) => !current)}
                     onUpdatePanel={updatePanel}
                     onUpdateSelectedPanelBox={updateSelectedPanelBox}
                     onUpdateSelectedBubble={updateSelectedBubble}
+                    onPreviewSelectedBubbleLettering={previewSelectedBubbleLettering}
+                    onSaveSelectedBubbleLettering={saveSelectedBubbleLettering}
                     onUpdateSelectedBubbleReadingOrder={updateSelectedBubbleReadingOrder}
                     onUpdateSelectedBubbleBox={updateSelectedBubbleBox}
                     onAssignSelectedBubblePanel={assignSelectedBubblePanel}

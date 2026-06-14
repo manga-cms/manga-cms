@@ -1,4 +1,4 @@
-import type { BoundingBox, BubbleData, PageData, PanelData } from "../../api";
+import type { BoundingBox, BubbleData, BubbleTextLayout, BubbleTextStyle, PageData, PanelData } from "../../api";
 import { useTranslation } from "../../i18n/I18nProvider";
 import { getBubbleSourceText, getBubbleTextComparison, getBubbleWarnings, type BubbleTextComparisonOverlay } from "../../lib/structure-review/bubbleDraft";
 import { bubbleIdOf } from "../../lib/structure-review/ids";
@@ -19,9 +19,17 @@ type StructureInspectorProps = {
     selectedBubbleTextComparison?: BubbleTextComparisonOverlay;
     selectedPanelDecision: ReviewDecision | null;
     selectedBubbleDecision: ReviewDecision | null;
+    letteringMode: boolean;
+    canManageLettering: boolean;
+    letteringSaving: boolean;
+    letteringSaved: boolean;
+    letteringDirty: boolean;
+    onToggleLetteringMode: () => void;
     onUpdatePanel: (panelIndex: number, nextPanel: PanelData) => void;
     onUpdateSelectedPanelBox: (field: keyof BoundingBox, value: number) => void;
     onUpdateSelectedBubble: (patch: Partial<BubbleData>) => void;
+    onPreviewSelectedBubbleLettering: (patch: { textLayout?: BubbleTextLayout; textStyle?: BubbleTextStyle }) => void;
+    onSaveSelectedBubbleLettering: () => void;
     onUpdateSelectedBubbleReadingOrder: (readingOrder: number) => void;
     onUpdateSelectedBubbleBox: (field: keyof BoundingBox, value: number) => void;
     onAssignSelectedBubblePanel: (panelIndex: number | null) => void;
@@ -41,9 +49,17 @@ export function StructureInspector({
     selectedBubbleTextComparison,
     selectedPanelDecision,
     selectedBubbleDecision,
+    letteringMode,
+    canManageLettering,
+    letteringSaving,
+    letteringSaved,
+    letteringDirty,
+    onToggleLetteringMode,
     onUpdatePanel,
     onUpdateSelectedPanelBox,
     onUpdateSelectedBubble,
+    onPreviewSelectedBubbleLettering,
+    onSaveSelectedBubbleLettering,
     onUpdateSelectedBubbleReadingOrder,
     onUpdateSelectedBubbleBox,
     onAssignSelectedBubblePanel,
@@ -55,6 +71,24 @@ export function StructureInspector({
     const { t } = useTranslation();
     const bubbleWarnings = selectedBubble ? getBubbleWarnings(page, selectedBubble, selectedBubbleTextComparison) : [];
     const bubbleTextComparison = selectedBubble ? getBubbleTextComparison(selectedBubble, selectedBubbleTextComparison) : null;
+
+    const updateTextLayout = (patch: BubbleTextLayout) => {
+        if (!selectedBubble) return;
+        const next = { ...(selectedBubble.textLayout ?? {}), ...patch, source: "manual" as const };
+        onPreviewSelectedBubbleLettering({ textLayout: next });
+    };
+
+    const updateTextStyle = (patch: BubbleTextStyle) => {
+        if (!selectedBubble) return;
+        const next = { ...(selectedBubble.textStyle ?? {}), ...patch };
+        onPreviewSelectedBubbleLettering({ textStyle: next });
+    };
+
+    const numberOrUndefined = (value: string) => {
+        if (value.trim() === "") return undefined;
+        const numberValue = Number(value);
+        return Number.isFinite(numberValue) ? numberValue : undefined;
+    };
 
     return (
         <aside className="structure-inspector card">
@@ -240,6 +274,118 @@ export function StructureInspector({
                                             placeholder="ja"
                                         />
                                     </div>
+                                </div>
+                                <div className="lettering-editor-panel">
+                                    <div className="canonical-bubble-header">
+                                        <h3>{t("structure.lettering.title")}</h3>
+                                        <p>{t("structure.lettering.description")}</p>
+                                    </div>
+                                    <button type="button" className="btn btn-outline" onClick={onToggleLetteringMode}>
+                                        {letteringMode ? t("structure.lettering.previewOn") : t("structure.lettering.previewOff")}
+                                    </button>
+                                    <div className="form-group">
+                                        <label>{t("structure.lettering.lines")}</label>
+                                        <textarea
+                                            value={selectedBubble.textLayout?.lines?.join("\n") ?? selectedBubble.textOriginal}
+                                            onChange={(e) => {
+                                                const lines = e.target.value.split(/\r?\n/u);
+                                                updateTextLayout({ lines });
+                                            }}
+                                        />
+                                        <small>{t("structure.lettering.linesHelp")}</small>
+                                    </div>
+                                    <div className="bubble-field-grid">
+                                        <div className="form-group">
+                                            <label>{t("structure.lettering.inlineAlign")}</label>
+                                            <select
+                                                value={selectedBubble.textLayout?.inlineAlign ?? "start"}
+                                                onChange={(e) => updateTextLayout({ inlineAlign: e.target.value as BubbleTextLayout["inlineAlign"] })}
+                                            >
+                                                <option value="start">{t("structure.lettering.alignStart")}</option>
+                                                <option value="center">{t("structure.lettering.alignCenter")}</option>
+                                                <option value="end">{t("structure.lettering.alignEnd")}</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>{t("structure.lettering.blockAlign")}</label>
+                                            <select
+                                                value={selectedBubble.textLayout?.blockAlign ?? "start"}
+                                                onChange={(e) => updateTextLayout({ blockAlign: e.target.value as BubbleTextLayout["blockAlign"] })}
+                                            >
+                                                <option value="start">{t("structure.lettering.alignStart")}</option>
+                                                <option value="center">{t("structure.lettering.alignCenter")}</option>
+                                                <option value="end">{t("structure.lettering.alignEnd")}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="bbox-grid">
+                                        <div className="form-group">
+                                            <label>{t("structure.lettering.fontSizePx")}</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={selectedBubble.textStyle?.fontSizePx ?? ""}
+                                                onChange={(e) => updateTextStyle({ fontSizePx: numberOrUndefined(e.target.value) })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>{t("structure.lettering.fontWeight")}</label>
+                                            <select
+                                                value={selectedBubble.textStyle?.fontWeight ?? ""}
+                                                onChange={(e) => updateTextStyle({ fontWeight: numberOrUndefined(e.target.value) })}
+                                            >
+                                                <option value="">{t("structure.lettering.auto")}</option>
+                                                {[100, 200, 300, 400, 500, 600, 700, 800, 900].map((weight) => (
+                                                    <option key={weight} value={weight}>{weight}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>{t("structure.lettering.lineHeight")}</label>
+                                            <input
+                                                type="number"
+                                                step="0.05"
+                                                min={0.1}
+                                                value={selectedBubble.textStyle?.lineHeight ?? ""}
+                                                onChange={(e) => updateTextStyle({ lineHeight: numberOrUndefined(e.target.value) })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>{t("structure.lettering.letterSpacing")}</label>
+                                            <input
+                                                type="number"
+                                                step="0.5"
+                                                value={selectedBubble.textStyle?.letterSpacing ?? ""}
+                                                onChange={(e) => updateTextStyle({ letterSpacing: numberOrUndefined(e.target.value) })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>{t("structure.lettering.fitMode")}</label>
+                                        <select
+                                            value={selectedBubble.textStyle?.fitMode ?? "auto"}
+                                            onChange={(e) => updateTextStyle({ fitMode: e.target.value as BubbleTextStyle["fitMode"] })}
+                                        >
+                                            <option value="auto">auto</option>
+                                            <option value="shrink">shrink</option>
+                                            <option value="fixed">fixed</option>
+                                        </select>
+                                    </div>
+                                    {canManageLettering ? (
+                                        <div className="section-actions">
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary"
+                                                onClick={onSaveSelectedBubbleLettering}
+                                                disabled={letteringSaving || !letteringDirty}
+                                            >
+                                                {letteringSaving ? t("structure.lettering.saving") : t("structure.lettering.save")}
+                                            </button>
+                                            {letteringSaved && <span className="success-msg-inline">{t("structure.lettering.saved")}</span>}
+                                        </div>
+                                    ) : (
+                                        <p className="card-meta">{t("structure.lettering.manageRightsRequired")}</p>
+                                    )}
                                 </div>
                             </div>
                             {page && selectedPanel && (

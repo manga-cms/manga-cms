@@ -381,8 +381,12 @@ Lettering Tool Phase 0 contract:
   `READER_TEXT_OVERLAY_SPACE_AS_BREAK`.
 - Full Episode saves strip incoming lettering field changes and preserve any
   already-authored lettering fields on matching Bubble IDs. Pack Draft writes
-  reject `text_layout` / `text_style` in Phase 0. A narrow write endpoint for
-  lettering edits is a later phase.
+  reject `text_layout` / `text_style` in Phase 0.
+- Lettering Tool Phase 2 adds the narrow canonical write endpoint
+  `PATCH /admin/series/{seriesId}/episodes/{episodeId}/pages/{pageId}/bubbles/{bubbleId}/lettering`.
+  It is gated by `manage_rights` only. It updates only `Bubble.textLayout` and
+  `Bubble.textStyle`; `textOriginal`, `bbox`, and other Bubble fields remain
+  unchanged. `edit_structure` users cannot use this endpoint.
 
 ### Content Lint Warnings
 
@@ -1086,6 +1090,10 @@ Current Series-scoped enforcement:
 - `PUT /admin/series/{id}`, Episode writes, Page image upload, and
   `/admin/series/{id}/publish` require `edit_structure` or `manage_rights` for
   that Series unless the user is a global admin.
+- `PATCH /admin/series/{id}/episodes/{epId}/pages/{pageId}/bubbles/{bubbleId}/lettering`
+  requires `manage_rights` for that Series. This is intentionally narrower than
+  full Episode saves so authors can apply canonical Japanese lettering while
+  `edit_structure` remains limited to structure/source edits.
 - `POST /admin/series` remains global-admin-only because a new Series has no
   pre-existing Series scope.
 - Rights grant list/create/revoke is global-admin-only for broad scopes, and
@@ -1152,6 +1160,7 @@ Current API coverage for CMS content editing:
 | Page structure and image metadata | Same Episode save routes | Full Episode replacement. CMS must preserve all other Pages. | Needed later for one-Page edits and conflict avoidance. |
 | Panel bbox/order/status/flags | Same Episode save routes | Full Episode replacement. CMS must preserve all other Panels/Bubbles. | Needed later for one-Panel edits and review workflows. |
 | Bubble bbox/order/source text/speaker/status/flags | Same Episode save routes | Full Episode replacement. `Bubble.textOriginal` remains canonical Japanese/source text. | Needed later for one-Bubble source text and bbox edits. |
+| Japanese Bubble lettering (`textLayout` / `textStyle`) | `PATCH /admin/series/{id}/episodes/{epId}/pages/{pageId}/bubbles/{bubbleId}/lettering` | Narrow Bubble lettering patch gated by `manage_rights`; does not alter `textOriginal` or `bbox`. | Future proposal flow for non-author edits. |
 | English translation import | `POST /admin/pack-drafts/{packDraftId}/translation-import` | Runtime Translation Pack Draft plan/apply; never overwrites canonical source text. | Existing route is enough for MVP import. Future entry update/delete may be needed. |
 | Oneshot routing | Public/CMS clients read `publicationType: "oneshot"` and Episode list | No special write endpoint; still one Series with one primary Episode. | Optional future route helper for resolving the primary Episode. |
 

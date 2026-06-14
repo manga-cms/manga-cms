@@ -48,6 +48,9 @@ importers:
 
   apps/cms:
     dependencies:
+      '@manga/lettering':
+        specifier: workspace:*
+        version: link:../../packages/lettering
       '@manga/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas

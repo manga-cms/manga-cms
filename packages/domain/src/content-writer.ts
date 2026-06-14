@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { SeriesManifestSchema, EpisodeSchema } from "@manga/schemas";
-import type { Series, Episode } from "./types.js";
+import type { Series, Episode, BubbleTextLayout, BubbleTextStyle } from "./types.js";
 import { isSafePathSegment, isSafeRelativeAssetPath } from "./path-safety.js";
 import { migrateLegacyPageBubbles } from "./content-v2.js";
 
@@ -67,6 +67,10 @@ export interface ContentWriteRepository {
     createSeries(input: CreateSeriesInput): { success: true; series: Series } | { success: false; error: string };
     updateSeries(seriesId: string, input: UpdateSeriesInput): { success: true; series: Series } | { success: false; error: string };
     saveEpisode(seriesId: string, input: SaveEpisodeInput): { success: true } | { success: false; error: string };
+    patchBubbleLettering(seriesId: string, episodeId: string, pageId: string, bubbleId: string, input: {
+        textLayout?: BubbleTextLayout;
+        textStyle?: BubbleTextStyle;
+    }): { success: true; episode: Episode } | { success: false; error: string };
     /** Re-read contents/ to pick up changes. */
     reload(): void;
 }
@@ -345,6 +349,74 @@ export class FileContentWriter implements ContentWriteRepository {
 
         this.onWrite?.();
         return { success: true };
+    }
+
+    patchBubbleLettering(seriesId: string, episodeId: string, pageId: string, bubbleId: string, input: {
+        textLayout?: BubbleTextLayout;
+        textStyle?: BubbleTextStyle;
+    }): { success: true; episode: Episode } | { success: false; error: string } {
+        if (!isSafePathSegment(seriesId)) {
+            return { success: false, error: "Series id must be a safe path segment" };
+        }
+        if (!isSafePathSegment(episodeId)) {
+            return { success: false, error: "Episode id must be a safe path segment" };
+        }
+
+        const episodePath = join(this.contentsDir, seriesId, episodeId, "episode.json");
+        if (!existsSync(episodePath)) {
+            return { success: false, error: `Episode "${episodeId}" not found` };
+        }
+
+        const existingEpisode = JSON.parse(readFileSync(episodePath, "utf-8"));
+        const migratedPages = (existingEpisode.pages ?? []).map((page: any) => migrateLegacyPageBubbles(page));
+        let updated = false;
+        const pages = migratedPages.map((page: any) => {
+            const currentPageId = String(page.pageId ?? page.id ?? "");
+            if (currentPageId !== pageId && String(page.pageNumber ?? "") !== pageId) return page;
+            const bubbles = (page.bubbles ?? []).map((bubble: any) => {
+                if (bubbleKeyOf(bubble) !== bubbleId) return bubble;
+                updated = true;
+                const nextBubble = { ...bubble };
+                if (input.textLayout !== undefined) {
+                    nextBubble.textLayout = Object.keys(input.textLayout).length > 0 ? input.textLayout : undefined;
+                }
+                if (input.textStyle !== undefined) {
+                    nextBubble.textStyle = Object.keys(input.textStyle).length > 0 ? input.textStyle : undefined;
+                }
+                return nextBubble;
+            });
+            return {
+                ...page,
+                bubbles,
+                panels: (page.panels ?? []).map((panel: any) => {
+                    const panelId = String(panel.panelId ?? panel.id ?? "");
+                    const { bubbles: _legacyBubbles, ...panelData } = panel;
+                    return {
+                        ...panelData,
+                        bubbles: bubbles.filter((bubble: any) => bubble.panelId === panelId),
+                    };
+                }),
+            };
+        });
+
+        if (!updated) {
+            return { success: false, error: `Bubble "${bubbleId}" not found on page "${pageId}"` };
+        }
+
+        const epData = {
+            ...existingEpisode,
+            schemaVersion: 2,
+            pages,
+        };
+
+        const epResult = EpisodeSchema.safeParse(epData);
+        if (!epResult.success) {
+            return { success: false, error: `Episode validation failed: ${epResult.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ")}` };
+        }
+
+        writeJsonAtomic(episodePath, epResult.data);
+        this.onWrite?.();
+        return { success: true, episode: epResult.data };
     }
 
     reload(): void {

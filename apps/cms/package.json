@@ -14,7 +14,8 @@
         "@manga/schemas": "workspace:*",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
-        "react-router-dom": "^7.0.0"
+        "react-router-dom": "^7.0.0",
+        "@manga/lettering": "workspace:*"
     },
     "devDependencies": {
         "@types/react": "^19.0.0",

@@ -1733,6 +1733,45 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /admin/series/{seriesId}/episodes/{episodeId}/pages/{pageId}/bubbles/{bubbleId}/lettering:
+    patch:
+      tags: [AdminContent]
+      summary: Patch canonical Bubble lettering fields
+      description: >
+        Narrow Phase 2 lettering endpoint. Requires `manage_rights` for the
+        Series. It updates only `textLayout` and `textStyle` on the target
+        Bubble; `textOriginal`, `bbox`, and other canonical fields are not
+        changed. Full Episode saves continue to strip incoming lettering field
+        changes and preserve already-authored lettering.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/seriesId"
+        - $ref: "#/components/parameters/episodeId"
+        - $ref: "#/components/parameters/pageId"
+        - $ref: "#/components/parameters/bubbleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BubbleLetteringPatchInput"
+      responses:
+        "200":
+          description: Updated Episode with attached Panel Bubble lists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BubbleLetteringPatchResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /admin/series/{seriesId}/episodes/{episodeId}/pages/{pageNumber}/image:
     get:
       tags: [AdminContent]
@@ -2539,6 +2578,18 @@ components:
       required: true
       schema:
         type: string
+    pageId:
+      name: pageId
+      in: path
+      required: true
+      schema:
+        type: string
+    bubbleId:
+      name: bubbleId
+      in: path
+      required: true
+      schema:
+        type: string
     pageNumber:
       name: pageNumber
       in: path
@@ -2930,6 +2981,30 @@ components:
           type: string
           enum: [auto, shrink, fixed]
       additionalProperties: false
+
+    BubbleLetteringPatchInput:
+      type: object
+      description: >
+        Narrow canonical lettering patch. At least one of `textLayout` or
+        `textStyle` must be present. Only the manage_rights-gated endpoint may
+        apply these fields to canonical Bubble content.
+      minProperties: 1
+      properties:
+        textLayout:
+          $ref: "#/components/schemas/BubbleTextLayout"
+        textStyle:
+          $ref: "#/components/schemas/BubbleTextStyle"
+      additionalProperties: false
+
+    BubbleLetteringPatchResponse:
+      type: object
+      required: [ok, episode]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        episode:
+          $ref: "#/components/schemas/Episode"
 
     Bubble:
       type: object

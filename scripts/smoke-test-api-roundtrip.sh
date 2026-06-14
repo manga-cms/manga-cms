@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/manga-api-roundtrip.XXXXXX")"
 API_LOG="$TMP_DIR/api.log"
 COOKIE_JAR="$TMP_DIR/cookies.txt"
+EDITOR_COOKIE_JAR="$TMP_DIR/editor-cookies.txt"
+MANAGER_COOKIE_JAR="$TMP_DIR/manager-cookies.txt"
 
 PORT="${PORT:-$(node -e 'const net=require("node:net"); const server=net.createServer(); server.listen(0, () => { console.log(server.address().port); server.close(); });')}"
 API="http://127.0.0.1:${PORT}/api/v1"
@@ -156,6 +158,63 @@ assert_json_equals "$EPISODE_RESPONSE" "data.pages[0].bubbles[0].panelId" "null"
 assert_json_equals "$EPISODE_RESPONSE" "data.pages[0].bubbles[0].bubbleId" "roundtrip-series-ep01-p01-bubble-001"
 assert_json_equals "$EPISODE_RESPONSE" "data.pages[0].panels[0].panelId" "roundtrip-series-ep01-p01-panel-001"
 echo "✅ panelId:null bubble roundtrip"
+
+curl -fsS -X POST "$API/admin/rights/grants" \
+    -H 'Content-Type: application/json' \
+    -b "$COOKIE_JAR" \
+    -d '{
+      "subject_user_id": "editor-user",
+      "role": "editor",
+      "permissions": ["edit_structure"],
+      "scope": { "series_id": "roundtrip-series" }
+    }' >/dev/null
+
+curl -fsS -X POST "$API/auth/dev-login" \
+    -H 'Content-Type: application/json' \
+    -d '{"userId":"editor-user","name":"CI Smoke Editor"}' \
+    -c "$EDITOR_COOKIE_JAR" >/dev/null
+
+LETTERING_EDITOR_STATUS="$(curl -sS -o "$TMP_DIR/lettering-editor-response.json" -w '%{http_code}' \
+    -X PATCH "$API/admin/series/roundtrip-series/episodes/ep01/pages/roundtrip-series-ep01-p01/bubbles/roundtrip-series-ep01-p01-bubble-001/lettering" \
+    -H 'Content-Type: application/json' \
+    -b "$EDITOR_COOKIE_JAR" \
+    -d '{"textLayout":{"lines":["Editor should not apply"]}}')"
+if [ "$LETTERING_EDITOR_STATUS" != "403" ]; then
+    fail "Expected edit_structure-only user to receive 403 from lettering patch, got ${LETTERING_EDITOR_STATUS}: $(cat "$TMP_DIR/lettering-editor-response.json")"
+fi
+echo "✅ edit_structure cannot apply lettering"
+
+curl -fsS -X POST "$API/admin/rights/grants" \
+    -H 'Content-Type: application/json' \
+    -b "$COOKIE_JAR" \
+    -d '{
+      "subject_user_id": "manager-user",
+      "role": "owner",
+      "permissions": ["manage_rights"],
+      "scope": { "series_id": "roundtrip-series" }
+    }' >/dev/null
+
+curl -fsS -X POST "$API/auth/dev-login" \
+    -H 'Content-Type: application/json' \
+    -d '{"userId":"manager-user","name":"CI Smoke Manager"}' \
+    -c "$MANAGER_COOKIE_JAR" >/dev/null
+
+LETTERING_RESPONSE="$(curl -fsS -X PATCH "$API/admin/series/roundtrip-series/episodes/ep01/pages/roundtrip-series-ep01-p01/bubbles/roundtrip-series-ep01-p01-bubble-001/lettering" \
+    -H 'Content-Type: application/json' \
+    -b "$MANAGER_COOKIE_JAR" \
+    -d '{
+      "textLayout": { "lines": ["Page-level", "bubble survives"], "inlineAlign": "center", "blockAlign": "start", "source": "manual" },
+      "textStyle": { "fontSizePx": 32, "fontWeight": 500, "lineHeight": 1.25, "letterSpacing": 1, "fitMode": "fixed" }
+    }')"
+assert_json_equals "$LETTERING_RESPONSE" "data.episode.pages[0].bubbles[0].textLayout.lines.join('|')" "Page-level|bubble survives"
+assert_json_equals "$LETTERING_RESPONSE" "data.episode.pages[0].bubbles[0].textOriginal" "Page-level bubble survives roundtrip."
+assert_json_equals "$LETTERING_RESPONSE" "data.episode.pages[0].bubbles[0].bbox.width" "300"
+echo "✅ manage_rights applies lettering without changing text or bbox"
+
+LETTERING_EPISODE_RESPONSE="$(curl -fsS "$API/admin/series/roundtrip-series/episodes/ep01" -b "$MANAGER_COOKIE_JAR")"
+assert_json_equals "$LETTERING_EPISODE_RESPONSE" "data.pages[0].bubbles[0].textLayout.lines.join('|')" "Page-level|bubble survives"
+assert_json_equals "$LETTERING_EPISODE_RESPONSE" "data.pages[0].bubbles[0].textStyle.fontSizePx" "32"
+echo "✅ lettering patch persists through admin reload"
 
 PUBLIC_EPISODE_RESPONSE="$(curl -fsS "$API/series/roundtrip-series/episodes/ep01")"
 DELIVERY_URL="$(node -e '

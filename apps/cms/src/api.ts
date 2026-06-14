@@ -119,6 +119,21 @@ export interface BoundingBox {
     coordinateSpace?: "pixel";
 }
 
+export interface BubbleTextLayout {
+    lines?: string[];
+    inlineAlign?: "start" | "center" | "end";
+    blockAlign?: "start" | "center" | "end";
+    source?: "manual" | "imported" | "ocr";
+}
+
+export interface BubbleTextStyle {
+    fontSizePx?: number;
+    fontWeight?: number;
+    lineHeight?: number;
+    letterSpacing?: number;
+    fitMode?: "auto" | "shrink" | "fixed";
+}
+
 export interface BubbleData {
     bubbleId?: string;
     id: string;
@@ -136,6 +151,8 @@ export interface BubbleData {
     lang?: string;
     flags?: ContentFlags;
     metadata?: ContentPublicMetadata;
+    textLayout?: BubbleTextLayout;
+    textStyle?: BubbleTextStyle;
     bbox: BoundingBox;
 }
 
@@ -402,6 +419,27 @@ export async function getAdminEpisode(seriesId: string, episodeId: string): Prom
         throwSeriesEditError(res, await readApiError(res), "Admin login or Series permission required");
     }
     return normalizeEpisode(await res.json());
+}
+
+export async function patchBubbleLettering(
+    seriesId: string,
+    episodeId: string,
+    pageId: string,
+    bubbleId: string,
+    input: {
+        textLayout?: BubbleTextLayout;
+        textStyle?: BubbleTextStyle;
+    },
+): Promise<EpisodeData> {
+    const res = await fetch(`${API}/admin/series/${seriesId}/episodes/${episodeId}/pages/${pageId}/bubbles/${bubbleId}/lettering`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throwSeriesEditError(res, data, "Failed to update lettering");
+    return normalizeEpisode(data.episode);
 }
 
 export function getAdminPageImageUrl(seriesId: string, episodeId: string, pageNumber: number, locale = "ja") {
@@ -975,6 +1013,22 @@ export async function revokeRightsGrant(grantId: string) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message ?? "Failed to revoke rights grant");
     return data as RightsGrantRecord;
+}
+
+export async function checkRightsPermission(input: {
+    user_id: string;
+    permission: RightsPermission;
+    scope: RightsScope;
+}): Promise<{ allowed: boolean; matched_grant_ids: string[]; reason?: string }> {
+    const res = await fetch(`${API}/admin/rights/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to check rights permission");
+    return data;
 }
 
 export interface GitHubHandoffRecord {

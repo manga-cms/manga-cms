@@ -36,6 +36,8 @@ import {
     RightsPermissionCheckInputSchema,
     TranslationBatchRunInputSchema,
     TranslationPackDraftImportInputSchema,
+    BubbleTextLayoutSchema,
+    BubbleTextStyleSchema,
     type GitHubHandoffSyncDryRunInputData,
 } from "@manga/schemas";
 import {
@@ -102,6 +104,8 @@ import {
     type RightsRepository,
     type RightsPermission,
     type RightsScope,
+    type BubbleTextLayout,
+    type BubbleTextStyle,
 } from "@manga/domain";
 
 // ---------------------------------------------------------------------------
@@ -2158,6 +2162,7 @@ const SERIES_ADMIN_PERMISSIONS: RightsPermission[] = [
 
 const SERIES_CONTENT_WRITE_PERMISSIONS: RightsPermission[] = ["edit_structure", "manage_rights"];
 const SERIES_TRANSLATION_WRITE_PERMISSIONS: RightsPermission[] = ["edit_translation", "manage_rights"];
+const SERIES_LETTERING_WRITE_PERMISSIONS: RightsPermission[] = ["manage_rights"];
 
 function isGlobalAdmin(user: DevUser | null): boolean {
     return user?.role === "admin";
@@ -2324,6 +2329,68 @@ app.get("/admin/series/:id/episodes/:epId", async (c) => {
     const ep = readRepo.getEpisode(seriesId, epId);
     if (!ep) return c.json({ error: { code: "NOT_FOUND", message: "Episode not found" } }, 404);
     return c.json(attachEpisodePanelBubbles(ep));
+});
+
+// PATCH /admin/series/:id/episodes/:epId/pages/:pageId/bubbles/:bubbleId/lettering
+// Narrow lettering patch endpoint. Full Episode saves intentionally preserve
+// existing lettering and strip incoming lettering fields; this manage_rights
+// path is the only Phase 2 API that applies canonical Bubble lettering.
+app.patch("/admin/series/:id/episodes/:epId/pages/:pageId/bubbles/:bubbleId/lettering", async (c) => {
+    const seriesId = c.req.param("id");
+    const access = await requireSeriesPermission(c, seriesId, SERIES_LETTERING_WRITE_PERMISSIONS);
+    if ("response" in access) return access.response;
+
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Body must be an object" } }, 400);
+    }
+
+    const input = body as Record<string, unknown>;
+    const allowedKeys = new Set(["textLayout", "textStyle"]);
+    const extraKeys = Object.keys(input).filter((key) => !allowedKeys.has(key));
+    if (extraKeys.length > 0) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: `Unsupported lettering fields: ${extraKeys.join(", ")}` } }, 400);
+    }
+
+    const patch: { textLayout?: BubbleTextLayout; textStyle?: BubbleTextStyle } = {};
+    if (input.textLayout !== undefined) {
+        const parsed = BubbleTextLayoutSchema.safeParse(input.textLayout);
+        if (!parsed.success) {
+            return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+        }
+        patch.textLayout = parsed.data;
+    }
+    if (input.textStyle !== undefined) {
+        const parsed = BubbleTextStyleSchema.safeParse(input.textStyle);
+        if (!parsed.success) {
+            return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+        }
+        patch.textStyle = parsed.data;
+    }
+    if (patch.textLayout === undefined && patch.textStyle === undefined) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "textLayout or textStyle is required" } }, 400);
+    }
+
+    const result = writer.patchBubbleLettering(
+        seriesId,
+        c.req.param("epId"),
+        c.req.param("pageId"),
+        c.req.param("bubbleId"),
+        patch,
+    );
+    if (!result.success) {
+        const status = /not found/iu.test(result.error) ? 404 : 400;
+        return c.json({ error: { code: status === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: result.error } }, status);
+    }
+    return c.json({
+        ok: true,
+        episode: attachEpisodePanelBubbles(result.episode),
+    });
 });
 
 // GET /admin/series/:id/episodes/:epId/pages/:pageNumber/image — CMS preview image
