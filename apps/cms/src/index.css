@@ -158,6 +158,10 @@ a:hover {
     max-width: none;
 }
 
+.app-main:has(.lettering-workspace) {
+    max-width: none;
+}
+
 h1 {
     font-size: 1.5rem;
     margin-bottom: 1.5rem;
@@ -2469,7 +2473,7 @@ textarea {
 
 .lettering-workspace-layout {
     display: grid;
-    grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr) minmax(18rem, 23rem);
+    grid-template-columns: minmax(8rem, 10rem) minmax(0, 1fr) minmax(17rem, 21rem);
     gap: 1rem;
     align-items: start;
 }
@@ -2504,11 +2508,13 @@ textarea {
 
 .lettering-preview-card {
     overflow: auto;
+    min-height: calc(100vh - 10rem);
 }
 
 .lettering-canvas {
     position: relative;
-    max-width: min(100%, 54rem);
+    width: min(100%, 72rem);
+    max-width: 100%;
     margin: 0 auto;
     container-type: inline-size;
 }

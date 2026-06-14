@@ -946,7 +946,7 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
                 canRedo={redoStack.length > 0}
                 onUndo={undo}
                 onRedo={redo}
-                onRequestLeave={() => requestLeave(`/works/${seriesId}/episodes/${episode.id}`)}
+                onRequestLeave={requestLeave}
                 onSave={save}
                 showTranslationImport={currentUser?.role === "admin"}
             />

@@ -16,7 +16,7 @@ type StructureReviewHeaderProps = {
     canRedo: boolean;
     onUndo: () => void;
     onRedo: () => void;
-    onRequestLeave: () => boolean;
+    onRequestLeave: (href: string) => boolean;
     onSave: () => void;
     showTranslationImport?: boolean;
 };
@@ -36,6 +36,9 @@ export function StructureReviewHeader({
     showTranslationImport = false,
 }: StructureReviewHeaderProps) {
     const { t } = useTranslation();
+    const episodeHref = `/works/${seriesId}/episodes/${episodeId}`;
+    const letteringHref = `/works/${seriesId}/episodes/${episodeId}/lettering`;
+    const translationImportHref = `/works/${seriesId}/episodes/${episodeId}/translation-import`;
     const [hintOpen, setHintOpen] = useState(() => {
         if (typeof window === "undefined") return true;
         return window.localStorage.getItem(STRUCTURE_HINT_SEEN_KEY) !== "1";
@@ -61,29 +64,29 @@ export function StructureReviewHeader({
             <div className="section-actions">
                 {dirty && <span className="badge badge-warn">{t("structure.dirty")}</span>}
                 <Link
-                    to={`/works/${seriesId}/episodes/${episodeId}`}
+                    to={episodeHref}
                     className="btn btn-outline"
                     onClick={(event) => {
-                        if (!onRequestLeave()) event.preventDefault();
+                        if (!onRequestLeave(episodeHref)) event.preventDefault();
                     }}
                 >
                     {t("structure.episode")}
                 </Link>
                 <Link
-                    to={`/works/${seriesId}/episodes/${episodeId}/lettering`}
+                    to={letteringHref}
                     className="btn btn-outline"
                     onClick={(event) => {
-                        if (!onRequestLeave()) event.preventDefault();
+                        if (!onRequestLeave(letteringHref)) event.preventDefault();
                     }}
                 >
                     {t("lettering.workspace.link")}
                 </Link>
                 {showTranslationImport && (
                     <Link
-                        to={`/works/${seriesId}/episodes/${episodeId}/translation-import`}
+                        to={translationImportHref}
                         className="btn btn-outline"
                         onClick={(event) => {
-                            if (!onRequestLeave()) event.preventDefault();
+                            if (!onRequestLeave(translationImportHref)) event.preventDefault();
                         }}
                     >
                         {t("structure.translation.import")}
