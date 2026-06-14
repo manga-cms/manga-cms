@@ -15,12 +15,13 @@ content）は変えず、表示の組版だけを整えます。
 できること（現状の実装範囲）:
 
 - 日本語（ja）のフキダシの写植を CMS で見たまま（WYSIWYG）編集
+- 翻訳（en / zh-Hans / sv など）の Translation Pack Draft entry の写植を言語タブで編集
 - 改行位置、文字の揃え、フォントサイズ・太さ・行間・字間、フィットモード
-- 編集結果は公開 overlay にそのまま反映
+- 日本語の編集結果は公開 overlay にそのまま反映
+- 翻訳の編集結果は Pack Draft に保存され、export/publish 後に公開 overlay に反映
 
 まだのこと（今後の段階で対応）:
 
-- 翻訳（en / zh-Hans / sv）の写植（言語タブ）
 - 編集者の「承認待ち修正」・読者の「修正提案」
 
 ## 前提
@@ -56,8 +57,21 @@ content）は変えず、表示の組版だけを整えます。
      - `shrink`: 指定サイズを基準にし、はみ出すときだけ縮小
      - `fixed`: 指定サイズで固定（はみ出しはフキダシ内スクロール）
 6. プレビューで収まりと改行を確認します。
-7. **保存**します。`manage_rights` があれば、その場で canonical に反映されます。
+7. **保存**します。日本語（ja）は `manage_rights` があれば、その場で canonical に反映されます。
+   翻訳タブでは、対応する Translation Pack Draft entry の `text_layout` / `text_style` に保存されます。
 8. 公開 overlay（`read.manga-cms.com/works/.../episodes/.../overlay`）で最終確認します。
+
+## 翻訳写植
+
+翻訳写植は、公開済み Pack を直接編集しません。先に Translation Pack Draft に翻訳 entry を
+作成し、その entry に対して写植だけを保存します。翻訳タブが表示されるのは、対象 Episode に
+対応する Translation Pack Draft がある場合です。
+
+1. 翻訳 import などで Translation Pack Draft entry を作成します。
+2. 写植画面の言語タブ（例: `en`, `zh-Hans`, `sv`）を開きます。
+3. 対応する Bubble entry があるフキダシだけ編集できます。entry が無い場合は、その旨が表示されます。
+4. 保存すると、Draft entry の `text_layout` / `text_style` だけが更新されます。翻訳本文や Bubble ID は変わりません。
+5. レビュー後、Pack Draft を export/publish すると、公開 overlay の `?lang=...` に反映されます。
 
 ## 手書きでの写植（上級・UI を使わない方法）
 
@@ -74,14 +88,15 @@ UI を使わず、`contents/` の `episode.json` の各 Bubble に `textLayout` 
 ```
 
 注意: CMS の通常の Episode 保存（写植ワークスペース以外の保存）は、写植データを上書きしません。
-既存の写植は保持され、保存に含めた写植差分は無視されます。写植は「写植モードの保存」か
-「手書き JSON」のどちらかでのみ入ります。
+既存の写植は保持され、保存に含めた写植差分は無視されます。日本語写植は「写植モードの保存」か
+「手書き JSON」のどちらかで入ります。翻訳写植は、通常の translation import ではなく、
+Translation Pack Draft entry の写植保存か、レビュー済み Pack JSON への手書き追加で入ります。
 
 ## 制約・注意
 
 - 原文（`textOriginal`）は写植では変わりません。写植は表示用の別データです。
 - フキダシ枠（`bbox`）は写植では動かしません。枠の調整は構造編集側で行います。
-- 翻訳の写植は言語ごとに別管理になる予定です（現状は日本語のみ）。
+- 翻訳写植は言語ごとに Pack Draft entry で別管理します。未publishのDraft写植は公開overlayには出ません。
 - overlay は現在 `noindex`（検索非掲載）の実験運用です。
 
 ## 関連ドキュメント

@@ -386,13 +386,21 @@ Lettering Tool Phase 0 contract:
   display. Hand-authored `textLayout.lines` takes precedence over
   `READER_TEXT_OVERLAY_SPACE_AS_BREAK`.
 - Full Episode saves strip incoming lettering field changes and preserve any
-  already-authored lettering fields on matching Bubble IDs. Pack Draft writes
-  reject `text_layout` / `text_style` in Phase 0.
+  already-authored lettering fields on matching Bubble IDs. Normal Pack Draft
+  writes and translation import reject `text_layout` / `text_style`; reviewed
+  translation lettering enters Pack Drafts only through the narrow Pack Draft
+  entry lettering patch endpoint.
 - Lettering Tool Phase 2 adds the narrow canonical write endpoint
   `PATCH /admin/series/{seriesId}/episodes/{episodeId}/pages/{pageId}/bubbles/{bubbleId}/lettering`.
   It is gated by `manage_rights` only. It updates only `Bubble.textLayout` and
   `Bubble.textStyle`; `textOriginal`, `bbox`, and other Bubble fields remain
   unchanged. `edit_structure` users cannot use this endpoint.
+- Lettering Tool Phase 3 adds the narrow Translation Pack Draft write endpoint
+  `PATCH /admin/pack-drafts/{packDraftId}/entries/{entryId}/lettering`.
+  It updates only draft entry `text_layout` and `text_style`; the translated
+  `text`, target Bubble ID, Pack metadata, and canonical Episode remain
+  unchanged. The public Reader sees translation lettering only after the Pack
+  Draft is exported/published.
 
 ### Content Lint Warnings
 
@@ -1073,6 +1081,7 @@ Base path: `/api/v1`
 | `POST` | `/admin/pack-drafts/{packDraftId}/adopt-proposal` | Adopt an accepted Proposal into a Pack draft |
 | `POST` | `/admin/pack-drafts/{packDraftId}/translation-import` | Validate/apply Bubble-level translation rows into a Translation Pack draft |
 | `POST` | `/admin/pack-drafts/{packDraftId}/translation-batch` | Run an explicit admin machine-translation batch into a Translation Pack draft |
+| `PATCH` | `/admin/pack-drafts/{packDraftId}/entries/{entryId}/lettering` | Patch reviewed translation lettering fields on a Translation Pack draft entry |
 | `POST` | `/admin/pack-drafts/{packDraftId}/export` | Export an approved/published Pack draft to `packs/{packId}/pack.json` |
 | `GET` | `/admin/rights/grants` | List runtime Rights grants |
 | `POST` | `/admin/rights/grants` | Create a runtime Rights grant |
@@ -1100,6 +1109,11 @@ Current Series-scoped enforcement:
   requires `manage_rights` for that Series. This is intentionally narrower than
   full Episode saves so authors can apply canonical Japanese lettering while
   `edit_structure` remains limited to structure/source edits.
+- `PATCH /admin/pack-drafts/{packDraftId}/entries/{entryId}/lettering`
+  is currently aligned with the existing Pack Draft surface and remains
+  global-admin-only. It is a narrow runtime draft patch for Translation Pack
+  entry lettering; Series-scoped translator/editor access is future feature
+  coverage rather than a security gap.
 - `POST /admin/series` remains global-admin-only because a new Series has no
   pre-existing Series scope.
 - Rights grant list/create/revoke is global-admin-only for broad scopes, and
@@ -1167,6 +1181,7 @@ Current API coverage for CMS content editing:
 | Panel bbox/order/status/flags | Same Episode save routes | Full Episode replacement. CMS must preserve all other Panels/Bubbles. | Needed later for one-Panel edits and review workflows. |
 | Bubble bbox/order/source text/speaker/status/flags | Same Episode save routes | Full Episode replacement. `Bubble.textOriginal` remains canonical Japanese/source text. | Needed later for one-Bubble source text and bbox edits. |
 | Japanese Bubble lettering (`textLayout` / `textStyle`) | `PATCH /admin/series/{id}/episodes/{epId}/pages/{pageId}/bubbles/{bubbleId}/lettering` | Narrow Bubble lettering patch gated by `manage_rights`; does not alter `textOriginal` or `bbox`. | Future proposal flow for non-author edits. |
+| Translation Pack Draft lettering (`text_layout` / `text_style`) | `PATCH /admin/pack-drafts/{packDraftId}/entries/{entryId}/lettering` | Narrow runtime Translation Pack Draft entry patch. Export/publish writes reviewed entry lettering to the Pack manifest. | Future Series-scoped translator/editor access and proposal flow. |
 | English translation import | `POST /admin/pack-drafts/{packDraftId}/translation-import` | Runtime Translation Pack Draft plan/apply; never overwrites canonical source text. | Existing route is enough for MVP import. Future entry update/delete may be needed. |
 | Oneshot routing | Public/CMS clients read `publicationType: "oneshot"` and Episode list | No special write endpoint; still one Series with one primary Episode. | Optional future route helper for resolving the primary Episode. |
 

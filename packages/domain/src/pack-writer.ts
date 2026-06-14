@@ -43,6 +43,8 @@ function draftEntryToPackEntry(entry: PackDraftRecord["entries"][number]): PackM
         ...(entry.note && { note: entry.note }),
         ...(entry.source_proposal_id && { sourceProposalId: entry.source_proposal_id }),
         ...(entry.metadata && { metadata: entry.metadata }),
+        ...(entry.text_layout && { textLayout: entry.text_layout }),
+        ...(entry.text_style && { textStyle: entry.text_style }),
     };
 }
 

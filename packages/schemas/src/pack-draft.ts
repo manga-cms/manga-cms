@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PackClassSchema, PackTypeSchema } from "./content.js";
+import { BubbleTextLayoutSchema, BubbleTextStyleSchema, PackClassSchema, PackTypeSchema } from "./content.js";
 
 export const PackDraftStatusSchema = z.enum(["draft", "in_review", "approved", "published", "archived"]);
 
@@ -38,7 +38,15 @@ export const PackDraftExportInputSchema = z.object({
     overwrite: z.boolean().optional(),
 }).strict();
 
+export const PackDraftEntryLetteringPatchInputSchema = z.object({
+    textLayout: BubbleTextLayoutSchema.optional(),
+    textStyle: BubbleTextStyleSchema.optional(),
+}).strict().refine((value) => value.textLayout !== undefined || value.textStyle !== undefined, {
+    message: "textLayout or textStyle is required",
+});
+
 export type PackDraftCreateInputData = z.infer<typeof PackDraftCreateInputSchema>;
 export type PackDraftStatusUpdateInputData = z.infer<typeof PackDraftStatusUpdateInputSchema>;
 export type PackDraftAdoptProposalInputData = z.infer<typeof PackDraftAdoptProposalInputSchema>;
 export type PackDraftExportInputData = z.infer<typeof PackDraftExportInputSchema>;
+export type PackDraftEntryLetteringPatchInputData = z.infer<typeof PackDraftEntryLetteringPatchInputSchema>;

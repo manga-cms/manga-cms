@@ -242,8 +242,13 @@ Each phase delivers value independently. Dependencies flow top to bottom.
 
 ### Phase 3: CMS lettering view (translations, Pack Draft)
 
-- Language tabs editing Pack Draft entries; Pack Draft entry patch/upsert
-  endpoint; export/publish (`publish_pack`).
+- Language tabs editing existing Translation Pack Draft entries; a narrow Pack
+  Draft entry patch endpoint updates only `text_layout` / `text_style`.
+- Normal translation import/adopt writes continue to reject lettering fields.
+  Translation text and Bubble IDs must already exist in the draft entry before
+  lettering can be applied.
+- Export/publish writes reviewed Pack Draft entry lettering into the Pack
+  manifest so public overlay `?lang=` can read it.
 - Optionally extend `translation-import` to carry `text_layout`/`text_style`
   (schema + column spec) here.
 - Verify: cms/api build, Pack Draft -> export -> overlay `?lang=` shows

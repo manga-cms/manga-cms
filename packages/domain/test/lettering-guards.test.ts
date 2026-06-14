@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { createFileWriter } from "../dist/content-writer.js";
 import { createFilePackDraftRepository } from "../dist/pack-draft-repository.js";
+import { createFilePackWriter } from "../dist/pack-writer.js";
 import type { SaveEpisodeInput } from "../src/content-writer.ts";
 import type { PackDraftEntry } from "../src/pack-draft-types.ts";
 
@@ -139,6 +140,43 @@ test("FilePackDraftRepository rejects lettering fields in Phase 0 writes", () =>
         })]);
         assert.equal(styleResult.success, false);
         assert.match(styleResult.success ? "" : styleResult.error, /lettering fields/);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test("FilePackDraftRepository applies translation lettering through narrow patch and export", () => {
+    const dir = mkdtempSync(join(tmpdir(), "manga-lettering-pack-draft-patch-"));
+    try {
+        const repo = createFilePackDraftRepository(join(dir, "pack-drafts"));
+        const writer = createFilePackWriter(join(dir, "packs"));
+        const draft = repo.create({
+            type: "TRANSLATION",
+            title: "English",
+            language: "en",
+            target_series_id: "series-1",
+            target_episode_id: "ep01",
+        });
+        const addResult = repo.addEntry(draft.pack_draft_id, packDraftEntry());
+        assert.equal(addResult.success, true);
+
+        const patchResult = repo.patchEntryLettering(draft.pack_draft_id, "entry-1", {
+            textLayout: { lines: ["Hello", "there"], source: "manual", offsetXPercent: 12.5 },
+            textStyle: { fontSizePx: 24, fitMode: "fixed" },
+        });
+        assert.equal(patchResult.success, true);
+        assert.deepEqual(patchResult.success ? patchResult.entry.text_layout : undefined, { lines: ["Hello", "there"], source: "manual", offsetXPercent: 12.5 });
+        assert.deepEqual(patchResult.success ? patchResult.entry.text_style : undefined, { fontSizePx: 24, fitMode: "fixed" });
+
+        const statusResult = repo.updateStatus(draft.pack_draft_id, { status: "approved" });
+        assert.equal(statusResult.success, true);
+        const exportResult = writer.exportDraft({
+            draft: statusResult.success ? statusResult.record : draft,
+            exportInput: { packId: "translation-en-series-1-ep01", isPublished: true },
+        });
+        assert.equal(exportResult.success, true);
+        assert.deepEqual(exportResult.success ? exportResult.pack.entries[0]?.textLayout : undefined, { lines: ["Hello", "there"], source: "manual", offsetXPercent: 12.5 });
+        assert.deepEqual(exportResult.success ? exportResult.pack.entries[0]?.textStyle : undefined, { fontSizePx: 24, fitMode: "fixed" });
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }

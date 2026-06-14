@@ -1297,6 +1297,47 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /admin/pack-drafts/{packDraftId}/entries/{entryId}/lettering:
+    patch:
+      tags: [PackManager]
+      summary: Patch lettering fields on a Translation Pack draft entry
+      description: >
+        Narrow Phase 3 lettering endpoint for reviewed translation lettering.
+        It updates only `text_layout` and `text_style` on an existing runtime
+        Translation Pack draft entry. Normal Pack Draft writes and translation
+        import continue to reject lettering fields; published Reader output is
+        updated only after the Pack Draft is exported.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/packDraftId"
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackDraftEntryLetteringPatchInput"
+      responses:
+        "200":
+          description: Pack draft and patched entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackDraftEntryLetteringPatchResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /admin/pack-drafts/{packDraftId}/export:
     post:
       tags: [PackManager]
@@ -4578,6 +4619,10 @@ components:
         metadata:
           type: object
           additionalProperties: true
+        text_layout:
+          $ref: "#/components/schemas/BubbleTextLayout"
+        text_style:
+          $ref: "#/components/schemas/BubbleTextStyle"
         adopted_at:
           type: string
           format: date-time
@@ -4652,6 +4697,29 @@ components:
       properties:
         proposal_id:
           type: string
+
+    PackDraftEntryLetteringPatchInput:
+      type: object
+      description: >
+        Narrow Translation Pack Draft lettering patch. At least one of
+        `textLayout` or `textStyle` must be present. Empty objects clear the
+        corresponding draft entry field.
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        textLayout:
+          $ref: "#/components/schemas/BubbleTextLayout"
+        textStyle:
+          $ref: "#/components/schemas/BubbleTextStyle"
+
+    PackDraftEntryLetteringPatchResponse:
+      type: object
+      required: [record, entry]
+      properties:
+        record:
+          $ref: "#/components/schemas/PackDraftRecord"
+        entry:
+          $ref: "#/components/schemas/PackDraftEntry"
 
     TranslationImportSourceFormat:
       type: string
@@ -5210,10 +5278,6 @@ components:
         metadata:
           type: object
           additionalProperties: true
-        textLayout:
-          $ref: "#/components/schemas/BubbleTextLayout"
-        textStyle:
-          $ref: "#/components/schemas/BubbleTextStyle"
 
     PublishedPackEntry:
       type: object

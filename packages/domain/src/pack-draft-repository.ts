@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { randomUUID as cryptoRandomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { PackType } from "./types.js";
+import type { BubbleTextLayout, BubbleTextStyle, PackType } from "./types.js";
 import type { PackDraftCreateInput, PackDraftEntry, PackDraftRecord, PackDraftStatus } from "./pack-draft-types.js";
 import type { ProposalKind, ProposalRecord } from "./proposal-types.js";
 import { withFileLock } from "./file-lock.js";
@@ -23,6 +23,11 @@ export interface PackDraftRepository {
         packDraftId: string,
         entries: PackDraftEntry[],
     ): { success: true; record: PackDraftRecord } | { success: false; error: string };
+    patchEntryLettering(
+        packDraftId: string,
+        entryId: string,
+        input: { textLayout?: BubbleTextLayout; textStyle?: BubbleTextStyle },
+    ): { success: true; record: PackDraftRecord; entry: PackDraftEntry } | { success: false; error: string };
 }
 
 export class FilePackDraftRepository implements PackDraftRepository {
@@ -178,6 +183,37 @@ export class FilePackDraftRepository implements PackDraftRepository {
             records[index] = record;
             this.writeAll(records);
             return { success: true, record };
+        });
+    }
+
+    patchEntryLettering(
+        packDraftId: string,
+        entryId: string,
+        input: { textLayout?: BubbleTextLayout; textStyle?: BubbleTextStyle },
+    ): { success: true; record: PackDraftRecord; entry: PackDraftEntry } | { success: false; error: string } {
+        return withFileLock(this.filePath(), () => {
+            const records = this.readAll();
+            const index = records.findIndex((record) => record.pack_draft_id === packDraftId);
+            if (index < 0) return { success: false, error: "Pack draft not found" };
+            const entryIndex = records[index]!.entries.findIndex((entry) => entry.entry_id === entryId);
+            if (entryIndex < 0) return { success: false, error: "Pack draft entry not found" };
+            const entry = { ...records[index]!.entries[entryIndex]! };
+            if (input.textLayout !== undefined) {
+                if (Object.keys(input.textLayout).length === 0) delete entry.text_layout;
+                else entry.text_layout = input.textLayout;
+            }
+            if (input.textStyle !== undefined) {
+                if (Object.keys(input.textStyle).length === 0) delete entry.text_style;
+                else entry.text_style = input.textStyle;
+            }
+            const record: PackDraftRecord = {
+                ...records[index]!,
+                entries: records[index]!.entries.map((existing, currentIndex) => currentIndex === entryIndex ? entry : existing),
+                updated_at: new Date().toISOString(),
+            };
+            records[index] = record;
+            this.writeAll(records);
+            return { success: true, record, entry };
         });
     }
 }

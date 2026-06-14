@@ -1292,6 +1292,8 @@ export interface PackDraftEntry {
         generated_at?: string;
         [key: string]: unknown;
     };
+    text_layout?: BubbleTextLayout;
+    text_style?: BubbleTextStyle;
     adopted_at: string;
     adopted_by?: string | null;
 }
@@ -1382,15 +1384,31 @@ export interface TranslationPackDraftImportResponse {
     record?: PackDraftRecord;
 }
 
-export async function listPackDrafts(filters: { status?: PackDraftStatus; type?: PackType } = {}): Promise<PackDraftRecord[]> {
+export async function listPackDrafts(filters: { status?: PackDraftStatus; type?: PackType; seriesId?: string } = {}): Promise<PackDraftRecord[]> {
     const params = new URLSearchParams();
     if (filters.status) params.set("status", filters.status);
     if (filters.type) params.set("type", filters.type);
+    if (filters.seriesId) params.set("seriesId", filters.seriesId);
     const suffix = params.toString() ? `?${params.toString()}` : "";
     const res = await fetch(`${API}/admin/pack-drafts${suffix}`, { credentials: "include" });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message ?? "Failed to load pack drafts");
     return data.items ?? [];
+}
+
+export async function patchPackDraftEntryLettering(packDraftId: string, entryId: string, input: {
+    textLayout?: BubbleTextLayout | Record<string, never>;
+    textStyle?: BubbleTextStyle | Record<string, never>;
+}) {
+    const res = await fetch(`${API}/admin/pack-drafts/${packDraftId}/entries/${entryId}/lettering`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message ?? "Failed to patch Pack Draft lettering");
+    return data as { record: PackDraftRecord; entry: PackDraftEntry };
 }
 
 export async function createPackDraft(input: {

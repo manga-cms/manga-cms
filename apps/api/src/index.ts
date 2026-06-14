@@ -28,6 +28,7 @@ import {
     GitHubTriageDraftInputSchema,
     PackDraftAdoptProposalInputSchema,
     PackDraftCreateInputSchema,
+    PackDraftEntryLetteringPatchInputSchema,
     PackDraftExportInputSchema,
     PackDraftStatusUpdateInputSchema,
     ProposalCreateInputSchema,
@@ -1654,6 +1655,41 @@ app.post("/admin/pack-drafts/:packDraftId/translation-batch", async (c) => {
         return c.json({ error: { code: statusCode === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: addResult.error } }, statusCode);
     }
     return c.json({ applied: true, batch: responseBatch, result, record: addResult.record });
+});
+
+app.patch("/admin/pack-drafts/:packDraftId/entries/:entryId/lettering", async (c) => {
+    const denied = requireAdmin(c); if (denied) return denied;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON body" } }, 400);
+    }
+
+    const parsed = PackDraftEntryLetteringPatchInputSchema.safeParse(body);
+    if (!parsed.success) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: formatZodError(parsed.error) } }, 400);
+    }
+
+    const draft = packDraftRepo.get(c.req.param("packDraftId"));
+    if (!draft) return c.json({ error: { code: "NOT_FOUND", message: "Pack draft not found" } }, 404);
+    if (draft.type !== "TRANSLATION") {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Translation lettering can only target TRANSLATION pack drafts" } }, 400);
+    }
+    if (!["draft", "in_review"].includes(draft.status)) {
+        return c.json({ error: { code: "VALIDATION_ERROR", message: "Only draft or in_review pack drafts can be lettered" } }, 400);
+    }
+
+    const result = packDraftRepo.patchEntryLettering(c.req.param("packDraftId"), c.req.param("entryId"), {
+        ...(parsed.data.textLayout !== undefined && { textLayout: parsed.data.textLayout }),
+        ...(parsed.data.textStyle !== undefined && { textStyle: parsed.data.textStyle }),
+    });
+    if (!result.success) {
+        const statusCode = result.error.includes("not found") ? 404 : 400;
+        return c.json({ error: { code: statusCode === 404 ? "NOT_FOUND" : "VALIDATION_ERROR", message: result.error } }, statusCode);
+    }
+
+    return c.json({ record: result.record, entry: result.entry });
 });
 
 app.post("/admin/pack-drafts/:packDraftId/export", async (c) => {

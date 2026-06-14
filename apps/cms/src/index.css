@@ -2538,6 +2538,28 @@ textarea {
     gap: 1rem;
 }
 
+.lettering-language-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem;
+}
+
+.lettering-language-tabs button {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.lettering-language-tabs button.is-active {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+}
+
 .lettering-workspace-layout {
     display: grid;
     grid-template-columns: minmax(8rem, 10rem) minmax(0, 1fr) minmax(17rem, 21rem);

@@ -216,6 +216,61 @@ assert_json_equals "$LETTERING_EPISODE_RESPONSE" "data.pages[0].bubbles[0].textL
 assert_json_equals "$LETTERING_EPISODE_RESPONSE" "data.pages[0].bubbles[0].textStyle.fontSizePx" "32"
 echo "✅ lettering patch persists through admin reload"
 
+PACK_DRAFT_RESPONSE="$(curl -fsS -X POST "$API/admin/pack-drafts" \
+    -H 'Content-Type: application/json' \
+    -b "$COOKIE_JAR" \
+    -d '{
+      "type": "TRANSLATION",
+      "title": "English Roundtrip Draft",
+      "language": "en",
+      "target_series_id": "roundtrip-series",
+      "target_episode_id": "ep01"
+    }')"
+PACK_DRAFT_ID="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.pack_draft_id);' "$PACK_DRAFT_RESPONSE")"
+
+TRANSLATION_IMPORT_RESPONSE="$(curl -fsS -X POST "$API/admin/pack-drafts/$PACK_DRAFT_ID/translation-import" \
+    -H 'Content-Type: application/json' \
+    -b "$COOKIE_JAR" \
+    -d '{
+      "series_id": "roundtrip-series",
+      "episode_id": "ep01",
+      "lang": "en",
+      "source_format": "json",
+      "apply": true,
+      "entries": [
+        {
+          "bubble_id": "roundtrip-series-ep01-p01-bubble-001",
+          "source_text": "Page-level bubble survives roundtrip.",
+          "text": "Translated page-level bubble."
+        }
+      ]
+    }')"
+assert_json_equals "$TRANSLATION_IMPORT_RESPONSE" "data.applied" "true"
+PACK_DRAFT_ENTRY_ID="$(node -e 'const data = JSON.parse(process.argv[1]); console.log(data.record.entries[0].entry_id);' "$TRANSLATION_IMPORT_RESPONSE")"
+
+PACK_DRAFT_LETTERING_RESPONSE="$(curl -fsS -X PATCH "$API/admin/pack-drafts/$PACK_DRAFT_ID/entries/$PACK_DRAFT_ENTRY_ID/lettering" \
+    -H 'Content-Type: application/json' \
+    -b "$COOKIE_JAR" \
+    -d '{
+      "textLayout": { "lines": ["Translated", "bubble"], "inlineAlign": "center", "source": "manual" },
+      "textStyle": { "fontSizePx": 24, "fitMode": "fixed" }
+    }')"
+assert_json_equals "$PACK_DRAFT_LETTERING_RESPONSE" "data.entry.text_layout.lines.join('|')" "Translated|bubble"
+assert_json_equals "$PACK_DRAFT_LETTERING_RESPONSE" "data.entry.text_style.fontSizePx" "24"
+
+curl -fsS -X PUT "$API/admin/pack-drafts/$PACK_DRAFT_ID/status" \
+    -H 'Content-Type: application/json' \
+    -b "$COOKIE_JAR" \
+    -d '{"status":"approved"}' >/dev/null
+
+PACK_EXPORT_RESPONSE="$(curl -fsS -X POST "$API/admin/pack-drafts/$PACK_DRAFT_ID/export" \
+    -H 'Content-Type: application/json' \
+    -b "$COOKIE_JAR" \
+    -d '{"pack_id":"translation-en-roundtrip-ep01","is_published":true}')"
+assert_json_equals "$PACK_EXPORT_RESPONSE" "data.pack.entries[0].textLayout.lines.join('|')" "Translated|bubble"
+assert_json_equals "$PACK_EXPORT_RESPONSE" "data.pack.entries[0].textStyle.fontSizePx" "24"
+echo "✅ translation Pack Draft lettering patch exports to published Pack"
+
 PUBLIC_EPISODE_RESPONSE="$(curl -fsS "$API/series/roundtrip-series/episodes/ep01")"
 DELIVERY_URL="$(node -e '
 const data = JSON.parse(process.argv[1]);

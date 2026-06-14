@@ -6,11 +6,15 @@ import {
     checkRightsPermission,
     getAdminEpisode,
     getAdminPageImageUrl,
+    listPackDrafts,
     patchBubbleLettering,
+    patchPackDraftEntryLettering,
     type BubbleData,
     type BubbleTextLayout,
     type BubbleTextStyle,
     type EpisodeData,
+    type PackDraftEntry,
+    type PackDraftRecord,
     type PageData,
 } from "../api";
 import { useTranslation } from "../i18n/I18nProvider";
@@ -21,6 +25,7 @@ const LETTERING_BLANK_IMAGE_KEYS = ["blank-ja", "blank", "ja-blank"] as const;
 
 type CmsUser = { id: string; role: string };
 type AlignValue = "start" | "center" | "end";
+type LetteringLanguage = "ja" | string;
 
 type BubbleRef = {
     bubble: BubbleData;
@@ -82,11 +87,19 @@ function activeBubblesOf(page: PageData | null): BubbleRef[] {
     }));
 }
 
+function isEditableTranslationDraft(draft: PackDraftRecord) {
+    return draft.type === "TRANSLATION" && (draft.status === "draft" || draft.status === "in_review");
+}
+
+function draftEntryForBubble(draft: PackDraftRecord | null, bubbleId: string, lang: string): PackDraftEntry | null {
+    return draft?.entries.find((entry) => entry.lang === lang && entry.target.bubble_id === bubbleId) ?? null;
+}
+
 function patchBubbleInEpisode(episode: EpisodeData, pageIndex: number, bubbleId: string, patch: Partial<BubbleData>): EpisodeData {
     const applyPatch = (bubble: BubbleData) => {
         const next = { ...bubble, ...patch };
-        if (patch.textLayout === undefined) delete next.textLayout;
-        if (patch.textStyle === undefined) delete next.textStyle;
+        if ("textLayout" in patch && patch.textLayout === undefined) delete next.textLayout;
+        if ("textStyle" in patch && patch.textStyle === undefined) delete next.textStyle;
         return next;
     };
     const pages = episode.pages.map((page, index) => {
@@ -107,6 +120,25 @@ function patchBubbleInEpisode(episode: EpisodeData, pageIndex: number, bubbleId:
     return { ...episode, pages };
 }
 
+function patchPackDraftEntryInRecord(draft: PackDraftRecord, entryId: string, patch: Partial<Pick<PackDraftEntry, "text_layout" | "text_style">>): PackDraftRecord {
+    return {
+        ...draft,
+        entries: draft.entries.map((entry) => {
+            if (entry.entry_id !== entryId) return entry;
+            const next = { ...entry };
+            if ("text_layout" in patch) {
+                if (patch.text_layout !== undefined) next.text_layout = patch.text_layout;
+                else delete next.text_layout;
+            }
+            if ("text_style" in patch) {
+                if (patch.text_style !== undefined) next.text_style = patch.text_style;
+                else delete next.text_style;
+            }
+            return next;
+        }),
+    };
+}
+
 function completeTextLayout(current: BubbleTextLayout | undefined, patch: Partial<BubbleTextLayout>): BubbleTextLayout {
     return {
         ...(current ?? {}),
@@ -115,9 +147,8 @@ function completeTextLayout(current: BubbleTextLayout | undefined, patch: Partia
     };
 }
 
-function lineTextForEditor(bubble: BubbleData | null, renderedText: string) {
-    if (!bubble) return "";
-    if (bubble.textLayout?.lines?.length) return bubble.textLayout.lines.join("\n");
+function lineTextForLetteringSource(textLayout: BubbleTextLayout | undefined, renderedText: string) {
+    if (textLayout?.lines?.length) return textLayout.lines.join("\n");
     return renderedText.replace(/\u200B/gu, "\n");
 }
 
@@ -168,10 +199,10 @@ function clampOffsetPercent(value: number) {
     return Math.max(-100, Math.min(100, Math.round(value * 10) / 10));
 }
 
-function visualAnchorBasePercent(bubble: BubbleData): { x: number; y: number } {
-    const inlineAlign = bubble.textLayout?.inlineAlign;
-    const blockAlign = bubble.textLayout?.blockAlign;
-    if (displayDirectionForLanguage(bubble.textDirection, "ja") === "vertical") {
+function visualAnchorBasePercent(bubble: BubbleData, lang: string, textLayout: BubbleTextLayout | undefined = bubble.textLayout): { x: number; y: number } {
+    const inlineAlign = textLayout?.inlineAlign;
+    const blockAlign = textLayout?.blockAlign;
+    if (displayDirectionForLanguage(bubble.textDirection, lang) === "vertical") {
         return {
             x: blockAlign === "start" ? 88 : blockAlign === "center" ? 50 : 12,
             y: alignRatio(inlineAlign),
@@ -183,10 +214,10 @@ function visualAnchorBasePercent(bubble: BubbleData): { x: number; y: number } {
     };
 }
 
-function anchorHandleStyle(bubble: BubbleData): CSSProperties {
-    const base = visualAnchorBasePercent(bubble);
-    const offsetX = bubble.textLayout?.offsetXPercent ?? 0;
-    const offsetY = bubble.textLayout?.offsetYPercent ?? 0;
+function anchorHandleStyle(bubble: BubbleData, lang: string, textLayout: BubbleTextLayout | undefined): CSSProperties {
+    const base = visualAnchorBasePercent(bubble, lang);
+    const offsetX = textLayout?.offsetXPercent ?? 0;
+    const offsetY = textLayout?.offsetYPercent ?? 0;
     return {
         left: `calc(${base.x}% + ${offsetX}%)`,
         top: `calc(${base.y}% + ${offsetY}%)`,
@@ -216,8 +247,10 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const editorDomTextRef = useRef("");
     const editorTextRef = useRef("");
     const [episode, setEpisode] = useState<EpisodeData | null>(null);
+    const [packDrafts, setPackDrafts] = useState<PackDraftRecord[]>([]);
     const [pageIndex, setPageIndex] = useState(0);
     const [selectedBubbleId, setSelectedBubbleId] = useState("");
+    const [selectedLanguage, setSelectedLanguage] = useState<LetteringLanguage>("ja");
     const [canManageLettering, setCanManageLettering] = useState(false);
     const [editorText, setEditorText] = useState("");
     const [dirty, setDirty] = useState(false);
@@ -251,6 +284,28 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     useEffect(() => {
         let cancelled = false;
+        setPackDrafts([]);
+        if (!seriesId || !epId) return;
+        listPackDrafts({ type: "TRANSLATION", seriesId })
+            .then((items) => {
+                if (cancelled) return;
+                setPackDrafts(items.filter((draft) =>
+                    draft.target_series_id === seriesId
+                    && (!draft.target_episode_id || draft.target_episode_id === epId)
+                    && isEditableTranslationDraft(draft)
+                    && Boolean(draft.language),
+                ));
+            })
+            .catch(() => {
+                if (!cancelled) setPackDrafts([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [epId, seriesId]);
+
+    useEffect(() => {
+        let cancelled = false;
         setCanManageLettering(false);
         if (!seriesId || !currentUser) return;
         if (currentUser.role === "admin") {
@@ -281,15 +336,39 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const bubbles = useMemo(() => activeBubblesOf(page), [page]);
     const selectedBubbleRef = bubbles.find((item) => bubbleIdOf(item.bubble) === selectedBubbleId) ?? bubbles[0] ?? null;
     const selectedBubble = selectedBubbleRef?.bubble ?? null;
+    const translationDrafts = useMemo(() => packDrafts.filter((draft) => draft.language), [packDrafts]);
+    const languageOptions = useMemo(() => {
+        const seen = new Set<string>(["ja"]);
+        const options = [{ lang: "ja", label: "日本語", draft: null as PackDraftRecord | null }];
+        for (const draft of translationDrafts) {
+            const lang = draft.language;
+            if (!lang || seen.has(lang)) continue;
+            seen.add(lang);
+            options.push({ lang, label: lang, draft });
+        }
+        return options;
+    }, [translationDrafts]);
+    const selectedTranslationDraft = selectedLanguage === "ja"
+        ? null
+        : translationDrafts.find((draft) => draft.language === selectedLanguage) ?? null;
+    const selectedPackEntry = selectedBubble && selectedLanguage !== "ja"
+        ? draftEntryForBubble(selectedTranslationDraft, bubbleIdOf(selectedBubble), selectedLanguage)
+        : null;
+    const canEditSelectedSource = canManageLettering && (selectedLanguage === "ja" || Boolean(selectedTranslationDraft && selectedPackEntry));
+    const selectedTextLayout = selectedLanguage === "ja" ? selectedBubble?.textLayout : selectedPackEntry?.text_layout;
+    const selectedTextStyle = selectedLanguage === "ja" ? selectedBubble?.textStyle : selectedPackEntry?.text_style;
+    const selectedSourceText = selectedLanguage === "ja" ? selectedBubble?.textOriginal ?? "" : selectedPackEntry?.text ?? "";
 
     const renderForBubble = useCallback((bubble: BubbleData) => {
         if (!page) return null;
-        const displayDirection = displayDirectionForLanguage(bubble.textDirection, "ja");
+        const lang = selectedLanguage;
+        const entry = lang === "ja" ? null : draftEntryForBubble(selectedTranslationDraft, bubbleIdOf(bubble), lang);
+        const displayDirection = displayDirectionForLanguage(bubble.textDirection, lang);
         return buildLetteringRender({
             source: {
-                text: bubble.textOriginal ?? "",
-                textLayout: bubble.textLayout,
-                textStyle: bubble.textStyle,
+                text: lang === "ja" ? bubble.textOriginal ?? "" : entry?.text ?? "",
+                textLayout: lang === "ja" ? bubble.textLayout : entry?.text_layout,
+                textStyle: lang === "ja" ? bubble.textStyle : entry?.text_style,
             },
             bbox: bubble.bbox,
             page: { width: page.width, height: page.height },
@@ -297,10 +376,10 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             addJapaneseSoftBreaks: displayDirection === "vertical",
             spaceAsBreak: false,
         });
-    }, [page]);
+    }, [page, selectedLanguage, selectedTranslationDraft]);
 
     useEffect(() => {
-        const nextKey = selectedBubble ? `${pageIndex}:${bubbleIdOf(selectedBubble)}` : "";
+        const nextKey = selectedBubble ? `${selectedLanguage}:${pageIndex}:${bubbleIdOf(selectedBubble)}` : "";
         if (seededEditorKeyRef.current === nextKey) return;
         seededEditorKeyRef.current = nextKey;
         if (!selectedBubble) {
@@ -313,14 +392,14 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             setIsComposing(false);
             return;
         }
-        setEditorTextValue(lineTextForEditor(selectedBubble, renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal));
+        setEditorTextValue(lineTextForLetteringSource(selectedTextLayout, renderForBubble(selectedBubble)?.text ?? selectedSourceText));
         setDirty(false);
         setSaved(false);
         setResetToAutoBubbleId("");
         setEditorActive(false);
         composingRef.current = false;
         setIsComposing(false);
-    }, [pageIndex, renderForBubble, selectedBubble]);
+    }, [pageIndex, renderForBubble, selectedBubble, selectedLanguage, selectedSourceText, selectedTextLayout]);
 
     useEffect(() => {
         if (!overlayRef.current) return;
@@ -335,7 +414,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     useLayoutEffect(() => {
         const editor = inlineEditorRef.current;
         if (!editor) return;
-        const nextKey = selectedBubble ? `${pageIndex}:${bubbleIdOf(selectedBubble)}` : "";
+        const nextKey = selectedBubble ? `${selectedLanguage}:${pageIndex}:${bubbleIdOf(selectedBubble)}` : "";
         const isNewSelection = editorDomKeyRef.current !== nextKey;
         const editorHasFocus = typeof document !== "undefined" && document.activeElement === editor;
         const editorTextChangedOutsideDom = editorDomTextRef.current !== editorText;
@@ -355,9 +434,9 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     useEffect(() => {
         const editor = inlineEditorRef.current;
-        if (!editor || !canManageLettering) return;
+        if (!editor || !canEditSelectedSource) return;
         requestAnimationFrame(() => editor.focus());
-    }, [canManageLettering, pageIndex, selectedBubbleId]);
+    }, [canEditSelectedSource, pageIndex, selectedBubbleId, selectedLanguage]);
 
     const patchSelectedBubble = (patch: Partial<BubbleData>) => {
         if (!episode || !selectedBubble) return;
@@ -366,40 +445,56 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         setSaved(false);
     };
 
+    const patchSelectedTranslationEntry = (patch: { textLayout?: BubbleTextLayout; textStyle?: BubbleTextStyle }) => {
+        if (!selectedTranslationDraft || !selectedPackEntry) return;
+        const entryPatch: Partial<Pick<PackDraftEntry, "text_layout" | "text_style">> = {};
+        if ("textLayout" in patch) entryPatch.text_layout = patch.textLayout;
+        if ("textStyle" in patch) entryPatch.text_style = patch.textStyle;
+        const nextDraft = patchPackDraftEntryInRecord(selectedTranslationDraft, selectedPackEntry.entry_id, entryPatch);
+        setPackDrafts((drafts) => drafts.map((draft) => draft.pack_draft_id === nextDraft.pack_draft_id ? nextDraft : draft));
+        setDirty(true);
+        setSaved(false);
+    };
+
+    const patchSelectedLettering = (patch: { textLayout?: BubbleTextLayout; textStyle?: BubbleTextStyle }) => {
+        if (selectedLanguage === "ja") {
+            const bubblePatch: Partial<BubbleData> = {};
+            if ("textLayout" in patch) bubblePatch.textLayout = patch.textLayout;
+            if ("textStyle" in patch) bubblePatch.textStyle = patch.textStyle;
+            patchSelectedBubble(bubblePatch);
+            return;
+        }
+        patchSelectedTranslationEntry(patch);
+    };
+
     const applyEditorText = (value: string) => {
-        if (!selectedBubble || !canManageLettering) return;
+        if (!selectedBubble || !canEditSelectedSource) return;
         setResetToAutoBubbleId("");
         if (isEmptyEditorText(value)) {
-            patchSelectedBubble({ textLayout: undefined });
+            patchSelectedLettering({ textLayout: undefined });
             return;
         }
         const lines = linesFromEditorText(value);
-        patchSelectedBubble({
-            textLayout: completeTextLayout(selectedBubble.textLayout, { lines }),
-        });
+        patchSelectedLettering({ textLayout: completeTextLayout(selectedTextLayout, { lines }) });
     };
 
     const updateTextLayout = (patch: Partial<BubbleTextLayout>) => {
-        if (!selectedBubble || !canManageLettering) return;
+        if (!selectedBubble || !canEditSelectedSource) return;
         setResetToAutoBubbleId("");
-        patchSelectedBubble({
-            textLayout: completeTextLayout(selectedBubble.textLayout, patch),
-        });
+        patchSelectedLettering({ textLayout: completeTextLayout(selectedTextLayout, patch) });
     };
 
     const updateTextStyle = (patch: Partial<BubbleTextStyle>) => {
-        if (!selectedBubble || !canManageLettering) return;
+        if (!selectedBubble || !canEditSelectedSource) return;
         setResetToAutoBubbleId("");
-        patchSelectedBubble({
-            textStyle: { ...(selectedBubble.textStyle ?? {}), ...patch },
-        });
+        patchSelectedLettering({ textStyle: { ...(selectedTextStyle ?? {}), ...patch } });
     };
 
     const updateSelectedBubbleOffsetAtPoint = (clientX: number, clientY: number, bubble: BubbleData, rect: DOMRect) => {
-        if (!canManageLettering || bubbleIdOf(bubble) !== selectedBubbleId) return;
+        if (!canEditSelectedSource || bubbleIdOf(bubble) !== selectedBubbleId) return;
         const xPercent = ((clientX - rect.left) / Math.max(rect.width, 1)) * 100;
         const yPercent = ((clientY - rect.top) / Math.max(rect.height, 1)) * 100;
-        const base = visualAnchorBasePercent(bubble);
+        const base = visualAnchorBasePercent(bubble, selectedLanguage, selectedTextLayout);
         updateTextLayout({
             offsetXPercent: clampOffsetPercent(xPercent - base.x),
             offsetYPercent: clampOffsetPercent(yPercent - base.y),
@@ -418,26 +513,35 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     };
 
     const resetSelectedBubble = () => {
-        if (!selectedBubble || !canManageLettering) return;
+        if (!selectedBubble || !canEditSelectedSource) return;
         setResetToAutoBubbleId(bubbleIdOf(selectedBubble));
-        patchSelectedBubble({ textLayout: undefined, textStyle: undefined });
-        setEditorTextValue(renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal);
+        patchSelectedLettering({ textLayout: undefined, textStyle: undefined });
+        setEditorTextValue(renderForBubble(selectedBubble)?.text ?? selectedSourceText);
     };
 
     const saveSelectedBubble = async () => {
-        if (!seriesId || !episode || !page || !selectedBubble || !canManageLettering) return false;
+        if (!seriesId || !episode || !page || !selectedBubble || !canEditSelectedSource) return false;
         const isResettingToAuto = resetToAutoBubbleId === bubbleIdOf(selectedBubble);
         const nextTextLayout = isResettingToAuto
             ? {}
-            : textLayoutFromEditorText(editorTextRef.current, selectedBubble.textLayout);
+            : textLayoutFromEditorText(editorTextRef.current, selectedTextLayout);
         setSaving(true);
         setError("");
         try {
-            const nextEpisode = await patchBubbleLettering(seriesId, episode.id, page.pageId ?? page.id, bubbleIdOf(selectedBubble), {
-                textLayout: nextTextLayout,
-                textStyle: isResettingToAuto ? {} : selectedBubble.textStyle ?? {},
-            });
-            setEpisode(nextEpisode);
+            if (selectedLanguage === "ja") {
+                const nextEpisode = await patchBubbleLettering(seriesId, episode.id, page.pageId ?? page.id, bubbleIdOf(selectedBubble), {
+                    textLayout: nextTextLayout,
+                    textStyle: isResettingToAuto ? {} : selectedTextStyle ?? {},
+                });
+                setEpisode(nextEpisode);
+            } else {
+                if (!selectedTranslationDraft || !selectedPackEntry) return false;
+                const result = await patchPackDraftEntryLettering(selectedTranslationDraft.pack_draft_id, selectedPackEntry.entry_id, {
+                    textLayout: nextTextLayout,
+                    textStyle: isResettingToAuto ? {} : selectedTextStyle ?? {},
+                });
+                setPackDrafts((drafts) => drafts.map((draft) => draft.pack_draft_id === result.record.pack_draft_id ? result.record : draft));
+            }
             setDirty(false);
             setSaved(true);
             setResetToAutoBubbleId("");
@@ -514,6 +618,16 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         setSelectedBubbleId(nextBubble ? bubbleIdOf(nextBubble) : "");
     };
 
+    const selectLanguage = async (lang: string) => {
+        if (lang === selectedLanguage) return;
+        if (!(await flushPendingEdit())) return;
+        setEditorActive(false);
+        composingRef.current = false;
+        setIsComposing(false);
+        setDraggingAnchorBubbleId("");
+        setSelectedLanguage(lang);
+    };
+
     if (!episode) {
         return (
             <div className="lettering-workspace">
@@ -527,7 +641,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             <div className="lettering-workspace-header">
                 <div>
                     <h1>{t("lettering.workspace.title")}</h1>
-                    <p className="card-meta">{episode.title} · ja</p>
+                    <p className="card-meta">{episode.title} · {selectedLanguage}</p>
                 </div>
                 <div className="section-actions">
                     {dirty && <span className="badge badge-warn">{t("lettering.workspace.unsaved")}</span>}
@@ -540,6 +654,23 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             {error && <div className="error-msg">{error}</div>}
             {!canManageLettering && (
                 <div className="info-msg">{t("lettering.workspace.readOnly")}</div>
+            )}
+            {languageOptions.length > 1 && (
+                <div className="lettering-language-tabs card">
+                    {languageOptions.map((option) => (
+                        <button
+                            key={option.lang}
+                            type="button"
+                            className={selectedLanguage === option.lang ? "is-active" : ""}
+                            onClick={() => void selectLanguage(option.lang)}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+            {selectedLanguage !== "ja" && !selectedTranslationDraft && (
+                <div className="info-msg">この言語のTranslation Pack Draftがありません。</div>
             )}
 
             <div className="lettering-workspace-layout">
@@ -574,8 +705,11 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                     if (!render || !page) return null;
                                     const bubbleId = bubbleIdOf(bubble);
                                     const selected = bubbleId === selectedBubbleId;
-                                    const displayDirection = displayDirectionForLanguage(bubble.textDirection, "ja");
-                                    const skipRefit = selected && canManageLettering && (editorActive || isComposing);
+                                    const entry = selectedLanguage === "ja" ? null : draftEntryForBubble(selectedTranslationDraft, bubbleId, selectedLanguage);
+                                    const bubbleTextLayout = selectedLanguage === "ja" ? bubble.textLayout : entry?.text_layout;
+                                    const displayDirection = displayDirectionForLanguage(bubble.textDirection, selectedLanguage);
+                                    const editable = selected && canEditSelectedSource;
+                                    const skipRefit = editable && (editorActive || isComposing);
                                     return (
                                         <div
                                             role="button"
@@ -599,7 +733,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                             title={`${bubble.displayRef ?? bubble.shortId ?? readingOrder}: ${bubble.textOriginal}`}
                                         >
                                             <span
-                                                className={`lettering-preview-bubble ${selected && canManageLettering ? "is-editing" : ""} ${displayDirection === "vertical" ? "is-vertical" : "is-horizontal"}`}
+                                                className={`lettering-preview-bubble ${editable ? "is-editing" : ""} ${displayDirection === "vertical" ? "is-vertical" : "is-horizontal"}`}
                                                 data-overlay-bubble
                                                 data-fit-mode={render.fitMode}
                                                 data-fit-characters={render.fit.characterCount}
@@ -608,7 +742,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                 data-overlay-refit-skip={skipRefit ? "true" : undefined}
                                                 style={letteringInnerStyle(render.style)}
                                             >
-                                                {selected && canManageLettering ? (
+                                                {editable ? (
                                                     <span
                                                         ref={inlineEditorRef}
                                                         className="lettering-inline-editor"
@@ -644,15 +778,15 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                     <span data-overlay-bubble-text>{render.text}</span>
                                                 )}
                                             </span>
-                                            {selected && canManageLettering && (
+                                            {editable && (
                                                 <span
                                                     className={`lettering-position-handle ${draggingAnchorBubbleId === bubbleId ? "is-dragging" : ""}`}
                                                     data-lettering-anchor-handle
                                                     role="slider"
                                                     tabIndex={0}
                                                     aria-label={t("lettering.workspace.positionHandle")}
-                                                    aria-valuetext={`${bubble.textLayout?.blockAlign ?? "start"} ${bubble.textLayout?.inlineAlign ?? "start"} ${bubble.textLayout?.offsetXPercent ?? 0} ${bubble.textLayout?.offsetYPercent ?? 0}`}
-                                                    style={anchorHandleStyle(bubble)}
+                                                    aria-valuetext={`${bubbleTextLayout?.blockAlign ?? "start"} ${bubbleTextLayout?.inlineAlign ?? "start"} ${bubbleTextLayout?.offsetXPercent ?? 0} ${bubbleTextLayout?.offsetYPercent ?? 0}`}
+                                                    style={anchorHandleStyle(bubble, selectedLanguage, bubbleTextLayout)}
                                                     onPointerDown={(event) => {
                                                         event.preventDefault();
                                                         event.stopPropagation();
@@ -693,12 +827,16 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                             <div className="canonical-bubble-header">
                                 <span className="badge">{selectedBubble.displayRef ?? selectedBubble.shortId ?? bubbleIdOf(selectedBubble)}</span>
                                 <span className="badge">{selectedBubble.bubbleType}</span>
+                                <span className="badge">{selectedLanguage}</span>
                             </div>
+                            {selectedLanguage !== "ja" && !selectedPackEntry && (
+                                <div className="info-msg">このフキダシには {selectedLanguage} のTranslation Pack Draft entry がありません。Translation import後に写植できます。</div>
+                            )}
                             <div className="form-group">
                                 <label>{t("structure.lettering.lines")}</label>
                                 <textarea
                                     value={editorText}
-                                    disabled={!canManageLettering}
+                                    disabled={!canEditSelectedSource}
                                     onChange={(event) => {
                                         setEditorTextValue(event.target.value);
                                         setResetToAutoBubbleId("");
@@ -728,8 +866,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                             <button
                                                 type="button"
                                                 key={`${blockAlign}-${inlineAlign}`}
-                                                className={selectedBubble.textLayout?.blockAlign === blockAlign && selectedBubble.textLayout?.inlineAlign === inlineAlign ? "is-active" : ""}
-                                                disabled={!canManageLettering}
+                                                className={selectedTextLayout?.blockAlign === blockAlign && selectedTextLayout?.inlineAlign === inlineAlign ? "is-active" : ""}
+                                                disabled={!canEditSelectedSource}
                                                 onClick={() => updateTextLayout({ blockAlign, inlineAlign, offsetXPercent: 0, offsetYPercent: 0 })}
                                                 aria-label={`${blockAlign} ${inlineAlign}`}
                                             />
@@ -746,8 +884,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                         min={-100}
                                         max={100}
                                         step={0.5}
-                                        value={selectedBubble.textLayout?.offsetXPercent ?? 0}
-                                        disabled={!canManageLettering}
+                                        value={selectedTextLayout?.offsetXPercent ?? 0}
+                                        disabled={!canEditSelectedSource}
                                         onChange={(event) => updateTextLayout({ offsetXPercent: clampOffsetPercent(Number(event.target.value)) })}
                                     />
                                 </div>
@@ -758,8 +896,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                         min={-100}
                                         max={100}
                                         step={0.5}
-                                        value={selectedBubble.textLayout?.offsetYPercent ?? 0}
-                                        disabled={!canManageLettering}
+                                        value={selectedTextLayout?.offsetYPercent ?? 0}
+                                        disabled={!canEditSelectedSource}
                                         onChange={(event) => updateTextLayout({ offsetYPercent: clampOffsetPercent(Number(event.target.value)) })}
                                     />
                                 </div>
@@ -771,15 +909,15 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                     type="range"
                                     min={8}
                                     max={96}
-                                    value={selectedBubble.textStyle?.fontSizePx ?? 28}
-                                    disabled={!canManageLettering}
+                                    value={selectedTextStyle?.fontSizePx ?? 28}
+                                    disabled={!canEditSelectedSource}
                                     onChange={(event) => updateTextStyle({ fontSizePx: boundedFontSize(Number(event.target.value)), fitMode: "fixed" })}
                                 />
                                 <input
                                     type="number"
                                     min={1}
-                                    value={selectedBubble.textStyle?.fontSizePx ?? ""}
-                                    disabled={!canManageLettering}
+                                    value={selectedTextStyle?.fontSizePx ?? ""}
+                                    disabled={!canEditSelectedSource}
                                     onChange={(event) => updateTextStyle({ fontSizePx: numberOrUndefined(event.target.value), fitMode: event.target.value ? "fixed" : undefined })}
                                 />
                             </div>
@@ -787,8 +925,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                             <div className="form-group">
                                 <label>{t("structure.lettering.fontWeight")}</label>
                                 <select
-                                    value={selectedBubble.textStyle?.fontWeight ?? ""}
-                                    disabled={!canManageLettering}
+                                    value={selectedTextStyle?.fontWeight ?? ""}
+                                    disabled={!canEditSelectedSource}
                                     onChange={(event) => updateTextStyle({ fontWeight: numberOrUndefined(event.target.value) })}
                                 >
                                     <option value="">{t("structure.lettering.auto")}</option>
@@ -805,8 +943,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                         type="number"
                                         min={0.1}
                                         step="0.05"
-                                        value={selectedBubble.textStyle?.lineHeight ?? ""}
-                                        disabled={!canManageLettering}
+                                        value={selectedTextStyle?.lineHeight ?? ""}
+                                        disabled={!canEditSelectedSource}
                                         onChange={(event) => updateTextStyle({ lineHeight: numberOrUndefined(event.target.value) })}
                                     />
                                 </div>
@@ -815,8 +953,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                     <input
                                         type="number"
                                         step="0.5"
-                                        value={selectedBubble.textStyle?.letterSpacing ?? ""}
-                                        disabled={!canManageLettering}
+                                        value={selectedTextStyle?.letterSpacing ?? ""}
+                                        disabled={!canEditSelectedSource}
                                         onChange={(event) => updateTextStyle({ letterSpacing: numberOrUndefined(event.target.value) })}
                                     />
                                 </div>
@@ -825,8 +963,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                             <div className="form-group">
                                 <label>{t("structure.lettering.fitMode")}</label>
                                 <select
-                                    value={selectedBubble.textStyle?.fitMode ?? "auto"}
-                                    disabled={!canManageLettering}
+                                    value={selectedTextStyle?.fitMode ?? "auto"}
+                                    disabled={!canEditSelectedSource}
                                     onChange={(event) => updateTextStyle({ fitMode: event.target.value as BubbleTextStyle["fitMode"] })}
                                 >
                                     <option value="auto">auto</option>
@@ -836,10 +974,10 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                             </div>
 
                             <div className="section-actions">
-                                <button type="button" className="btn btn-outline" disabled={!canManageLettering} onClick={resetSelectedBubble}>
+                                <button type="button" className="btn btn-outline" disabled={!canEditSelectedSource} onClick={resetSelectedBubble}>
                                     {t("lettering.workspace.resetAuto")}
                                 </button>
-                                <button type="button" className="btn btn-primary" disabled={!canManageLettering || saving || !dirty} onClick={saveSelectedBubble}>
+                                <button type="button" className="btn btn-primary" disabled={!canEditSelectedSource || saving || !dirty} onClick={saveSelectedBubble}>
                                     {saving ? t("structure.lettering.saving") : t("structure.lettering.save")}
                                 </button>
                             </div>
