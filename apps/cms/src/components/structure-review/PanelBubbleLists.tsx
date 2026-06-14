@@ -21,6 +21,7 @@ type PanelBubbleListsProps = {
     textComparisonOverlays?: BubbleTextComparisonOverlayMap;
     onSelectPanel: (index: number) => void;
     onSelectBubbleCandidate: (panelIndex: number | null, bubbleIndex: number) => void;
+    onUpdateBubbleText: (panelIndex: number | null, bubbleIndex: number, text: string) => void;
     onMovePanel: (index: number, direction: -1 | 1) => void;
     onMoveBubbleCandidate: (bubbleId: string, direction: -1 | 1) => void;
 };
@@ -66,6 +67,7 @@ export function PanelBubbleLists({
     textComparisonOverlays,
     onSelectPanel,
     onSelectBubbleCandidate,
+    onUpdateBubbleText,
     onMovePanel,
     onMoveBubbleCandidate,
 }: PanelBubbleListsProps) {
@@ -85,28 +87,36 @@ export function PanelBubbleLists({
                             key={bubbleIdOf(candidate.bubble)}
                             className={`structure-list-row ${selectedPanelIndex === candidate.panelIndex && selectedBubbleIndex === candidate.bubbleIndex ? "is-active" : ""}`}
                         >
-                            <button
-                                type="button"
-                                className="structure-list-item structure-list-item-text"
-                                onClick={() => onSelectBubbleCandidate(candidate.panelIndex, candidate.bubbleIndex)}
-                            >
-                                <div className="structure-list-title">
-                                    <strong>{t("structure.sidebar.bubbleCandidateRow", { readingOrder: candidate.readingOrder })}</strong>
-                                    <code>{bubbleDisplayRef(candidate.bubble)}</code>
-                                </div>
-                                <div className="structure-review-state-row">
-                                    <span className={`badge ${candidate.decision === "accepted" ? "badge-ok" : candidate.decision === "rejected" ? "badge-muted" : "badge-warn"}`}>
-                                        {t(decisionLabelKey(candidate.decision))}
-                                    </span>
-                                    {candidate.warnings.length > 0 && (
-                                        <span className="badge badge-err">{t("structure.reviewState.needs_review")}</span>
-                                    )}
-                                </div>
+                            <div className="structure-list-item structure-list-item-text">
+                                <button
+                                    type="button"
+                                    className="structure-list-select"
+                                    onClick={() => onSelectBubbleCandidate(candidate.panelIndex, candidate.bubbleIndex)}
+                                >
+                                    <div className="structure-list-title">
+                                        <strong>{t("structure.sidebar.bubbleCandidateRow", { readingOrder: candidate.readingOrder })}</strong>
+                                        <code>{bubbleDisplayRef(candidate.bubble)}</code>
+                                    </div>
+                                    <div className="structure-review-state-row">
+                                        <span className={`badge ${candidate.decision === "accepted" ? "badge-ok" : candidate.decision === "rejected" ? "badge-muted" : "badge-warn"}`}>
+                                            {t(decisionLabelKey(candidate.decision))}
+                                        </span>
+                                        {candidate.warnings.length > 0 && (
+                                            <span className="badge badge-err">{t("structure.reviewState.needs_review")}</span>
+                                        )}
+                                    </div>
+                                </button>
                                 <CandidateTextBadges bubble={candidate.bubble} textComparisonOverlays={textComparisonOverlays} />
-                                <div className="structure-source-line">
+                                <label className="structure-source-line">
                                     <span>{t("structure.sidebar.sourceTextLabel")}</span>
-                                    <p>{getBubbleSourceText(candidate.bubble) || t("structure.sidebar.noText")}</p>
-                                </div>
+                                    <textarea
+                                        rows={2}
+                                        value={getBubbleSourceText(candidate.bubble)}
+                                        onFocus={() => onSelectBubbleCandidate(candidate.panelIndex, candidate.bubbleIndex)}
+                                        onChange={(event) => onUpdateBubbleText(candidate.panelIndex, candidate.bubbleIndex, event.target.value)}
+                                        placeholder={t("structure.sidebar.noText")}
+                                    />
+                                </label>
                                 <small className="structure-list-meta">
                                     {candidate.panel
                                         ? t("structure.sidebar.panelRow", { panelNumber: candidate.panel.panelNumber })
@@ -124,7 +134,7 @@ export function PanelBubbleLists({
                                         ))}
                                     </div>
                                 )}
-                            </button>
+                            </div>
                             <div className="order-controls">
                                 <button type="button" onClick={() => onMoveBubbleCandidate(bubbleIdOf(candidate.bubble), -1)} disabled={candidateIndex === 0} aria-label={t("structure.sidebar.moveBubbleEarlier")}>↑</button>
                                 <button type="button" onClick={() => onMoveBubbleCandidate(bubbleIdOf(candidate.bubble), 1)} disabled={candidateIndex === bubbleCandidates.length - 1} aria-label={t("structure.sidebar.moveBubbleLater")}>↓</button>

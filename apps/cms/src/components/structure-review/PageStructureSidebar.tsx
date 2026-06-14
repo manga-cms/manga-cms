@@ -31,6 +31,7 @@ type PageStructureSidebarProps = {
     onApplyScriptAssist: () => void;
     onSelectPanel: (index: number) => void;
     onSelectBubbleCandidate: (panelIndex: number | null, bubbleIndex: number) => void;
+    onUpdateBubbleText: (panelIndex: number | null, bubbleIndex: number, text: string) => void;
     onMovePanel: (index: number, direction: -1 | 1) => void;
     onMoveBubbleCandidate: (panelIndex: number | null, bubbleIndex: number, direction: -1 | 1) => void;
 };
@@ -78,6 +79,7 @@ export function PageStructureSidebar({
     onApplyScriptAssist,
     onSelectPanel,
     onSelectBubbleCandidate,
+    onUpdateBubbleText,
     onMovePanel,
     onMoveBubbleCandidate,
 }: PageStructureSidebarProps) {
@@ -253,6 +255,7 @@ export function PageStructureSidebar({
                 textComparisonOverlays={textComparisonOverlays}
                 onSelectPanel={onSelectPanel}
                 onSelectBubbleCandidate={onSelectBubbleCandidate}
+                onUpdateBubbleText={onUpdateBubbleText}
                 onMovePanel={onMovePanel}
                 onMoveBubbleCandidate={onMoveBubbleCandidate}
             />

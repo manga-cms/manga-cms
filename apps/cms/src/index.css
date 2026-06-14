@@ -1907,6 +1907,17 @@ textarea {
     gap: 0.45rem;
 }
 
+.structure-list-select {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
 .structure-list-title {
     display: flex;
     min-width: 0;
@@ -1940,17 +1951,13 @@ textarea {
     font-weight: 700;
 }
 
-.structure-source-line p {
-    display: -webkit-box;
-    margin: 0;
-    overflow: hidden;
-    color: var(--text);
-    font-size: 0.78rem;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-height: 1.45;
-    text-overflow: ellipsis;
-    white-space: normal;
+.structure-source-line textarea {
+    min-height: 4.75rem;
+    padding: 0.5rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    resize: vertical;
 }
 
 .structure-review-state-row {

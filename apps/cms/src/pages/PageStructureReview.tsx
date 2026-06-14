@@ -529,6 +529,7 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
                 shortId: displayRef,
                 bubbleType: "speech",
                 textOriginal: "",
+                textDirection: "vertical",
                 bbox: clampBox({
                     x: Math.round(page.width - width - 24),
                     y: 24,
@@ -563,6 +564,7 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
             shortId: displayRef,
             bubbleType: "speech",
             textOriginal: "",
+            textDirection: "vertical",
             bbox: clampBox({
                 x: Math.round(panel.bbox.x + panel.bbox.width - width - 24),
                 y: Math.round(panel.bbox.y + 24),
@@ -631,6 +633,33 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
         setSelectedBubbleIndex(bubbleIndex);
     };
 
+    const updateBubbleCandidateText = (panelIndex: number | null, bubbleIndex: number, text: string) => {
+        if (!page) return;
+        if (panelIndex === null) {
+            const selected = pageLevelBubbles[bubbleIndex];
+            if (!selected) return;
+            const patch: Partial<BubbleData> = {
+                textOriginal: text,
+                textDirection: selected.textDirection ?? "vertical",
+            };
+            const bubbles = (page.bubbles ?? []).map((bubble) =>
+                bubbleIdOf(bubble) === bubbleIdOf(selected) ? applyBubblePatch(bubble, patch) : bubble,
+            );
+            updatePage({ ...page, bubbles });
+            return;
+        }
+        const panel = page.panels[panelIndex];
+        if (!panel) return;
+        const bubbles = [...panel.bubbles];
+        const selected = bubbles[bubbleIndex];
+        if (!selected) return;
+        bubbles[bubbleIndex] = applyBubblePatch(selected, {
+            textOriginal: text,
+            textDirection: selected.textDirection ?? "vertical",
+        });
+        updatePanel(panelIndex, { ...panel, bubbles });
+    };
+
     const moveBubbleCandidate = (bubbleId: string, direction: -1 | 1) => {
         if (!page) return;
         const result = moveBubbleByGlobalReadingOrder(page, bubbleId, direction);
@@ -676,17 +705,20 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
 
     const updateSelectedBubble = (patch: Partial<BubbleData>) => {
         if (!page || selectedBubbleIndex === null) return;
+        const nextPatch: Partial<BubbleData> = patch.textOriginal !== undefined && !selectedBubble?.textDirection
+            ? { ...patch, textDirection: "vertical" }
+            : patch;
         if (!selectedPanel || selectedPanelIndex === null) {
             const selected = pageLevelBubbles[selectedBubbleIndex];
             if (!selected) return;
             const bubbles = (page.bubbles ?? []).map((bubble) =>
-                bubbleIdOf(bubble) === bubbleIdOf(selected) ? applyBubblePatch(bubble, patch) : bubble,
+                bubbleIdOf(bubble) === bubbleIdOf(selected) ? applyBubblePatch(bubble, nextPatch) : bubble,
             );
             updatePage({ ...page, bubbles });
             return;
         }
         const bubbles = [...selectedPanel.bubbles];
-        bubbles[selectedBubbleIndex] = applyBubblePatch(bubbles[selectedBubbleIndex], patch);
+        bubbles[selectedBubbleIndex] = applyBubblePatch(bubbles[selectedBubbleIndex], nextPatch);
         updatePanel(selectedPanelIndex, { ...selectedPanel, bubbles });
     };
 
@@ -794,6 +826,7 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
                 shortId: displayRef,
                 bubbleType: entry.bubbleType,
                 textOriginal: entry.textOriginal,
+                textDirection: "vertical",
                 speaker: entry.speaker,
                 bbox: clampBox({
                     x: Math.round(selectedPanel.bbox.x + selectedPanel.bbox.width - width - 18),
@@ -939,6 +972,7 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
                         setSelectedBubbleIndex(null);
                     }}
                     onSelectBubbleCandidate={selectBubbleCandidate}
+                    onUpdateBubbleText={updateBubbleCandidateText}
                     onMovePanel={movePanel}
                     onMoveBubbleCandidate={moveBubbleCandidate}
                 />
