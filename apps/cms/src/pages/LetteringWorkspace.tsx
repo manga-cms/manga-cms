@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type CompositionEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { buildLetteringRender, displayDirectionForLanguage } from "@manga/lettering";
-import { refitLetteringNow } from "@manga/lettering/refit";
+import { refitLetteringNow, startLetteringRefit } from "@manga/lettering/refit";
 import {
     checkRightsPermission,
     getAdminEpisode,
@@ -268,6 +268,11 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         refitLetteringNow(overlayRef.current);
     }, [episode, pageIndex, selectedBubbleId]);
 
+    useEffect(() => {
+        if (!overlayRef.current) return;
+        return startLetteringRefit(overlayRef.current);
+    }, [episode?.episodeId, pageIndex]);
+
     useLayoutEffect(() => {
         const editor = inlineEditorRef.current;
         if (!editor) return;
@@ -311,8 +316,12 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     const updateTextLayout = (patch: Partial<BubbleTextLayout>) => {
         if (!selectedBubble || !canManageLettering) return;
+        const textStylePatch = selectedBubble.textStyle?.fontSizePx != null && selectedBubble.textStyle.fitMode !== "fixed"
+            ? { textStyle: { ...selectedBubble.textStyle, fitMode: "fixed" as const } }
+            : {};
         patchSelectedBubble({
             textLayout: completeTextLayout(selectedBubble.textLayout, patch),
+            ...textStylePatch,
         });
     };
 
@@ -593,14 +602,14 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                     max={96}
                                     value={selectedBubble.textStyle?.fontSizePx ?? 28}
                                     disabled={!canManageLettering}
-                                    onChange={(event) => updateTextStyle({ fontSizePx: boundedFontSize(Number(event.target.value)), fitMode: "shrink" })}
+                                    onChange={(event) => updateTextStyle({ fontSizePx: boundedFontSize(Number(event.target.value)), fitMode: "fixed" })}
                                 />
                                 <input
                                     type="number"
                                     min={1}
                                     value={selectedBubble.textStyle?.fontSizePx ?? ""}
                                     disabled={!canManageLettering}
-                                    onChange={(event) => updateTextStyle({ fontSizePx: numberOrUndefined(event.target.value), fitMode: event.target.value ? "shrink" : undefined })}
+                                    onChange={(event) => updateTextStyle({ fontSizePx: numberOrUndefined(event.target.value), fitMode: event.target.value ? "fixed" : undefined })}
                                 />
                             </div>
 
