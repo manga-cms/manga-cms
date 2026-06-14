@@ -313,6 +313,31 @@ test("PageSchema and Linter Validation", async (t) => {
         assert.ok(warnings.some((warning) => warning.code === "TEXT_LAYOUT_TEXT_MISMATCH"));
         assert.ok(warnings.some((warning) => warning.code === "TEXT_STYLE_FITMODE_WITHOUT_FONT_SIZE"));
     });
+
+    await t.test("Linter allows manual lettering lines to differ from source text", () => {
+        const page = PageSchema.parse({
+            id: "page-1",
+            pageNumber: 1,
+            width: 800,
+            height: 1200,
+            images: {},
+            panels: [],
+            bubbles: [
+                {
+                    id: "bubble-1",
+                    bubbleNumber: 1,
+                    bubbleType: "speech",
+                    textOriginal: "こんにちは",
+                    panelId: null,
+                    textLayout: { lines: ["こんにちは！"], source: "manual" },
+                    bbox: { x: 20, y: 20, width: 100, height: 100 },
+                },
+            ],
+        });
+
+        const warnings = lintPageContent(page);
+        assert.equal(warnings.some((warning) => warning.code === "TEXT_LAYOUT_TEXT_MISMATCH"), false);
+    });
 });
 
 test("PublishedPackSchema omits private Pack entry metadata", () => {
@@ -364,4 +389,23 @@ test("Pack lint warns for stale translation textLayout lines", () => {
     const warnings = lintPackContent(pack);
     assert.ok(warnings.some((warning) => warning.code === "TEXT_LAYOUT_TEXT_MISMATCH"));
     assert.ok(warnings.some((warning) => warning.code === "TEXT_STYLE_FITMODE_WITHOUT_FONT_SIZE"));
+});
+
+test("Pack lint allows manual translation lettering lines to differ from entry text", () => {
+    const pack = PackManifestSchema.parse({
+        id: "translation-en-demo",
+        type: "TRANSLATION",
+        language: "en",
+        version: 1,
+        isPublished: false,
+        entries: [{
+            id: "entry-1",
+            target: { seriesId: "series-1", bubbleId: "b01" },
+            text: "Hello world",
+            textLayout: { lines: ["Hello,", "world!"], source: "manual" },
+        }],
+    });
+
+    const warnings = lintPackContent(pack);
+    assert.equal(warnings.some((warning) => warning.code === "TEXT_LAYOUT_TEXT_MISMATCH"), false);
 });

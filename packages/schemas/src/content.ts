@@ -341,7 +341,7 @@ function addTextStyleWarnings(args: {
 
 function addTextLayoutWarnings(args: {
     warnings: ContentLintWarning[];
-    textLayout?: { lines?: string[] };
+    textLayout?: { lines?: string[]; source?: "manual" | "imported" | "ocr" };
     expectedText?: string;
     language?: string;
     path: Array<string | number>;
@@ -349,6 +349,7 @@ function addTextLayoutWarnings(args: {
     bubbleId?: string;
     panelId?: string | null;
 }) {
+    if (args.textLayout?.source === "manual") return;
     const lines = args.textLayout?.lines;
     if (!lines || lines.length === 0) return;
     const layoutText = normalizedTextForLayoutCompare(joinedLayoutLines(lines, args.language));

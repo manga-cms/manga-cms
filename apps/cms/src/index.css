@@ -2455,6 +2455,150 @@ textarea {
     background: rgba(37, 99, 235, 0.045);
 }
 
+.lettering-workspace {
+    display: grid;
+    gap: 1rem;
+}
+
+.lettering-workspace-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.lettering-workspace-layout {
+    display: grid;
+    grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr) minmax(18rem, 23rem);
+    gap: 1rem;
+    align-items: start;
+}
+
+.lettering-page-strip,
+.lettering-inspector {
+    position: sticky;
+    top: 1rem;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.lettering-page-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.lettering-page-button.is-active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
+}
+
+.lettering-preview-card {
+    overflow: auto;
+}
+
+.lettering-canvas {
+    position: relative;
+    max-width: min(100%, 54rem);
+    margin: 0 auto;
+    container-type: inline-size;
+}
+
+.lettering-canvas > img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    box-shadow: var(--shadow-md);
+}
+
+.lettering-canvas-overlay {
+    position: absolute;
+    inset: 0;
+}
+
+.lettering-bubble-hit {
+    position: absolute;
+    display: block;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.lettering-bubble-hit.is-selected {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.24);
+}
+
+.lettering-inline-editor {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    resize: none;
+    padding: 0.45cqw;
+    border: 1px solid rgba(37, 99, 235, 0.55);
+    border-radius: inherit;
+    background: rgba(255, 255, 255, 0.72);
+    color: #111827;
+    font-family: "Shippori Antique", "Noto Sans JP", sans-serif;
+    font-size: clamp(0.8rem, 3cqw, 1.45rem);
+    line-height: 1.3;
+    outline: none;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.lettering-inline-editor.is-vertical {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    line-break: strict;
+}
+
+.lettering-anchor-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 2rem));
+    gap: 0.35rem;
+}
+
+.lettering-anchor-grid button {
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    cursor: pointer;
+}
+
+.lettering-anchor-grid button.is-active {
+    border-color: var(--accent);
+    background: rgba(37, 99, 235, 0.15);
+}
+
+@media (max-width: 1024px) {
+    .lettering-workspace-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .lettering-page-strip,
+    .lettering-inspector {
+        position: static;
+    }
+}
+
 .canonical-bubble-header h3 {
     margin: 0 0 0.25rem;
     font-size: 0.95rem;

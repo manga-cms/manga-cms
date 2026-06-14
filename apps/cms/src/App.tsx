@@ -11,6 +11,7 @@ import CreateJob from "./pages/CreateJob";
 import JobDetail from "./pages/JobDetail";
 import Entitlements from "./pages/Entitlements";
 import PageStructureReview from "./pages/PageStructureReview";
+import LetteringWorkspace from "./pages/LetteringWorkspace";
 import FeedbackList from "./pages/FeedbackList";
 import FeedbackDetail from "./pages/FeedbackDetail";
 import ProposalList from "./pages/ProposalList";
@@ -247,6 +248,7 @@ export default function App() {
                     <Route path="/works/:id" element={<WorkDetail currentUser={user} />} />
                     <Route path="/works/:id/episodes/:epId" element={<EpisodeEditor currentUser={user} />} />
                     <Route path="/works/:id/episodes/:epId/structure" element={<PageStructureReview currentUser={user} />} />
+                    <Route path="/works/:id/episodes/:epId/lettering" element={<LetteringWorkspace currentUser={user} />} />
                     <Route path="/works/:id/episodes/:epId/translation-import" element={<AdminOnlyRoute user={user}><TranslationDraftImport /></AdminOnlyRoute>} />
                     <Route path="/works/:id/publish" element={<Publish />} />
                     <Route path="/ingestion" element={<AdminOnlyRoute user={user}><JobsList /></AdminOnlyRoute>} />

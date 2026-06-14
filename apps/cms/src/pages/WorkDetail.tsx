@@ -583,6 +583,7 @@ export default function WorkDetail({ currentUser }: WorkDetailProps) {
                             <div className="section-actions">
                                 <Link to={`/works/${id}/episodes/${ep.id}`} className="btn btn-outline">Episode</Link>
                                 <Link to={`/works/${id}/episodes/${ep.id}/structure`} className="btn btn-primary">Structure Review</Link>
+                                <Link to={`/works/${id}/episodes/${ep.id}/lettering`} className="btn btn-outline">Lettering</Link>
                                 {currentUser?.role === "admin" && (
                                     <Link to={`/works/${id}/episodes/${ep.id}/translation-import`} className="btn btn-outline">EN Translation import</Link>
                                 )}

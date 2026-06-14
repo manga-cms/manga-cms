@@ -69,6 +69,15 @@ export function StructureReviewHeader({
                 >
                     {t("structure.episode")}
                 </Link>
+                <Link
+                    to={`/works/${seriesId}/episodes/${episodeId}/lettering`}
+                    className="btn btn-outline"
+                    onClick={(event) => {
+                        if (!onRequestLeave()) event.preventDefault();
+                    }}
+                >
+                    {t("lettering.workspace.link")}
+                </Link>
                 {showTranslationImport && (
                     <Link
                         to={`/works/${seriesId}/episodes/${episodeId}/translation-import`}
