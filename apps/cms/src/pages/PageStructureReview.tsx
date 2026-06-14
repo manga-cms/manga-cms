@@ -52,6 +52,7 @@ type PageStructureReviewProps = {
     currentUser?: { id: string; role: string } | null;
 };
 const MAX_HISTORY_LENGTH = 80;
+const LETTERING_BLANK_IMAGE_KEYS = ["blank-ja", "blank", "ja-blank"] as const;
 
 function clampStructureZoom(zoom: number) {
     return Math.max(MIN_STRUCTURE_ZOOM, Math.min(MAX_STRUCTURE_ZOOM, zoom));
@@ -65,6 +66,14 @@ function applyBubblePatch(bubble: BubbleData, patch: Partial<BubbleData>): Bubbl
         }
     }
     return next;
+}
+
+function findLetteringBlankImageKey(page: PageData | null) {
+    if (!page) return "";
+    for (const key of LETTERING_BLANK_IMAGE_KEYS) {
+        if (page.images?.[key]?.trim()) return key;
+    }
+    return "";
 }
 
 export default function PageStructureReview({ currentUser }: PageStructureReviewProps) {
@@ -291,8 +300,15 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
 
     const imageUrl = useMemo(() => {
         if (!seriesId || !epId || !page) return "";
+        if (letteringMode) {
+            const blankKey = findLetteringBlankImageKey(page);
+            return blankKey ? getAdminPageImageUrl(seriesId, epId, page.pageNumber, blankKey) : "";
+        }
         return getAdminPageImageUrl(seriesId, epId, page.pageNumber);
-    }, [seriesId, epId, page]);
+    }, [letteringMode, seriesId, epId, page]);
+    const imageUnavailableMessage = letteringMode && page && !findLetteringBlankImageKey(page)
+        ? t("structure.lettering.blankImageMissing")
+        : "";
 
     const reviewSummary = useMemo(() => {
         return summarizeReview(page, reviewDecisions);
@@ -1063,6 +1079,7 @@ export default function PageStructureReview({ currentUser }: PageStructureReview
                 <CanvasOverlayEditor
                     page={page}
                     imageUrl={imageUrl}
+                    imageUnavailableMessage={imageUnavailableMessage}
                     letteringMode={letteringMode}
                     stageRef={stageRef}
                     canvasRef={canvasRef}

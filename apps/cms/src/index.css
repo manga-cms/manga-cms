@@ -2298,6 +2298,22 @@ textarea {
     box-shadow: var(--shadow-md);
 }
 
+.structure-image-placeholder {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-height: 18rem;
+    padding: 2rem;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    background: var(--surface-subtle);
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+}
+
 .structure-overlay {
     position: absolute;
     inset: 0;

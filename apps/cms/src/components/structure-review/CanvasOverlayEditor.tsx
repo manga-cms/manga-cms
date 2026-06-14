@@ -12,6 +12,7 @@ import type { DragState, ReviewDecisions, StructureViewport } from "../../lib/st
 type CanvasOverlayEditorProps = {
     page: PageData | null;
     imageUrl: string;
+    imageUnavailableMessage?: string;
     letteringMode?: boolean;
     stageRef: RefObject<HTMLElement | null>;
     canvasRef: RefObject<HTMLDivElement | null>;
@@ -36,9 +37,26 @@ type CanvasOverlayEditorProps = {
 
 const decisionLabelKey = (decision: string | undefined): MessageKey => `decision.${decision ?? "pending"}` as MessageKey;
 
+function cssTextToStyleObject(cssText: string): CSSProperties {
+    const style: Record<string, string> = {};
+    for (const declaration of cssText.split(";")) {
+        const sep = declaration.indexOf(":");
+        if (sep === -1) continue;
+        const prop = declaration.slice(0, sep).trim();
+        const value = declaration.slice(sep + 1).trim();
+        if (!prop || !value) continue;
+        const key = prop.startsWith("--")
+            ? prop
+            : prop.replace(/-([a-z])/g, (_, ch: string) => ch.toUpperCase());
+        style[key] = value;
+    }
+    return style as CSSProperties;
+}
+
 export function CanvasOverlayEditor({
     page,
     imageUrl,
+    imageUnavailableMessage = "",
     letteringMode = false,
     stageRef,
     canvasRef,
@@ -165,72 +183,85 @@ export function CanvasOverlayEditor({
                         width: baseCanvasWidth ? `${baseCanvasWidth * viewport.zoom}px` : `min(100%, 46rem)`,
                     }}
                 >
-                    <img src={imageUrl} alt={t("structure.canvas.pageAlt", { pageNumber: page.pageNumber })} draggable={false} />
-                    <div className="structure-overlay" ref={overlayRef}>
-                        {page.panels.map((panel: PanelData, panelIndex: number) => (
-                            <div
-                                key={panelIdOf(panel)}
-                                className={`bbox bbox-panel ${selectedPanelIndex === panelIndex ? "is-active" : ""}`}
-                                style={toBoxStyle(panel.bbox, page)}
-                                onPointerDown={(e) => startBoxDrag(e, "panel", "move", panelIndex)}
-                            >
-                                <span className="bbox-label" title={`${t("structure.canvas.panelLabel", { panelNumber: panel.panelNumber })} · ${t(decisionLabelKey(reviewDecisions[panelReviewKey(panel)]))}`}>
-                                    {t("structure.canvas.panelLabel", { panelNumber: panel.panelNumber })}
-                                </span>
-                                <button
-                                    type="button"
-                                    className="bbox-resize"
-                                    aria-label={t("structure.canvas.resizePanel")}
-                                    onPointerDown={(e) => startBoxDrag(e, "panel", "resize", panelIndex)}
-                                />
-                            </div>
-                        ))}
-                        {letteringMode && bubbleOverlays.map(({ bubble }) => {
-                            const render = letteringRenderFor(bubble);
-                            if (!render) return null;
-                            const displayDirection = displayDirectionForLanguage(bubble.textDirection, "ja");
-                            return (
-                                <p
-                                    key={`lettering-${bubbleIdOf(bubble)}`}
-                                    className={`lettering-preview-bubble ${displayDirection === "vertical" ? "is-vertical" : "is-horizontal"}`}
-                                    data-overlay-bubble
-                                    data-fit-mode={render.fitMode}
-                                    data-fit-characters={render.fit.characterCount}
-                                    data-inline-align={render.inlineAlign}
-                                    data-block-align={render.blockAlign}
-                                    style={render.style as CSSProperties}
+                    {imageUrl ? (
+                        <img src={imageUrl} alt={t("structure.canvas.pageAlt", { pageNumber: page.pageNumber })} draggable={false} />
+                    ) : (
+                        <div
+                            className="structure-image-placeholder"
+                            style={{ aspectRatio: `${page.width} / ${page.height}` }}
+                            role="img"
+                            aria-label={imageUnavailableMessage || t("structure.canvas.pageAlt", { pageNumber: page.pageNumber })}
+                        >
+                            {imageUnavailableMessage}
+                        </div>
+                    )}
+                    {imageUrl && (
+                        <div className="structure-overlay" ref={overlayRef}>
+                            {page.panels.map((panel: PanelData, panelIndex: number) => (
+                                <div
+                                    key={panelIdOf(panel)}
+                                    className={`bbox bbox-panel ${selectedPanelIndex === panelIndex ? "is-active" : ""}`}
+                                    style={toBoxStyle(panel.bbox, page)}
+                                    onPointerDown={(e) => startBoxDrag(e, "panel", "move", panelIndex)}
                                 >
-                                    <span data-overlay-bubble-text>{render.text}</span>
-                                </p>
-                            );
-                        })}
-                        {bubbleOverlays.map(({ bubble, panelIndex, bubbleIndex, readingOrder }) => (
-                            <div
-                                key={bubbleIdOf(bubble)}
-                                className={`bbox bbox-bubble ${letteringMode ? "is-lettering-preview" : ""} ${selectedPanelIndex === panelIndex && selectedBubbleIndex === bubbleIndex ? "is-active" : ""}`}
-                                style={toBoxStyle(bubble.bbox, page)}
-                                onPointerDown={(e) => startBoxDrag(e, "bubble", "move", panelIndex, bubbleIndex)}
-                            >
-                                <span
-                                    className="bbox-label"
-                                    title={[
-                                        t("structure.canvas.bubbleLabel", { bubbleNumber: bubble.bubbleNumber }),
-                                        t("structure.sidebar.bubbleCandidateRow", { readingOrder }),
-                                        t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)])),
-                                        bubble.textOriginal,
-                                    ].filter(Boolean).join(" · ")}
+                                    <span className="bbox-label" title={`${t("structure.canvas.panelLabel", { panelNumber: panel.panelNumber })} · ${t(decisionLabelKey(reviewDecisions[panelReviewKey(panel)]))}`}>
+                                        {t("structure.canvas.panelLabel", { panelNumber: panel.panelNumber })}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="bbox-resize"
+                                        aria-label={t("structure.canvas.resizePanel")}
+                                        onPointerDown={(e) => startBoxDrag(e, "panel", "resize", panelIndex)}
+                                    />
+                                </div>
+                            ))}
+                            {letteringMode && bubbleOverlays.map(({ bubble }) => {
+                                const render = letteringRenderFor(bubble);
+                                if (!render) return null;
+                                const displayDirection = displayDirectionForLanguage(bubble.textDirection, "ja");
+                                return (
+                                    <p
+                                        key={`lettering-${bubbleIdOf(bubble)}`}
+                                        className={`lettering-preview-bubble ${displayDirection === "vertical" ? "is-vertical" : "is-horizontal"}`}
+                                        data-overlay-bubble
+                                        data-fit-mode={render.fitMode}
+                                        data-fit-characters={render.fit.characterCount}
+                                        data-inline-align={render.inlineAlign}
+                                        data-block-align={render.blockAlign}
+                                        style={cssTextToStyleObject(render.style)}
+                                    >
+                                        <span data-overlay-bubble-text>{render.text}</span>
+                                    </p>
+                                );
+                            })}
+                            {bubbleOverlays.map(({ bubble, panelIndex, bubbleIndex, readingOrder }) => (
+                                <div
+                                    key={bubbleIdOf(bubble)}
+                                    className={`bbox bbox-bubble ${letteringMode ? "is-lettering-preview" : ""} ${selectedPanelIndex === panelIndex && selectedBubbleIndex === bubbleIndex ? "is-active" : ""}`}
+                                    style={toBoxStyle(bubble.bbox, page)}
+                                    onPointerDown={(e) => startBoxDrag(e, "bubble", "move", panelIndex, bubbleIndex)}
                                 >
-                                    {bubble.displayRef ?? bubble.shortId ?? t("structure.canvas.bubbleLabel", { bubbleNumber: bubble.bubbleNumber })}
-                                </span>
-                                <button
-                                    type="button"
-                                    className="bbox-resize"
-                                    aria-label={t("structure.canvas.resizeBubble")}
-                                    onPointerDown={(e) => startBoxDrag(e, "bubble", "resize", panelIndex, bubbleIndex)}
-                                />
-                            </div>
-                        ))}
-                    </div>
+                                    <span
+                                        className="bbox-label"
+                                        title={[
+                                            t("structure.canvas.bubbleLabel", { bubbleNumber: bubble.bubbleNumber }),
+                                            t("structure.sidebar.bubbleCandidateRow", { readingOrder }),
+                                            t(decisionLabelKey(reviewDecisions[bubbleReviewKey(bubble)])),
+                                            bubble.textOriginal,
+                                        ].filter(Boolean).join(" · ")}
+                                    >
+                                        {bubble.displayRef ?? bubble.shortId ?? t("structure.canvas.bubbleLabel", { bubbleNumber: bubble.bubbleNumber })}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="bbox-resize"
+                                        aria-label={t("structure.canvas.resizeBubble")}
+                                        onPointerDown={(e) => startBoxDrag(e, "bubble", "resize", panelIndex, bubbleIndex)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </section>
