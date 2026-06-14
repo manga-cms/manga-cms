@@ -171,6 +171,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const inlineEditorRef = useRef<HTMLDivElement | null>(null);
     const composingRef = useRef(false);
     const seededEditorKeyRef = useRef("");
+    const editorDomKeyRef = useRef("");
     const [episode, setEpisode] = useState<EpisodeData | null>(null);
     const [pageIndex, setPageIndex] = useState(0);
     const [selectedBubbleId, setSelectedBubbleId] = useState("");
@@ -269,16 +270,18 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     useEffect(() => {
         const editor = inlineEditorRef.current;
         if (!editor) return;
-        if (typeof document !== "undefined" && document.activeElement === editor) return;
+        const nextKey = selectedBubble ? `${pageIndex}:${bubbleIdOf(selectedBubble)}` : "";
+        const isNewSelection = editorDomKeyRef.current !== nextKey;
+        if (!isNewSelection && typeof document !== "undefined" && document.activeElement === editor) return;
         if (editableTextFromElement(editor) !== editorText) {
             editor.innerText = editorText;
         }
-    }, [editorText, selectedBubbleId]);
+        editorDomKeyRef.current = nextKey;
+    }, [editorText, pageIndex, selectedBubble]);
 
     useEffect(() => {
         const editor = inlineEditorRef.current;
         if (!editor || !canManageLettering) return;
-        editor.innerText = editorText;
         requestAnimationFrame(() => editor.focus());
     }, [canManageLettering, pageIndex, selectedBubbleId]);
 
@@ -485,41 +488,43 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                             }}
                                             title={`${bubble.displayRef ?? bubble.shortId ?? readingOrder}: ${bubble.textOriginal}`}
                                         >
-                                            {selected && canManageLettering ? (
-                                                <div
-                                                    ref={inlineEditorRef}
-                                                    className={`lettering-inline-editor ${displayDirection === "vertical" ? "is-vertical" : "is-horizontal"}`}
-                                                    contentEditable="plaintext-only"
-                                                    role="textbox"
-                                                    aria-multiline="true"
-                                                    data-lettering-inline-editor
-                                                    suppressContentEditableWarning
-                                                    onInput={(event) => {
-                                                        const nextText = editableTextFromElement(event.currentTarget);
-                                                        setEditorText(nextText);
-                                                        if (!composingRef.current) applyEditorText(nextText);
-                                                    }}
-                                                    onBlur={(event) => {
-                                                        if (!composingRef.current) applyEditorText(editableTextFromElement(event.currentTarget));
-                                                    }}
-                                                    onKeyDown={onEditorKeyDown}
-                                                    onCompositionStart={onCompositionStart}
-                                                    onCompositionEnd={onCompositionEnd}
-                                                    aria-label={t("lettering.workspace.inlineEditorLabel")}
-                                                />
-                                            ) : (
-                                                <span
-                                                    className={`lettering-preview-bubble ${displayDirection === "vertical" ? "is-vertical" : "is-horizontal"}`}
-                                                    data-overlay-bubble
-                                                    data-fit-mode={render.fitMode}
-                                                    data-fit-characters={render.fit.characterCount}
-                                                    data-inline-align={render.inlineAlign}
-                                                    data-block-align={render.blockAlign}
-                                                    style={letteringInnerStyle(render.style)}
-                                                >
+                                            <span
+                                                className={`lettering-preview-bubble ${selected && canManageLettering ? "is-editing" : ""} ${displayDirection === "vertical" ? "is-vertical" : "is-horizontal"}`}
+                                                data-overlay-bubble
+                                                data-fit-mode={render.fitMode}
+                                                data-fit-characters={render.fit.characterCount}
+                                                data-inline-align={render.inlineAlign}
+                                                data-block-align={render.blockAlign}
+                                                style={letteringInnerStyle(render.style)}
+                                            >
+                                                {selected && canManageLettering ? (
+                                                    <span
+                                                        ref={inlineEditorRef}
+                                                        className="lettering-inline-editor"
+                                                        contentEditable="plaintext-only"
+                                                        role="textbox"
+                                                        aria-multiline="true"
+                                                        data-overlay-bubble-text
+                                                        data-lettering-inline-editor
+                                                        suppressContentEditableWarning
+                                                        onInput={(event) => {
+                                                            const nextText = editableTextFromElement(event.currentTarget);
+                                                            setEditorText(nextText);
+                                                            if (!composingRef.current) applyEditorText(nextText);
+                                                        }}
+                                                        onBlur={(event) => {
+                                                            if (!composingRef.current) applyEditorText(editableTextFromElement(event.currentTarget));
+                                                        }}
+                                                        onKeyDown={onEditorKeyDown}
+                                                        onCompositionStart={onCompositionStart}
+                                                        onCompositionEnd={onCompositionEnd}
+                                                        aria-label={t("lettering.workspace.inlineEditorLabel")}
+                                                        spellCheck={false}
+                                                    />
+                                                ) : (
                                                     <span data-overlay-bubble-text>{render.text}</span>
-                                                </span>
-                                            )}
+                                                )}
+                                            </span>
                                         </div>
                                     );
                                 })}
