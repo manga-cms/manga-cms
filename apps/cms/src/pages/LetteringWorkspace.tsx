@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type CompositionEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type CompositionEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { buildLetteringRender, displayDirectionForLanguage } from "@manga/lettering";
 import { refitLetteringNow } from "@manga/lettering/refit";
@@ -172,6 +172,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const composingRef = useRef(false);
     const seededEditorKeyRef = useRef("");
     const editorDomKeyRef = useRef("");
+    const editorDomTextRef = useRef("");
     const [episode, setEpisode] = useState<EpisodeData | null>(null);
     const [pageIndex, setPageIndex] = useState(0);
     const [selectedBubbleId, setSelectedBubbleId] = useState("");
@@ -267,16 +268,20 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         refitLetteringNow(overlayRef.current);
     }, [episode, pageIndex, selectedBubbleId]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const editor = inlineEditorRef.current;
         if (!editor) return;
         const nextKey = selectedBubble ? `${pageIndex}:${bubbleIdOf(selectedBubble)}` : "";
         const isNewSelection = editorDomKeyRef.current !== nextKey;
-        if (!isNewSelection && typeof document !== "undefined" && document.activeElement === editor) return;
-        if (editableTextFromElement(editor) !== editorText) {
+        const editorHasFocus = typeof document !== "undefined" && document.activeElement === editor;
+        const editorTextChangedOutsideDom = editorDomTextRef.current !== editorText;
+        if (!isNewSelection && editorHasFocus && !editorTextChangedOutsideDom) return;
+        const currentDomText = editableTextFromElement(editor);
+        if (currentDomText !== editorText) {
             editor.innerText = editorText;
         }
         editorDomKeyRef.current = nextKey;
+        editorDomTextRef.current = editorText;
     }, [editorText, pageIndex, selectedBubble]);
 
     useEffect(() => {
