@@ -183,6 +183,8 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState("");
     const [resetToAutoBubbleId, setResetToAutoBubbleId] = useState("");
+    const [editorActive, setEditorActive] = useState(false);
+    const [isComposing, setIsComposing] = useState(false);
 
     useEffect(() => {
         if (!seriesId || !epId) return;
@@ -258,18 +260,24 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             setDirty(false);
             setSaved(false);
             setResetToAutoBubbleId("");
+            setEditorActive(false);
+            composingRef.current = false;
+            setIsComposing(false);
             return;
         }
         setEditorText(lineTextForEditor(selectedBubble, renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal));
         setDirty(false);
         setSaved(false);
         setResetToAutoBubbleId("");
+        setEditorActive(false);
+        composingRef.current = false;
+        setIsComposing(false);
     }, [pageIndex, renderForBubble, selectedBubble]);
 
     useEffect(() => {
         if (!overlayRef.current) return;
         refitLetteringNow(overlayRef.current);
-    }, [episode, pageIndex, selectedBubbleId]);
+    }, [editorActive, episode, isComposing, pageIndex, selectedBubbleId]);
 
     useEffect(() => {
         if (!overlayRef.current) return;
@@ -400,6 +408,9 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const selectBubble = async (bubbleId: string) => {
         if (bubbleId === selectedBubbleId) return;
         if (!(await flushPendingEdit())) return;
+        setEditorActive(false);
+        composingRef.current = false;
+        setIsComposing(false);
         setSelectedBubbleId(bubbleId);
     };
 
@@ -415,16 +426,24 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     const onCompositionStart = (_event: CompositionEvent<HTMLElement>) => {
         composingRef.current = true;
+        setIsComposing(true);
     };
 
     const onCompositionEnd = (event: CompositionEvent<HTMLElement>) => {
         composingRef.current = false;
+        setIsComposing(false);
         applyEditorText(textFromEditorTarget(event.currentTarget));
+        requestAnimationFrame(() => {
+            if (overlayRef.current) refitLetteringNow(overlayRef.current);
+        });
     };
 
     const selectPage = async (nextIndex: number) => {
         if (nextIndex === pageIndex) return;
         if (!(await flushPendingEdit())) return;
+        setEditorActive(false);
+        composingRef.current = false;
+        setIsComposing(false);
         setPageIndex(nextIndex);
         const nextBubble = activeBubblesOf(episode?.pages[nextIndex] ?? null)[0]?.bubble;
         setSelectedBubbleId(nextBubble ? bubbleIdOf(nextBubble) : "");
@@ -491,6 +510,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                     const bubbleId = bubbleIdOf(bubble);
                                     const selected = bubbleId === selectedBubbleId;
                                     const displayDirection = displayDirectionForLanguage(bubble.textDirection, "ja");
+                                    const skipRefit = selected && canManageLettering && (editorActive || isComposing);
                                     return (
                                         <div
                                             role="button"
@@ -520,6 +540,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                 data-fit-characters={render.fit.characterCount}
                                                 data-inline-align={render.inlineAlign}
                                                 data-block-align={render.blockAlign}
+                                                data-overlay-refit-skip={skipRefit ? "true" : undefined}
                                                 style={letteringInnerStyle(render.style)}
                                             >
                                                 {selected && canManageLettering ? (
@@ -537,8 +558,13 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                             setEditorText(nextText);
                                                             if (!composingRef.current) applyEditorText(nextText);
                                                         }}
+                                                        onFocus={() => setEditorActive(true)}
                                                         onBlur={(event) => {
+                                                            setEditorActive(false);
                                                             if (!composingRef.current) applyEditorText(editableTextFromElement(event.currentTarget));
+                                                            requestAnimationFrame(() => {
+                                                                if (overlayRef.current) refitLetteringNow(overlayRef.current);
+                                                            });
                                                         }}
                                                         onKeyDown={onEditorKeyDown}
                                                         onCompositionStart={onCompositionStart}

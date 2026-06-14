@@ -248,6 +248,7 @@ export const refitLetteringNow = (root: ParentNode = document) => {
     const bubbles = Array.from(root.querySelectorAll<HTMLElement>("[data-overlay-bubble]"));
     if (bubbles.length === 0) return;
     for (const bubble of bubbles) {
+        if (bubble.dataset.overlayRefitSkip === "true") continue;
         refitLetteringBubble(bubble);
     }
 };
