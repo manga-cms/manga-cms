@@ -49,6 +49,7 @@ Related specs (keep in sync; canonical contract owner in parentheses):
 - `docs/api-contract.md` (HTTP + domain contract — owner)
 - `docs/manga-content-v2-spec.md` (content v2 layout/style design)
 - `docs/reader-text-layer-spec.md` (overlay rendering + space-as-break)
+- `docs/lettering-tool-guide.md` (author/editor usage guide)
 - `openapi.yaml`, `packages/domain/src/types.ts`,
   `packages/schemas/src/content.ts` (executable truth)
 
