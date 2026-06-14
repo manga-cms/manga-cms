@@ -2378,7 +2378,9 @@ textarea {
 }
 
 .lettering-preview-bubble {
-    --overlay-padding: 1.12cqw;
+    --overlay-padding-block: 1.12cqw;
+    --overlay-padding-inline: 1.12cqw;
+    --overlay-padding: var(--overlay-padding-block) var(--overlay-padding-inline);
     box-sizing: border-box;
     position: absolute;
     inset: 0;
@@ -2422,7 +2424,9 @@ textarea {
 
 .lettering-preview-bubble.is-vertical {
     --overlay-base-size: 3cqw;
-    --overlay-padding: 2cqw 1.55cqw;
+    --overlay-padding-block: 2cqw;
+    --overlay-padding-inline: 1.55cqw;
+    --overlay-padding: var(--overlay-padding-block) var(--overlay-padding-inline);
     writing-mode: vertical-rl;
     text-orientation: mixed;
     line-break: strict;
@@ -2441,7 +2445,13 @@ textarea {
 
 .lettering-preview-bubble.is-horizontal > span {
     display: block;
-    inline-size: 100%;
+    inline-size: calc(100% + (var(--overlay-padding-inline) * 2));
+    margin-inline: calc(var(--overlay-padding-inline) * -1);
+}
+
+.lettering-preview-bubble.is-vertical > span {
+    margin-inline: calc(var(--overlay-padding-block) * -1);
+    max-inline-size: calc(100% + (var(--overlay-padding-block) * 2));
 }
 
 .lettering-preview-bubble[data-overflow="scroll"] {

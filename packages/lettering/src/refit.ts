@@ -11,6 +11,8 @@ interface TextMeasurement {
     textHeight: number;
     textWidth: number;
     vertical: boolean;
+    wrapHeight: number;
+    wrapWidth: number;
 }
 
 interface VerticalLayoutEstimate {
@@ -23,7 +25,7 @@ interface VerticalLayoutEstimate {
 const textElementOf = (element: HTMLElement) =>
     element.querySelector<HTMLElement>("[data-overlay-bubble-text]") ?? element;
 
-const availableBoxOf = (element: HTMLElement) => {
+const measurementBoxOf = (element: HTMLElement) => {
     const style = window.getComputedStyle(element);
     const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
     const paddingRight = Number.parseFloat(style.paddingRight) || 0;
@@ -32,12 +34,14 @@ const availableBoxOf = (element: HTMLElement) => {
     return {
         height: Math.max(1, element.clientHeight - paddingTop - paddingBottom),
         width: Math.max(1, element.clientWidth - paddingLeft - paddingRight),
+        wrapHeight: Math.max(1, element.clientHeight),
+        wrapWidth: Math.max(1, element.clientWidth),
     };
 };
 
 const measureText = (element: HTMLElement): TextMeasurement => {
     const text = textElementOf(element);
-    const available = availableBoxOf(element);
+    const available = measurementBoxOf(element);
     const rect = text.getBoundingClientRect();
     return {
         availableHeight: available.height,
@@ -45,6 +49,8 @@ const measureText = (element: HTMLElement): TextMeasurement => {
         textHeight: Math.max(rect.height, text.scrollHeight),
         textWidth: Math.max(rect.width, text.scrollWidth),
         vertical: element.classList.contains("is-vertical"),
+        wrapHeight: available.wrapHeight,
+        wrapWidth: available.wrapWidth,
     };
 };
 
@@ -55,7 +61,7 @@ const lineHeightOf = (style: CSSStyleDeclaration, fontSize: number) => {
 };
 
 const verticalLayoutEstimate = (element: HTMLElement): VerticalLayoutEstimate => {
-    const available = availableBoxOf(element);
+    const available = measurementBoxOf(element);
     const style = window.getComputedStyle(element);
     const fontSize = Number.parseFloat(style.fontSize) || 1;
     const lineHeight = lineHeightOf(style, fontSize);
@@ -63,13 +69,13 @@ const verticalLayoutEstimate = (element: HTMLElement): VerticalLayoutEstimate =>
     const charAdvance = fontSize * 1.03;
     const maxCharsPerColumn = Math.max(
         1,
-        Math.floor((available.height * VERTICAL_HEIGHT_TARGET_FILL_RATIO) / Math.max(charAdvance, 1)),
+        Math.floor((available.wrapHeight * VERTICAL_HEIGHT_TARGET_FILL_RATIO) / Math.max(charAdvance, 1)),
     );
     const columns = Math.ceil(characterCount / maxCharsPerColumn);
     const textWidth = columns * lineHeight;
     const textHeight = Math.min(characterCount, maxCharsPerColumn) * charAdvance;
     return {
-        fillHeight: textHeight / available.height,
+        fillHeight: textHeight / available.wrapHeight,
         fillWidth: textWidth / available.width,
         textHeight,
         textWidth,
@@ -78,8 +84,12 @@ const verticalLayoutEstimate = (element: HTMLElement): VerticalLayoutEstimate =>
 
 const overflows = (element: HTMLElement) => {
     const measurement = measureText(element);
+    if (measurement.vertical) {
+        return measurement.textHeight > measurement.wrapHeight + FIT_EPSILON
+            || measurement.textWidth > measurement.availableWidth + FIT_EPSILON;
+    }
     return measurement.textHeight > measurement.availableHeight + FIT_EPSILON
-        || measurement.textWidth > measurement.availableWidth + FIT_EPSILON;
+        || measurement.textWidth > measurement.wrapWidth + FIT_EPSILON;
 };
 
 const exceedsTargetFill = (element: HTMLElement) => {
@@ -90,7 +100,7 @@ const exceedsTargetFill = (element: HTMLElement) => {
             || estimate.fillHeight > VERTICAL_HEIGHT_TARGET_FILL_RATIO;
     }
     return measurement.textHeight > measurement.availableHeight * HORIZONTAL_TARGET_FILL_RATIO + FIT_EPSILON
-        || measurement.textWidth > measurement.availableWidth + FIT_EPSILON;
+        || measurement.textWidth > measurement.wrapWidth + FIT_EPSILON;
 };
 
 const setRefitScale = (element: HTMLElement, scale: number) => {
@@ -108,8 +118,8 @@ const hasExplicitAlign = (element: HTMLElement) =>
 
 const setTextShift = (element: HTMLElement) => {
     const measurement = measureText(element);
-    const freeWidth = Math.max(0, measurement.availableWidth - measurement.textWidth);
-    const freeHeight = Math.max(0, measurement.availableHeight - measurement.textHeight);
+    const freeWidth = Math.max(0, (measurement.vertical ? measurement.availableWidth : measurement.wrapWidth) - measurement.textWidth);
+    const freeHeight = Math.max(0, (measurement.vertical ? measurement.wrapHeight : measurement.availableHeight) - measurement.textHeight);
     if (hasExplicitAlign(element)) {
         const inlineAlign = element.dataset.inlineAlign;
         const blockAlign = element.dataset.blockAlign;

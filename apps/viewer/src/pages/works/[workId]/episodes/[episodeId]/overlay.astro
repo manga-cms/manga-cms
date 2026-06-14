@@ -397,7 +397,9 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
   }
 
   .overlay-bubble {
-    --overlay-padding: 1.12cqw;
+    --overlay-padding-block: 1.12cqw;
+    --overlay-padding-inline: 1.12cqw;
+    --overlay-padding: var(--overlay-padding-block) var(--overlay-padding-inline);
     box-sizing: border-box;
     color: #151515;
     display: block;
@@ -443,12 +445,15 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
 
   .overlay-bubble.is-horizontal .overlay-bubble-text {
     display: block;
-    inline-size: 100%;
+    inline-size: calc(100% + (var(--overlay-padding-inline) * 2));
+    margin-inline: calc(var(--overlay-padding-inline) * -1);
   }
 
   .overlay-bubble.is-vertical {
     --overlay-base-size: 3cqw;
-    --overlay-padding: 2cqw 1.55cqw;
+    --overlay-padding-block: 2cqw;
+    --overlay-padding-inline: 1.55cqw;
+    --overlay-padding: var(--overlay-padding-block) var(--overlay-padding-inline);
     line-break: strict;
     line-height: var(--overlay-line-height, 1.3);
     overflow-wrap: normal;
@@ -459,7 +464,8 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
 
   .overlay-bubble.is-vertical .overlay-bubble-text {
     display: inline-block;
-    max-inline-size: 100%;
+    margin-inline: calc(var(--overlay-padding-block) * -1);
+    max-inline-size: calc(100% + (var(--overlay-padding-block) * 2));
   }
 
   .overlay-bubble.is-sfx {
