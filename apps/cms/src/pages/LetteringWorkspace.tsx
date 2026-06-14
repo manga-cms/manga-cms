@@ -182,6 +182,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState("");
+    const [resetToAutoBubbleId, setResetToAutoBubbleId] = useState("");
 
     useEffect(() => {
         if (!seriesId || !epId) return;
@@ -256,11 +257,13 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
             setEditorText("");
             setDirty(false);
             setSaved(false);
+            setResetToAutoBubbleId("");
             return;
         }
         setEditorText(lineTextForEditor(selectedBubble, renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal));
         setDirty(false);
         setSaved(false);
+        setResetToAutoBubbleId("");
     }, [pageIndex, renderForBubble, selectedBubble]);
 
     useEffect(() => {
@@ -271,7 +274,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
     useEffect(() => {
         if (!overlayRef.current) return;
         return startLetteringRefit(overlayRef.current);
-    }, [episode?.episodeId, pageIndex]);
+    }, [episode?.id, pageIndex]);
 
     useLayoutEffect(() => {
         const editor = inlineEditorRef.current;
@@ -304,6 +307,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     const applyEditorText = (value: string) => {
         if (!selectedBubble || !canManageLettering) return;
+        setResetToAutoBubbleId("");
         if (isEmptyEditorText(value)) {
             patchSelectedBubble({ textLayout: undefined });
             return;
@@ -316,6 +320,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     const updateTextLayout = (patch: Partial<BubbleTextLayout>) => {
         if (!selectedBubble || !canManageLettering) return;
+        setResetToAutoBubbleId("");
         const textStylePatch = selectedBubble.textStyle?.fontSizePx != null && selectedBubble.textStyle.fitMode !== "fixed"
             ? { textStyle: { ...selectedBubble.textStyle, fitMode: "fixed" as const } }
             : {};
@@ -327,6 +332,7 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     const updateTextStyle = (patch: Partial<BubbleTextStyle>) => {
         if (!selectedBubble || !canManageLettering) return;
+        setResetToAutoBubbleId("");
         patchSelectedBubble({
             textStyle: { ...(selectedBubble.textStyle ?? {}), ...patch },
         });
@@ -354,23 +360,28 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
 
     const resetSelectedBubble = () => {
         if (!selectedBubble || !canManageLettering) return;
+        setResetToAutoBubbleId(bubbleIdOf(selectedBubble));
         patchSelectedBubble({ textLayout: undefined, textStyle: undefined });
-        setEditorText(selectedBubble.textOriginal);
+        setEditorText(renderForBubble(selectedBubble)?.text ?? selectedBubble.textOriginal);
     };
 
     const saveSelectedBubble = async () => {
         if (!seriesId || !episode || !page || !selectedBubble || !canManageLettering) return false;
-        const nextTextLayout = textLayoutFromEditorText(editorText, selectedBubble.textLayout);
+        const isResettingToAuto = resetToAutoBubbleId === bubbleIdOf(selectedBubble);
+        const nextTextLayout = isResettingToAuto
+            ? {}
+            : textLayoutFromEditorText(editorText, selectedBubble.textLayout);
         setSaving(true);
         setError("");
         try {
             const nextEpisode = await patchBubbleLettering(seriesId, episode.id, page.pageId ?? page.id, bubbleIdOf(selectedBubble), {
                 textLayout: nextTextLayout,
-                textStyle: selectedBubble.textStyle ?? {},
+                textStyle: isResettingToAuto ? {} : selectedBubble.textStyle ?? {},
             });
             setEpisode(nextEpisode);
             setDirty(false);
             setSaved(true);
+            setResetToAutoBubbleId("");
             return true;
         } catch (e) {
             setError((e as Error).message);
