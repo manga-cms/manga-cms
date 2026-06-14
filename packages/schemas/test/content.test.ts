@@ -243,6 +243,8 @@ test("PageSchema and Linter Validation", async (t) => {
                         lines: ["こんにちは", "世界"],
                         inlineAlign: "start",
                         blockAlign: "center",
+                        offsetXPercent: 12.5,
+                        offsetYPercent: -8,
                         source: "manual",
                     },
                     textStyle: {
@@ -258,6 +260,8 @@ test("PageSchema and Linter Validation", async (t) => {
         });
 
         assert.deepEqual(page.bubbles[0].textLayout?.lines, ["こんにちは", "世界"]);
+        assert.equal(page.bubbles[0].textLayout?.offsetXPercent, 12.5);
+        assert.equal(page.bubbles[0].textLayout?.offsetYPercent, -8);
         assert.equal(page.bubbles[0].textStyle?.fontWeight, 500);
     });
 
@@ -356,7 +360,7 @@ test("PublishedPackSchema omits private Pack entry metadata", () => {
                 bubbleId: "b01",
             },
             text: "Hello",
-            textLayout: { lines: ["Hel", "lo"], inlineAlign: "center" },
+            textLayout: { lines: ["Hel", "lo"], inlineAlign: "center", offsetXPercent: 10 },
             textStyle: { fontSizePx: 24, fontWeight: 700, fitMode: "shrink" },
             metadata: {
                 translation_origin: "machine",
@@ -367,6 +371,7 @@ test("PublishedPackSchema omits private Pack entry metadata", () => {
 
     assert.equal("metadata" in parsed.entries[0], false);
     assert.deepEqual(parsed.entries[0].textLayout?.lines, ["Hel", "lo"]);
+    assert.equal(parsed.entries[0].textLayout?.offsetXPercent, 10);
     assert.equal(parsed.entries[0].textStyle?.fontWeight, 700);
 });
 

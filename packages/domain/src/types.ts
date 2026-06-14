@@ -123,6 +123,10 @@ export interface BubbleTextLayout {
     lines?: string[];
     inlineAlign?: "start" | "center" | "end";
     blockAlign?: "start" | "center" | "end";
+    /** Visual X offset as a percentage of the Bubble bbox width. */
+    offsetXPercent?: number;
+    /** Visual Y offset as a percentage of the Bubble bbox height. */
+    offsetYPercent?: number;
     source?: "manual" | "imported" | "ocr";
 }
 

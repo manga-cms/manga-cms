@@ -2951,6 +2951,16 @@ components:
         blockAlign:
           type: string
           enum: [start, center, end]
+        offsetXPercent:
+          type: number
+          minimum: -100
+          maximum: 100
+          description: Visual X offset from the align anchor as a percentage of the Bubble bbox width.
+        offsetYPercent:
+          type: number
+          minimum: -100
+          maximum: 100
+          description: Visual Y offset from the align anchor as a percentage of the Bubble bbox height.
         source:
           type: string
           enum: [manual, imported, ocr]

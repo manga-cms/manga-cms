@@ -313,6 +313,8 @@ interface BubbleTextLayout {
   lines?: string[];
   inlineAlign?: "start" | "center" | "end";
   blockAlign?: "start" | "center" | "end";
+  offsetXPercent?: number; // -100..100, relative to Bubble bbox width
+  offsetYPercent?: number; // -100..100, relative to Bubble bbox height
   source?: "manual" | "imported" | "ocr";
 }
 
@@ -338,6 +340,10 @@ Comparison:
   translation memory, search, speech synthesis, CSV/TSV export, and share
   descriptions.
 - `textLayout.lines` keeps canonical text and lettering layout separate.
+  `offsetXPercent` / `offsetYPercent` move the rendered lettering relative to
+  the selected `inlineAlign` / `blockAlign` anchor. They are percentages of the
+  Bubble bbox so CMS preview and public overlay stay responsive across viewport
+  sizes.
   Readers, CMS previews, and future exports can opt into layout lines while
   translation, search, and accessibility keep using normalized source text.
 

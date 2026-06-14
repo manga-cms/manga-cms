@@ -129,6 +129,8 @@ export interface BubbleTextLayout {
     lines?: string[];
     inlineAlign?: "start" | "center" | "end";
     blockAlign?: "start" | "center" | "end";
+    offsetXPercent?: number;
+    offsetYPercent?: number;
     source?: "manual" | "imported" | "ocr";
 }
 

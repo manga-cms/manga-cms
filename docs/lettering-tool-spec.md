@@ -75,6 +75,8 @@ interface BubbleTextLayout {
   blockAlign?: "start" | "center" | "end";   // block axis (line stacking):
                                              // start = horizontal -> top;
                                              //         vertical-rl -> right
+  offsetXPercent?: number; // visual X offset from anchor, -100..100 bbox %
+  offsetYPercent?: number; // visual Y offset from anchor, -100..100 bbox %
   source?: "manual" | "imported" | "ocr";
 }
 
@@ -103,9 +105,9 @@ Rules for implementers:
   rejected at load/validate/publish (deploy) time, so the Reader never receives
   out-of-range typesetting from canonical sources. See Error Handling for the
   Reader-side defensive layer.
-- Position offset: `inlineAlign`/`blockAlign` (9 combinations) is the MVP. No
-  free pixel offset. If sub-align nudging is needed later, add
-  `textOffsetPx: { x, y }` (manuscript px, bbox unchanged) — deferred.
+- Position offset: `inlineAlign`/`blockAlign` select the anchor, and
+  `offsetXPercent`/`offsetYPercent` apply free visual movement from that anchor.
+  Offsets are percentages of the Bubble bbox so CMS and Reader stay responsive.
 - Overlay read order: the active display text is `Bubble.textOriginal` for ja
   and the matching `PackEntry.text` for translations. If `textLayout.lines` is
   present, render it joined with `\n` (`white-space: pre-line`); else render the

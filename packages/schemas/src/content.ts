@@ -35,6 +35,8 @@ export const BubbleTextLayoutSchema = z.object({
     lines: z.array(z.string()).min(1).optional(),
     inlineAlign: z.enum(["start", "center", "end"]).optional(),
     blockAlign: z.enum(["start", "center", "end"]).optional(),
+    offsetXPercent: z.number().finite().min(-100).max(100).optional(),
+    offsetYPercent: z.number().finite().min(-100).max(100).optional(),
     source: z.enum(["manual", "imported", "ocr"]).optional(),
 }).strict();
 

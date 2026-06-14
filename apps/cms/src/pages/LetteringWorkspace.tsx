@@ -158,26 +158,39 @@ function boundedFontSize(value: number) {
     return Math.max(1, Math.min(160, Math.round(value)));
 }
 
-function alignFromRatio(value: number): AlignValue {
-    if (value < 1 / 3) return "start";
-    if (value > 2 / 3) return "end";
-    return "center";
-}
-
 function alignRatio(value: AlignValue | undefined) {
     if (value === "center") return 50;
     if (value === "end") return 88;
     return 12;
 }
 
-function anchorHandleStyle(bubble: BubbleData): CSSProperties {
+function clampOffsetPercent(value: number) {
+    return Math.max(-100, Math.min(100, Math.round(value * 10) / 10));
+}
+
+function visualAnchorBasePercent(bubble: BubbleData): { x: number; y: number } {
     const inlineAlign = bubble.textLayout?.inlineAlign;
     const blockAlign = bubble.textLayout?.blockAlign;
     if (displayDirectionForLanguage(bubble.textDirection, "ja") === "vertical") {
-        const left = blockAlign === "start" ? 88 : blockAlign === "center" ? 50 : 12;
-        return { left: `${left}%`, top: `${alignRatio(inlineAlign)}%` };
+        return {
+            x: blockAlign === "start" ? 88 : blockAlign === "center" ? 50 : 12,
+            y: alignRatio(inlineAlign),
+        };
     }
-    return { left: `${alignRatio(inlineAlign)}%`, top: `${alignRatio(blockAlign)}%` };
+    return {
+        x: alignRatio(inlineAlign),
+        y: alignRatio(blockAlign),
+    };
+}
+
+function anchorHandleStyle(bubble: BubbleData): CSSProperties {
+    const base = visualAnchorBasePercent(bubble);
+    const offsetX = bubble.textLayout?.offsetXPercent ?? 0;
+    const offsetY = bubble.textLayout?.offsetYPercent ?? 0;
+    return {
+        left: `calc(${base.x}% + ${offsetX}%)`,
+        top: `calc(${base.y}% + ${offsetY}%)`,
+    };
 }
 
 function insertTextAtSelection(text: string) {
@@ -382,33 +395,26 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
         });
     };
 
-    const snapSelectedBubbleAlignAtPoint = (clientX: number, clientY: number, bubble: BubbleData, rect: DOMRect) => {
+    const updateSelectedBubbleOffsetAtPoint = (clientX: number, clientY: number, bubble: BubbleData, rect: DOMRect) => {
         if (!canManageLettering || bubbleIdOf(bubble) !== selectedBubbleId) return;
-        const xRatio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(rect.width, 1)));
-        const yRatio = Math.max(0, Math.min(1, (clientY - rect.top) / Math.max(rect.height, 1)));
-        const displayDirection = displayDirectionForLanguage(bubble.textDirection, "ja");
-        if (displayDirection === "vertical") {
-            updateTextLayout({
-                inlineAlign: alignFromRatio(yRatio),
-                blockAlign: xRatio < 1 / 3 ? "end" : xRatio > 2 / 3 ? "start" : "center",
-            });
-            return;
-        }
+        const xPercent = ((clientX - rect.left) / Math.max(rect.width, 1)) * 100;
+        const yPercent = ((clientY - rect.top) / Math.max(rect.height, 1)) * 100;
+        const base = visualAnchorBasePercent(bubble);
         updateTextLayout({
-            inlineAlign: alignFromRatio(xRatio),
-            blockAlign: alignFromRatio(yRatio),
+            offsetXPercent: clampOffsetPercent(xPercent - base.x),
+            offsetYPercent: clampOffsetPercent(yPercent - base.y),
         });
     };
 
-    const snapSelectedBubbleAlign = (event: MouseEvent<HTMLElement>, bubble: BubbleData) => {
+    const moveSelectedBubbleOffset = (event: MouseEvent<HTMLElement>, bubble: BubbleData) => {
         if (event.target instanceof HTMLElement && event.target.closest("[data-lettering-inline-editor], [data-lettering-anchor-handle]")) return;
-        snapSelectedBubbleAlignAtPoint(event.clientX, event.clientY, bubble, event.currentTarget.getBoundingClientRect());
+        updateSelectedBubbleOffsetAtPoint(event.clientX, event.clientY, bubble, event.currentTarget.getBoundingClientRect());
     };
 
-    const snapSelectedBubbleAnchor = (event: PointerEvent<HTMLElement>, bubble: BubbleData) => {
+    const dragSelectedBubbleOffset = (event: PointerEvent<HTMLElement>, bubble: BubbleData) => {
         const hit = event.currentTarget.closest<HTMLElement>("[data-lettering-bubble-hit]");
         if (!hit) return;
-        snapSelectedBubbleAlignAtPoint(event.clientX, event.clientY, bubble, hit.getBoundingClientRect());
+        updateSelectedBubbleOffsetAtPoint(event.clientX, event.clientY, bubble, hit.getBoundingClientRect());
     };
 
     const resetSelectedBubble = () => {
@@ -577,12 +583,12 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                             key={bubbleId}
                                             className={`lettering-bubble-hit ${selected ? "is-selected" : ""}`}
                                             style={toBoxStyle(bubble.bbox, page)}
-                                            onClick={(event) => {
-                                                if (selected) {
-                                                    snapSelectedBubbleAlign(event, bubble);
-                                                } else {
-                                                    void selectBubble(bubbleId);
-                                                }
+                                                    onClick={(event) => {
+                                                        if (selected) {
+                                                    moveSelectedBubbleOffset(event, bubble);
+                                                        } else {
+                                                            void selectBubble(bubbleId);
+                                                        }
                                             }}
                                             onKeyDown={(event) => {
                                                 if (event.key === "Enter" || event.key === " ") {
@@ -645,23 +651,23 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                     role="slider"
                                                     tabIndex={0}
                                                     aria-label={t("lettering.workspace.positionHandle")}
-                                                    aria-valuetext={`${bubble.textLayout?.blockAlign ?? "start"} ${bubble.textLayout?.inlineAlign ?? "start"}`}
+                                                    aria-valuetext={`${bubble.textLayout?.blockAlign ?? "start"} ${bubble.textLayout?.inlineAlign ?? "start"} ${bubble.textLayout?.offsetXPercent ?? 0} ${bubble.textLayout?.offsetYPercent ?? 0}`}
                                                     style={anchorHandleStyle(bubble)}
                                                     onPointerDown={(event) => {
                                                         event.preventDefault();
                                                         event.stopPropagation();
                                                         event.currentTarget.setPointerCapture(event.pointerId);
                                                         setDraggingAnchorBubbleId(bubbleId);
-                                                        snapSelectedBubbleAnchor(event, bubble);
+                                                        dragSelectedBubbleOffset(event, bubble);
                                                     }}
                                                     onPointerMove={(event) => {
                                                         if (draggingAnchorBubbleId !== bubbleId) return;
                                                         event.preventDefault();
-                                                        snapSelectedBubbleAnchor(event, bubble);
+                                                        dragSelectedBubbleOffset(event, bubble);
                                                     }}
                                                     onPointerUp={(event) => {
                                                         event.preventDefault();
-                                                        snapSelectedBubbleAnchor(event, bubble);
+                                                        dragSelectedBubbleOffset(event, bubble);
                                                         setDraggingAnchorBubbleId("");
                                                         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
                                                             event.currentTarget.releasePointerCapture(event.pointerId);
@@ -724,11 +730,38 @@ export default function LetteringWorkspace({ currentUser }: LetteringWorkspacePr
                                                 key={`${blockAlign}-${inlineAlign}`}
                                                 className={selectedBubble.textLayout?.blockAlign === blockAlign && selectedBubble.textLayout?.inlineAlign === inlineAlign ? "is-active" : ""}
                                                 disabled={!canManageLettering}
-                                                onClick={() => updateTextLayout({ blockAlign, inlineAlign })}
+                                                onClick={() => updateTextLayout({ blockAlign, inlineAlign, offsetXPercent: 0, offsetYPercent: 0 })}
                                                 aria-label={`${blockAlign} ${inlineAlign}`}
                                             />
                                         )),
                                     )}
+                                </div>
+                            </div>
+
+                            <div className="bubble-field-grid">
+                                <div className="form-group">
+                                    <label>{t("structure.lettering.offsetXPercent")}</label>
+                                    <input
+                                        type="number"
+                                        min={-100}
+                                        max={100}
+                                        step={0.5}
+                                        value={selectedBubble.textLayout?.offsetXPercent ?? 0}
+                                        disabled={!canManageLettering}
+                                        onChange={(event) => updateTextLayout({ offsetXPercent: clampOffsetPercent(Number(event.target.value)) })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>{t("structure.lettering.offsetYPercent")}</label>
+                                    <input
+                                        type="number"
+                                        min={-100}
+                                        max={100}
+                                        step={0.5}
+                                        value={selectedBubble.textLayout?.offsetYPercent ?? 0}
+                                        disabled={!canManageLettering}
+                                        onChange={(event) => updateTextLayout({ offsetYPercent: clampOffsetPercent(Number(event.target.value)) })}
+                                    />
                                 </div>
                             </div>
 

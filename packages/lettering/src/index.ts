@@ -2,6 +2,8 @@ export interface BubbleTextLayoutLike {
     lines?: string[];
     inlineAlign?: "start" | "center" | "end";
     blockAlign?: "start" | "center" | "end";
+    offsetXPercent?: number;
+    offsetYPercent?: number;
     source?: "manual" | "imported" | "ocr";
 }
 
@@ -43,6 +45,8 @@ export interface LetteringRenderResult {
     fitMode: "auto" | "shrink" | "fixed";
     inlineAlign?: "start" | "center" | "end";
     blockAlign?: "start" | "center" | "end";
+    offsetXPercent?: number;
+    offsetYPercent?: number;
     style: string;
     fit: LetteringFitEstimate;
 }
@@ -92,11 +96,15 @@ export const sanitizeTextLayout = (value: unknown): BubbleTextLayoutLike | undef
         : undefined;
     const inlineAlign = isAlignValue(value.inlineAlign) ? value.inlineAlign : undefined;
     const blockAlign = isAlignValue(value.blockAlign) ? value.blockAlign : undefined;
+    const offsetXPercent = numberInRange(value.offsetXPercent, -100, 100);
+    const offsetYPercent = numberInRange(value.offsetYPercent, -100, 100);
     const source = isLayoutSourceValue(value.source) ? value.source : undefined;
     const sanitized: BubbleTextLayoutLike = {
         ...(lines && lines.length > 0 && { lines }),
         ...(inlineAlign && { inlineAlign }),
         ...(blockAlign && { blockAlign }),
+        ...(offsetXPercent !== undefined && { offsetXPercent }),
+        ...(offsetYPercent !== undefined && { offsetYPercent }),
         ...(source && { source }),
     };
     return Object.keys(sanitized).length > 0 ? sanitized : undefined;
@@ -247,6 +255,7 @@ export const buildLetteringStyle = (input: {
     page: LetteringPageSize;
     text: string;
     displayDirection: "horizontal" | "vertical";
+    textLayout?: BubbleTextLayoutLike;
     textStyle?: BubbleTextStyleLike;
     fitMode?: "auto" | "shrink" | "fixed";
 }) => {
@@ -254,6 +263,8 @@ export const buildLetteringStyle = (input: {
     const pageHeight = Number(input.page.height ?? 1);
     const bbox = input.bbox ?? { x: 0, y: 0, width: 0, height: 0 };
     const fitMode = input.fitMode ?? resolvedFitMode(input.textStyle);
+    const offsetX = Number(input.bbox.width ?? 0) * Number(input.textLayout?.offsetXPercent ?? 0) / 100;
+    const offsetY = Number(input.bbox.height ?? 0) * Number(input.textLayout?.offsetYPercent ?? 0) / 100;
     const fit = estimateLetteringFit({
         text: input.text,
         bbox,
@@ -268,6 +279,8 @@ export const buildLetteringStyle = (input: {
             `width:${pct(Number(bbox.width ?? 0), pageWidth)}`,
             `height:${pct(Number(bbox.height ?? 0), pageHeight)}`,
             `--overlay-fit:${initialFit.toFixed(4)}`,
+            `--overlay-manual-offset-x:${styleNumberToCqw(offsetX, pageWidth)}`,
+            `--overlay-manual-offset-y:${styleNumberToCqw(offsetY, pageWidth)}`,
             ...(input.textStyle?.fontSizePx !== undefined ? [`--overlay-manual-font-size:${styleNumberToCqw(input.textStyle.fontSizePx, pageWidth)}`] : []),
             ...(input.textStyle?.fontWeight !== undefined ? [`--overlay-font-weight:${input.textStyle.fontWeight}`] : []),
             ...(input.textStyle?.lineHeight !== undefined ? [`--overlay-line-height:${input.textStyle.lineHeight}`] : []),
@@ -298,6 +311,7 @@ export const buildLetteringRender = (input: {
         page: input.page,
         text,
         displayDirection: input.displayDirection,
+        textLayout,
         textStyle,
         fitMode,
     });
@@ -306,6 +320,8 @@ export const buildLetteringRender = (input: {
         fitMode,
         inlineAlign: textLayout?.inlineAlign,
         blockAlign: textLayout?.blockAlign,
+        offsetXPercent: textLayout?.offsetXPercent,
+        offsetYPercent: textLayout?.offsetYPercent,
         style,
         fit,
     };

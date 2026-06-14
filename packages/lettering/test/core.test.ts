@@ -21,10 +21,13 @@ test("sanitizeTextLayout and sanitizeTextStyle clamp invalid reader fields defen
         lines: ["A", 1, "B"],
         inlineAlign: "center",
         blockAlign: "bad",
+        offsetXPercent: 12,
+        offsetYPercent: 120,
         source: "manual",
     }), {
         lines: ["A", "B"],
         inlineAlign: "center",
+        offsetXPercent: 12,
         source: "manual",
     });
 
@@ -66,6 +69,8 @@ test("buildLetteringRender emits Phase 0-compatible style variables", () => {
                 lines: ["Hel", "lo"],
                 inlineAlign: "center",
                 blockAlign: "end",
+                offsetXPercent: 10,
+                offsetYPercent: -5,
             },
             textStyle: {
                 fontSizePx: 24,
@@ -86,9 +91,13 @@ test("buildLetteringRender emits Phase 0-compatible style variables", () => {
     assert.equal(render.fitMode, "fixed");
     assert.equal(render.inlineAlign, "center");
     assert.equal(render.blockAlign, "end");
+    assert.equal(render.offsetXPercent, 10);
+    assert.equal(render.offsetYPercent, -5);
     assert.equal(render.style.includes("left:8.3333%"), true);
     assert.equal(render.style.includes("top:12.5000%"), true);
     assert.equal(render.style.includes("--overlay-fit:1.0000"), true);
+    assert.equal(render.style.includes("--overlay-manual-offset-x:2.5000cqw"), true);
+    assert.equal(render.style.includes("--overlay-manual-offset-y:-0.5000cqw"), true);
     assert.equal(render.style.includes("--overlay-manual-font-size:2.0000cqw"), true);
     assert.equal(render.style.includes("--overlay-font-weight:700"), true);
     assert.equal(render.style.includes("--overlay-line-height:1.2"), true);

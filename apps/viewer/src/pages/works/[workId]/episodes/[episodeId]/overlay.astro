@@ -428,7 +428,10 @@ const canonicalPath = `/works/${encodeURIComponent(workId)}/episodes/${encodeURI
     max-inline-size: 100%;
     overflow-wrap: inherit;
     text-wrap: inherit;
-    transform: translate(var(--overlay-shift-x, 0), var(--overlay-shift-y, 0));
+    transform: translate(
+      calc(var(--overlay-shift-x, 0px) + var(--overlay-manual-offset-x, 0px)),
+      calc(var(--overlay-shift-y, 0px) + var(--overlay-manual-offset-y, 0px))
+    );
     white-space: inherit;
     word-break: inherit;
   }
